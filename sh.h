@@ -258,6 +258,7 @@ extern int setpgrp();
 #  endif /* _MINIX */
 # endif /* !pyr && !stellar */
 #endif /* SYSVREL > 0 ||  _IBMR2 */
+#include <time.h>
 
 #if !((defined(SUNOS4) || defined(_MINIX)) && defined(TERMIO))
 # if !defined(COHERENT) && !defined(_VMS_POSIX)
