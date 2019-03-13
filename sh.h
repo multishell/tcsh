@@ -266,6 +266,7 @@ extern pid_t setpgrp();
 #  endif /* _MINIX */
 # endif /* !pyr && !stellar */
 #endif /* SYSVREL > 0 ||  _IBMR2 */
+#include <time.h>
 
 #if !((defined(SUNOS4) || defined(_MINIX) || defined(DECOSF1)) && defined(TERMIO))
 # if !defined(COHERENT) && !defined(_VMS_POSIX)
