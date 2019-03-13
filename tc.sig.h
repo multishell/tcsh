@@ -55,12 +55,12 @@
 /*
  * sigvec is not the same everywhere
  */
-# ifdef _SEQUENT_
+//# ifdef _SEQUENT_
 #  define HAVE_SIGVEC
 #  define mysigvec(a, b, c)	sigaction(a, b, c)
 typedef struct sigaction sigvec_t;
 #  define sv_handler sa_handler
-# endif	/* _SEQUENT */
+//# endif	/* _SEQUENT */
 
 # ifdef hpux
 #  define HAVE_SIGVEC
