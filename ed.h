@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.h,v 3.2 1991/07/16 11:36:42 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.h,v 3.4 1991/07/29 22:41:12 christos Exp $ */
 /*
  * ed.h: Editor declarations and globals
  */
@@ -104,7 +104,7 @@ EXTERN struct termio nio;
 EXTERN struct termio xio;
 EXTERN struct termio testio;
 
-#  if defined(OREO) || defined(hpux) || defined(_IBMR2)
+#  if (defined(OREO) || defined(hpux) || defined(_IBMR2)) && !defined(hp9000s500)
 EXTERN struct ltchars nlc;
 EXTERN struct ltchars xlc;
 EXTERN struct ltchars testlc;
@@ -182,7 +182,6 @@ EXTERN Char CurrentHistLit;	/* Literal status of current show history line */
  * These are truly extern
  */
 extern Char PromptBuf[];
-extern short SHIN, SHOUT;
 extern int MacroLvl;
 
 EXTERN Char *KeyMacro[MAXMACROLEVELS];

@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.dir.c,v 3.1 1991/07/15 19:37:24 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.dir.c,v 3.3 1991/07/31 07:12:20 christos Exp $ */
 /*
  * sh.dir.c: Directory manipulation functions
  */
@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-RCSID("$Id: sh.dir.c,v 3.1 1991/07/15 19:37:24 christos Exp $")
+RCSID("$Id: sh.dir.c,v 3.3 1991/07/31 07:12:20 christos Exp $")
 
 
 #include "sh.h"
@@ -268,11 +268,12 @@ dnormalize(cp)
     Char   *cp;
 {
 
-#define UC (unsigned char)
-#define ISDOT(c) (UC(c)[0] == '.' && ((UC(c)[1] == '\0') || (UC(c)[1] == '/')))
-#define ISDOTDOT(c) (UC(c)[0] == '.' && ISDOT(&((c)[1])))
+#define TRM(a) ((a) & TRIM)
+#define ISDOT(c) (TRM((c)[0]) == '.' && ((TRM((c)[1]) == '\0') || \
+		  (TRM((c)[1]) == '/')))
+#define ISDOTDOT(c) (TRM((c)[0]) == '.' && ISDOT(&((c)[1])))
 
-    if ((unsigned char) cp[0] == '/')
+    if (TRM(cp[0]) == '/')
 	return (Strsave(cp));
 
 #ifdef S_IFLNK
@@ -320,7 +321,7 @@ dnormalize(cp)
 		break;
 
 	if (*cp) {
-	    if (((unsigned char) cwd[(dotdot = Strlen(cwd)) - 1]) != '/')
+	    if ((TRM(cwd[(dotdot = Strlen(cwd)) - 1])) != '/')
 		cwd[dotdot++] = '/';
 	    cwd[dotdot] = '\0';
 	    dp = Strspl(cwd, cp);
@@ -977,14 +978,7 @@ dcanon(cp, p)
 	    /*
 	     * Use STRhome to make '~' work
 	     */
-	    p2 = cp + Strlen(p2);
-	    sp = newcp = (Char *) xmalloc((size_t)
-					  ((cc + Strlen(p2)) * sizeof(Char)));
-	    while (*p1)
-		*sp++ = *p1++;
-	    while (*p2)
-		*sp++ = *p2++;
-	    *sp = '\0';
+	    newcp = Strspl(p1, cp + Strlen(p2));
 	    xfree((ptr_t) cp);
 	    cp = newcp;
 	}

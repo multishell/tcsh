@@ -1,3 +1,14 @@
+V6.00.02, 08/05/91 [For comp.sources.unix]
+8.  tcsh will always set $LOGNAME and $USER if not already set in the
+    environment.
+7.  added $histfile.
+6.  echo `echo` * and  echo ~ {} were broken
+5.  setty builtin addition
+4.  Multiple : modifiers [experimental, disabled with -DCOMPAT]
+3.  7 bit fixes, and hp9000s500.
+2.  #undef DEBUG in tc.alloc.c, so we continue if we get a bad free() 
+1.  getn() is now protected against NULL strings.
+
 V6.00.01, 07/16/91
 17. added beepcmd, and fixed small tenematch bugs.
 16. Renamed DUP2 flag to HAVEDUP2 cause AIXPS2 defines DUP2 already.

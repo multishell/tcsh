@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.h,v 3.4 1991/07/15 19:37:24 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.h,v 3.11 1991/08/05 23:02:13 christos Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -64,7 +64,7 @@ typedef char Char;
  * [The 4.2/3BSD vax compiler does not like that]
  */
 #ifdef SIGVOID
-# if defined(vax) && !defined(__GNUC__)
+# if (defined(vax) || defined(uts)) && !defined(__GNUC__)
 #  define sigret_t void
 # else
 typedef void sigret_t;
@@ -73,20 +73,6 @@ typedef void sigret_t;
 typedef int sigret_t;
 #endif /* SIGVOID */
 
-/*
- * ANSIisms...
- */
-#ifndef __P
-# if __STDC__
-#  define __P(a) a
-# else
-#  define __P(a) ()
-#  define const
-#  ifndef apollo
-#   define volatile	/* Apollo 'c' extensions need this */
-#  endif /* apollo */
-# endif 
-#endif 
 
 /*
  * Fundamental definitions which may vary from system to system.
@@ -222,7 +208,11 @@ extern int setpgrp();
 #ifdef DIRENT
 # include <dirent.h>
 #else
-# include <sys/dir.h>
+# ifdef hp9000s500
+#  include <ndir.h>
+# else
+#  include <sys/dir.h>
+# endif
 # define dirent direct
 #endif /* DIRENT */
 #ifdef hpux
@@ -236,6 +226,24 @@ extern int setpgrp();
 #else
 # include <string.h>
 #endif /* BSD */
+
+
+/*
+ * ANSIisms... These must be *after* the system include and 
+ * *before* our includes, so that BSDreno has time to define __P
+ */
+#ifndef __P
+# if __STDC__
+#  define __P(a) a
+# else
+#  define __P(a) ()
+#  define const
+#  ifndef apollo
+#   define volatile	/* Apollo 'c' extensions need this */
+#  endif /* apollo */
+# endif 
+#endif 
+
 
 typedef int bool;
 
@@ -373,14 +381,20 @@ struct tms shtimes;		/* shell and child times for process timing */
  * Miscellany
  */
 Char   *doldol;			/* Character pid for $$ */
+time_t  chktim;			/* Time mail last checked */
+
+/*
+ * Ideally these should be uid_t, gid_t, pid_t. I cannot do that right now
+ * cause pid's could be unsigned and that would break our -1 flag, and 
+ * uid_t and gid_t are not defined in all the systems so I would have to
+ * make special cases for them. In the future...
+ */
 int     uid;			/* Invokers uid */
 int     gid;			/* Invokers gid */
-time_t  chktim;			/* Time mail last checked */
-int     shpgrp;			/* Pgrp of shell */
-int     tpgrp;			/* Terminal process group */
-
-/* If tpgrp is -1, leave tty alone! */
-int     opgrp;			/* Initial pgrp and tty pgrp */
+int     opgrp,			/* Initial pgrp and tty pgrp */
+        shpgrp,			/* Pgrp of shell */
+        tpgrp;			/* Terminal process group */
+				/* If tpgrp is -1, leave tty alone! */
 
 Char    PromptBuf[256];		/* buffer for the actual printed prompt. this
 				 * is used in tenex.c and sh.c for pegets.c */
@@ -393,10 +407,10 @@ Char    PromptBuf[256];		/* buffer for the actual printed prompt. this
  * The desired initial values for these descriptors are defined in
  * sh.local.h.
  */
-short   SHIN;			/* Current shell input (script) */
-short   SHOUT;			/* Shell output */
-short   SHDIAG;			/* Diagnostic output... shell errs go here */
-short   OLDSTD;			/* Old standard input (def for cmds) */
+int   SHIN;			/* Current shell input (script) */
+int   SHOUT;			/* Shell output */
+int   SHDIAG;			/* Diagnostic output... shell errs go here */
+int   OLDSTD;			/* Old standard input (def for cmds) */
 
 /*
  * Error control
@@ -424,7 +438,7 @@ sigret_t (*parterm) ();		/* Parents terminate catch */
  * Lexical definitions.
  *
  * All lexical space is allocated dynamically.
- * The eighth/sizteenth bit of characters is used to prevent recognition,
+ * The eighth/sixteenth bit of characters is used to prevent recognition,
  * and eventually stripped.
  */
 #define		META		0200
@@ -462,7 +476,7 @@ struct Bin {
     off_t   Bfseekp;		/* Seek pointer */
     off_t   Bfbobp;		/* Seekp of beginning of buffers */
     off_t   Bfeobp;		/* Seekp of end of buffers */
-    short   Bfblocks;		/* Number of buffer blocks */
+    int     Bfblocks;		/* Number of buffer blocks */
     Char  **Bfbuf;		/* The array of buffer blocks */
 }       B;
 
@@ -606,13 +620,13 @@ struct command {
 extern struct biltins {
     char   *bname;
     void    (*bfunct) __P((Char **, struct command *));
-    short   minargs, maxargs;
+    int     minargs, maxargs;
 }       bfunc[];
 extern int nbfunc;
 
 extern struct srch {
     char   *s_name;
-    short   s_value;
+    int     s_value;
 }       srchn[];
 extern int nsrchn;
 
@@ -661,7 +675,7 @@ Char  **alvec;			/* The (remnants of) alias vector */
 /*
  * Filename/command name expansion variables
  */
-short   gflag;			/* After tglob -> is globbing needed? */
+int   gflag;			/* After tglob -> is globbing needed? */
 
 #define MAXVARLEN 30		/* Maximum number of char in a variable name */
 
@@ -721,6 +735,9 @@ Char    HISTSUB;		/* auto-substitute character */
 extern char *sys_errlist[];
 extern int errno, sys_nerr;
 
+#ifdef strerror
+# undef strerror
+#endif 
 #define strerror(e) ((e) < sys_nerr && (e) >= 0 ? sys_errlist[(e)] :\
 		"Unknown Error")
 
@@ -746,7 +763,7 @@ extern int errno, sys_nerr;
 #define str2short(a) 		(a)
 #define blk2short(a) 		saveblk(a)
 #define short2blk(a) 		saveblk(a)
-#define short2str(a) 		(a)
+#define short2str(a) 		strip(a)
 #else
 #define Strchr(a, b)   	s_strchr(a, b)
 #define Strrchr(a, b) 		s_strrchr(a, b)

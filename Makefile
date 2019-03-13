@@ -79,12 +79,15 @@ LIBES= -ltermcap		## BSD style things, hpux
 #LIBES= -lcurses -lnet		## Sys V3 with networking
 #LIBES= -lcurses -ldir		## Sys V2 w/o networking [needs directory lib]
 #LIBES= -lcurses -ldir -lnet	## Sys V2 with networking [needs directory lib]
+#LIBES= -lcurses -lsocket -lbsd	## Amdahl UTS 2.1
 #LIBES= -lcurses -lbsd		## For Irix3.1 on SGI-IRIS4D
 #LIBES= -lcurses -lsun -lbsd -lc_s ## For Irix3.3 on SGI-IRIS4D (w/ yp)
 #LIBES= -lcurses -lbsd -lc_s	## For Irix3.3 on SGI-IRIS4D (wo/ yp)
 #LIBES= -lcurses -lbsd		## For aix on an IBM 370 or rs6000 or ps2
 #LIBES= -lcurses -lcposix	## ISC 2.2 
+#LIBES= -lcposix -lc_s -lcurses -linet ## ISC 2.2 with networking
 #LIBES= -ltermcap -ldir -lx	## Xenix 386 style things
+#LIBES= -lcurses -lintl		## SCO SysVR3.2v2.0
 #LIBES= -lposix -ltermcap	## A/UX 2.0
 #LIBES= -ltermcap -lseq		## Sequent's Dynix
 #LIBES= -lcurses -lsocket	## Intel's hypercube
@@ -109,9 +112,10 @@ SCCS=	/usr/local/sccs
 PARALLEL=12				# Make the multi-max run fast.
 #P=&					# Use Sequent's parallel make
 P=
-DESTDIR=/usr/local/bin
+DESTDIR=/usr/local
 MANSECT=1
-DESTMAN=/usr/local/man/man${MANSECT}
+DESTBIN=${DESTDIR}/bin
+DESTMAN=${DESTDIR}/man/man${MANSECT}
 FTPAREA=/usr/spool/ftp
 
 ASSRCS=	sh.c sh.dir.c sh.dol.c sh.err.c sh.exec.c sh.char.c \
@@ -256,10 +260,10 @@ vgrind:
 	@vgrind -t -x -h Index index >/crp/bill/csh/index.t
 
 install: tcsh 
-	-mv  ${DESTDIR}/tcsh  ${DESTDIR}/tcsh.old
-	cp tcsh ${DESTDIR}/tcsh
-	strip ${DESTDIR}/tcsh
-	chmod 555 ${DESTDIR}/tcsh
+	-mv  ${DESTBIN}/tcsh  ${DESTBIN}/tcsh.old
+	cp tcsh ${DESTBIN}/tcsh
+	strip ${DESTBIN}/tcsh
+	chmod 555 ${DESTBIN}/tcsh
 
 manpage: tcsh.man
 	cp tcsh.man ${DESTMAN}/tcsh.${MANSECT}
@@ -341,25 +345,25 @@ ftp: tcsh-${VERSION}.tar.Z tcsh.tahoe-${VERSION}.tar.Z
 #
 config.h: config_f.h
 
-tc.h: tc.const.h tc.decls.h tc.os.h tc.sig.h
-sh.h: sh.types.h sh.char.h sh.err.h sh.dir.h sh.proc.h pathnames.h \
-      sh.decls.h tc.h
-tw.h: tw.decls.h
-ed.h: ed.decls.h
+TCH=tc.h tc.const.h tc.decls.h tc.os.h tc.sig.h
+SHH=sh.h sh.types.h sh.char.h sh.err.h sh.dir.h sh.proc.h pathnames.h \
+    sh.decls.h ${TCH}
+TWH=tw.h tw.decls.h
+EDH=ed.h ed.decls.h
 
-# ed.h
+# EDH
 EDINC=sh.${SUF} sh.func.${SUF} sh.lex.${SUF} sh.print.${SUF} sh.proc.${SUF} \
       sh.set.${SUF} tc.bind.${SUF} tc.os.${SUF} tc.prompt.${SUF} \
       tc.sched.${SUF} tw.parse.${SUF}
-${EDOBJS} ${EDINC} : ed.h
+${EDOBJS} ${EDINC} : ${EDH}
 
-# sh.h
-${OBJS}: config.h sh.h
+# SHH
+${OBJS}: config.h ${SHH}
 
-# tw.h:
+# TWH
 TWINC=ed.chared.${SUF} ed.inputl.${SUF} sh.exec.${SUF} sh.func.${SUF} \
       sh.set.${SUF} tc.func.${SUF}
-${TWOBJS} ${TWINC}: tw.h
+${TWOBJS} ${TWINC}: ${TWH}
 
 # glob.h
 glob.${SUF} sh.glob.${SUF}: glob.h

@@ -31,35 +31,33 @@
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
  */
-#ifdef NeXT
-# undef VFORK
-#endif
+#undef VFORK
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and
  *		a tty that deals correctly
  */
-#define BSDJOBS
+#undef BSDJOBS
 
 /*
  * BSDSIGS	You have 4.2-style signals, rather than USG style.
  *		Note: POSIX systems should not define this unless they
  *		have sigvec() and friends (ie: 4.3BSD-RENO, HP-UX).
  */
-#define BSDSIGS
+#undef BSDSIGS
 
 /*
  * BSDTIMES	You have BSD-style process time stuff (like rusage)
  *		This may or may not be true.  For example, Apple Unix
  *		(OREO) has BSDJOBS and BSDSIGS but not BSDTIMES.
  */
-#define BSDTIMES
+#undef BSDTIMES
 
 /*
  * BSDNICE	Your system uses setpriority() instead of nice, to
  *		change a processes scheduling priority
  */
-#define BSDNICE
+#undef BSDNICE
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
@@ -76,7 +74,7 @@
  *		Set SVID to 1, 2, or 3, depending the version of System V
  *		you are running. Or set it to 0 if you are not SVID based
  */
-#define SVID	0
+#define SVID	1
 
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
@@ -88,11 +86,7 @@
  * SIGVOID	Define this if your signal handlers return void.  On older
  *		systems, signal returns int, but on newer ones, it returns void.
  */
-#ifdef NeXT
-# define SIGVOID 
-#else
-# undef SIGVOID 
-#endif
+#undef SIGVOID 
 
 /*
  * HAVEDUP2	Define this if your system supports dup2().
@@ -102,26 +96,20 @@
 /*
  * UTHOST	Does the utmp file have a host field?
  */
-#define UTHOST
+#undef UTHOST
 
 /*
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
  */
 #undef DIRENT
+
 /****************** local defines *********************/
-#ifdef NeXT
-#define environ _environ
-/* strcoll() on the NeXT appears to have 3 args, but only 2 args in tcsh src */
-#define NOSTRCOLL
-#else
-#define SETENV_IN_LIB
-#define setenv(x,y) Setenv(x,y)
-#endif
+#define register
+#define void int
+#define HAVENOLIMIT
 
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
 
-#ifndef NeXT
 #undef NLS
-#endif

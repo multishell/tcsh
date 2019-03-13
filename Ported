@@ -8,7 +8,7 @@ christos
 
 
 VENDOR	:	sun
-MODELS	:	sun3, sun4
+MODELS	:	sun3, sun4, sun386i
 COMPILER:	cc, gcc
 CFLAGS	:	normal
 LIBES	:	-ltermcap
@@ -40,6 +40,18 @@ ENVIRON	:	n/a
 NOTES	:	Don't use -lBSD; breaks getpgrp(). Config.hp-3.2 obsolete?
 VERSION	:	6.00.01
 
+VENDOR	:	hp
+MODELS	:	hp9000s500
+COMPILER:	cc
+CFLAGS	:	-I. -O
+LIBES	:	-ltermcap
+OS	:	hpux 5.2
+CONFIG	:	config.hp-5.2
+ENVIRON	:	n/a
+NOTES	:	very slow in executing commands (I think the reason is
+NOTES	:	a very slow fork)
+VERSION	:	6.00.01
+
 VENDOR	:	digital
 MODELS	:	vax
 COMPILER:	cc, gcc
@@ -62,19 +74,19 @@ ENVIRON	:	n/a
 NOTES	:	cc broken: typedef void sigret_t;
 VERSION	:	6.00.00
 
-
 VENDOR	:	digital
 MODELS	:	vax, decstation
 COMPILER:	cc
 CFLAGS	:	normal
 LIBES	:	-ltermcap
-OS	:	ultrix 3.5, 4.0, 4.1, 4.2
+OS	:	ultrix 3.0 (vax), 3.5, 4.0, 4.1, 4.2
 CONFIG	:	config.ultrix 
 ENVIRON	:	n/a
 NOTES	:	pcc broken: typedef void sigret_t (vax); 
 NOTES	:	mips compiler on ultrix 3.5 needs -Dvoid=int
+NOTES	:	vax compiler on ultrix 3.0 needs -Dvoid=int
 NOTES	:	Does Ultrix 4.x still need YPBUGS?
-VERSION	:	6.00.00
+VERSION	:	6.00.01
 
 VENDOR	:	apple
 MODELS	:	macII
@@ -179,3 +191,80 @@ NOTES	:	For early reno systems need to uncomment definition of
 NOTES	:	speed_t in sh.types.h and append "#undef NLS" and
 NOTES	:	"#define SYSMALLOC" to end of config.h
 VERSION	:	6.00.01
+
+VENDOR	:	pyramid
+MODELS	:	?
+COMPILER:	cc
+CFLAGS	:	-I. -O -DBSD
+LIBES	:	-ltermcap
+OS	:	?
+CONFIG	:	config.bsd
+ENVIRON	:	n/a
+NOTES	:	none
+VERSION	:	6.00.01
+
+VENDOR	:	alliant
+MODELS	:	FX/8X series
+COMPILER:	pcc
+CFLAGS	:	normal
+LIBES	:	-ltermcap
+OS	:	Concentrix 5.7.00
+CONFIG	:	config.bsd
+ENVIRON	:	n/a
+NOTES	:	n/a
+VERSION	:	6.00.01
+
+VENDOR	:	next
+MODELS	:	any
+COMPILER:	cc
+CFLAGS	:	normal
+LIBES	:	-ltermcap -lcs
+OS	:	next os 2.x
+CONFIG	:	config.mach
+ENVIRON	:	n/a
+NOTES	:	n/a
+VERSION	:	6.00.01
+
+VENDOR	:	Heurikon
+MODELS	:	HK68
+COMPILER:	gcc (Green Hills C-68000)
+CFLAGS	:	-ga -X138 -X25 -I.
+LDFLAGS	:	-n
+LIBES	:	-lcurses -ltermcap -ldirent
+OS	:	UniPlus+ 5.0
+CONFIG	:	config.hk68
+ENVIRON	:	n/a
+NOTES	:	Need Doug Gwyn's POSIX directory library (libdirent.a)
+VERSION	:	6.00.01
+
+VENDOR	:	Amdahl
+MODELS	:	n/a
+COMPILER:	cc/gcc
+CFLAGS	:	normal
+LIBES	: 	-lcurses -lsocket -lbsd	
+CONFIG	:	config.amdahl
+ENVIRON	:	n/a
+VERSION	:	6.00.01
+
+VENDOR	:	prime
+MODELS	:	exl 300 series
+COMPILER:	cc
+CFLAGS	:	-O -s -I.
+LIBES	:	-lcurses -lstcp
+OS	:	system v.3.1.2
+CONFIG	:	config.sysv
+ENVIRON	:	sysv
+NOTES	:	Is libstcp.a on all exl 300s?
+VERSION	:	6.00.01
+
+VENDOR  :       convex
+MODELS  :       c220
+COMPILER:       cc
+CFLAGS  :       normal
+LIBES   :       -ltermcap
+OS      :       9.0.6 (bsd 4.3)
+CONFIG  :       config.convex
+ENVIRON :       n/a
+NOTES   :       Dont use the -pcc flag.
+	:	Use setty to fix the default tty settings.
+VERSION :       6.00.01

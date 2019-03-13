@@ -1,5 +1,5 @@
 
-Last Updated: Wed Feb 27 17:06:15 EST 1991
+Last Updated: Sun Jul 21 16:02:05 EDT 1991
 
 This is for people that do not read the manual!
 
@@ -51,8 +51,8 @@ be able to get it... :-)
 
 4.  Where can I get csh sources? 
 
-    Csh sources are not public domain. If you do not have an AT&T V3.2 source
-    licence or better, you are stuck.
+    Csh sources are now available with the 4.4BSD networking distributions.
+    You don't need csh sources to compile tcsh-6.00.
 
 5.  I just made tcsh my login shell, and I cannot ftp any more?
 

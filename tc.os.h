@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.os.h,v 3.3 1991/07/16 11:39:38 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.os.h,v 3.12 1991/08/06 02:00:24 christos Exp $ */
 /*
  * tc.os.h: Shell os dependent defines
  */
@@ -73,7 +73,9 @@ struct ucred {
 #  define CSUSP 032
 # endif	/* CSUSP */
 
-# include <sys/bsdtty.h>
+# ifndef hp9000s500
+#  include <sys/bsdtty.h>
+# endif
 
 # ifndef POSIX
 #  ifdef BSDJOBS
@@ -91,14 +93,23 @@ struct ucred {
 #  define CSUSP 032
 # endif	/* CSUSP */
 #endif /* ISC */
-#ifdef HYPERCUBE
+
+/*
+ * XXX: This will be changed soon to 
+ * #if (SVID > 0) && defined(TIOCGWINSZ)
+ * If that breaks on your machine, let me know.
+ */
+#if defined(INTEL) || defined(u3b2) || defined (u3b5) || \
+    defined(ub15) || defined(u3b20d) || defined(ISC) || defined(SCO) 
+#ifdef TIOCGWINSZ
 /*
  * for struct winsiz
  */
 # include <sys/stream.h>
 # include <sys/ptem.h>
+#endif /* TIOCGWINSZ */
 # define NEEDgethostname
-#endif /* HYPERCUBE */
+#endif /* INTEL || att || isc || sco */
 
 #ifdef IRIS4D
 # include <sys/time.h>
@@ -254,14 +265,13 @@ struct ucred {
 #endif /* DGUX */
 
 #ifdef SXA
-# ifndef BSDNICE
+# ifndef _BSDX_
 /*
- * We check BSDNICE cause this is not defined in config.sxa.
  * Only needed in the system V environment.
  */
-#  define setrlimit(a, b) 	bsd_setrlimit(a, b)
-#  define getrlimit(a, b)	bsd_getrlimit(a, b)
-# endif	/* BSDNICE */
+#  define setrlimit 	bsd_setrlimit
+#  define getrlimit	bsd_getrlimit
+# endif	/* _BSDX_ */
 # ifndef NOFILE
 #  define	NOFILE	64
 # endif	/* NOFILE */
@@ -326,8 +336,10 @@ extern int gethostname();
 extern int sigvec();
 extern int sigpause();
 #  else	/* _AIX370 || MACH || NeXT || _AIXPS2 */
+#   if !defined(apollo) || !defined(__STDC__)
 extern sigret_t sigvec();
 extern void sigpause();
+#   endif /* !apollo || !__STDC__ */
 #  endif /* _AIX370 || MACH || NeXT || _AIXPS2 */
 extern sigmask_t sigblock();
 extern sigmask_t sigsetmask();
@@ -400,6 +412,10 @@ extern char *getwd();
 # if defined(sun) && !defined(__GNUC__)
 extern char *getwd();
 # endif	/* sun && ! __GNUC__ */
+
+# ifdef SCO
+extern char *ttyname();   
+# endif /* SCO */
 
 # ifdef RENO
 extern void perror();		/* Reno declares that in stdio.h :-( */

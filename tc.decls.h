@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.decls.h,v 3.2 1991/07/16 10:45:07 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.decls.h,v 3.4 1991/08/05 23:02:13 christos Exp $ */
 /*
  * tc.decls.h: Function declarations from all the tcsh modules
  */
@@ -145,7 +145,7 @@ extern	int		  vfork		__P((void));
 extern	void		  doinlib	__P((Char **, struct command *));
 extern	void		  dover		__P((Char **, struct command *));
 extern	void		  dorootnode	__P((Char **, struct command *));
-extern	int		  getv		__P((Char **, struct command *));
+extern	int		  getv		__P((Char *));
 #endif
 
 
@@ -183,7 +183,7 @@ extern	void 		  sigpause	__P((int));
 # ifdef SXA
 extern	void 		  sigpause	__P((int));
 # endif
-extern	int 		  ourwait	__P((int *));
+extern	pid_t 		  ourwait	__P((int *));
 #endif
 #ifdef NEEDsignal
 extern	sigret_t	(*xsignal	__P((int, sigret_t (*)(int)))) ();

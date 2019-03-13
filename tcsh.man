@@ -1,5 +1,5 @@
-.\" $Id: tcsh.man,v 3.2 1991/07/16 11:01:44 christos Exp $
-.TH TCSH 1 "16 July 1991" "Cornell"
+\" $Id: tcsh.man,v 3.10 1991/08/06 02:00:24 christos Exp $
+.TH TCSH 1 "5 August 1991" "Cornell"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
@@ -77,7 +77,7 @@ executed at given times.
 .sp
 .ti -4
 18) An addition to the file expression syntax for a character not
-in a set of characters and the ability to negate a regular expression.
+in a set of characters and the ability to negate a globbing pattern.
 .sp
 .ti -4
 19) New automatically initialized environment variables \fIHOST\fR and
@@ -121,6 +121,9 @@ directory is changed.
 .sp
 .ti -4
 31) Additional/Undocumented Options
+.sp
+.ti -4
+32) Enhanced history/variable modifier expansion
 .RE
 .sp
 For a description of standard C-shell features, see the
@@ -221,7 +224,11 @@ left arrow	backward-char
 .DT
 .fi
 .sp
-Also the vt100 sequences for arrow keys are always bound.
+except where these bindings would alter other single character bindings.
+If this is not desired one can avoid the automatic arrow key binding using
+.I settc 
+to change the arrow key escape sequences to the empty string.
+The ansi/vt100 sequences for arrow keys are always bound.
 .PP
 The following is a list of the default emacs and vi bindings.
 Characters with the 8th bit set are written as M-<character>.
@@ -551,7 +558,55 @@ Some changes to the command keys will be obeyed, however if a command key
 is unset,
 .I tcsh
 will reset it to what it was.  Also, the shell will automatically turn off
-RAW and CBREAK modes, and will turn on the tty driver's output processing.
+RAW and CBREAK (on systems that use 
+.I termio(7) 
+it will turn on ICANON) modes, and will turn on 
+the tty driver's output processing (OPOST).
+.PP
+The list of the tty modes that are always set or cleared by 
+.I tcsh 
+can be examined and modified using the
+.I setty 
+builtin.  The
+.I setty
+display is similar to 
+.I stty(1),
+and varies depending on the system's tty driver. Modes that 
+.I tcsh 
+will always try to set are shown as
+.I "+mode"
+modes that 
+.I tcsh 
+will always try to clear are shown as
+.I "-mode"
+and modes that tcsh will track and allow to be modified are not shown by
+default, or if the 
+.I "-a"
+flag is given, are shown without a leading sign.
+For example if one wants to set the 
+.I echok
+flag and let the 
+.I echoe
+pass unchanged:
+.sp
+.nf
+.RS +.6i
+> setty 
+iflag:-inlcr -igncr +icrnl 
+oflag:+opost +onlcr -onlret 
+cflag:
+lflag:+isig +icanon +echo +echoe -echok -echonl -noflsh 
+      +echoctl -flusho +iexten 
+> setty +echok echoe
+> setty
+iflag:-inlcr -igncr +icrnl 
+oflag:+opost +onlcr -onlret 
+cflag:
+lflag:+isig +icanon +echo +echok -echonl -noflsh +echoctl 
+      -flusho +iexten 
+.RE
+.fi
+.sp
 .PP
 .SH "4. WORD COMPLETION"
 In typing commands,
@@ -1635,7 +1690,7 @@ specified.  For example:
 Note that the second form includes .Xdefaults and .Xinit because 'X'
 (and all the lower case letters) are outside of the range of a single '.'.
 .PP
-Also the ability to negate a regular expression has been added:
+Also the ability to negate a globbing pattern has been added:
 .sp
 .nf
 .RS +.6i
@@ -1688,34 +1743,40 @@ The current possible values are:
 .nf
 \fIaix370\fR		an IBM 370, running aix
 \fIalliant\fR		an Alliant FX series
+\fIamdahl\fR		an Amdahl running uts 2.1
 \fIapollo\fR		an Apollo running DomainOS
 \fIatt3b15\fR		an AT&T 3b15
-\fIatt3b20\fR		an AT&T 3b20
 \fIatt3b2\fR		an AT&T 3b2
+\fIatt3b20\fR		an AT&T 3b20
 \fIatt3b5\fR		an AT&T 3b5
 \fIbalance\fR		a Sequent Balance (32000 based)
 \fIbutterfly\fR		a BBN Computer Butterfly 1000
 \fIconvex\fR		a Convex
 \fIdecstation\fR	a DecStation XXXX
 \fIgould-np1\fR		a Gould NP1
+\fIhk68\fR		a Heurikon HK68 running Uniplus+ 5.0
 \fIhp300\fR		an HP 9000, series 300, running mtXinu
 \fIhp800\fR		an HP 9000, series 800, running mtXinu
 \fIhp9000s300\fR	an HP 9000, series 300, running hpux
+\fIhp9000s500\fR	an HP 9000, series 500, running hpux
 \fIhp9000s700\fR	an HP 9000, series 700, running hpux
 \fIhp9000s800\fR	an HP 9000, series 800, running hpux
 \fIhp\fR			an HP, running hpux
+\fIi386\fR		an Intel 386, generic
 \fIi386-mach\fR		an Intel 386, running mach
+\fIintel386\fR		an Intel 386, running INTEL's SVR3
 \fIiris3d\fR		a Silicon Graphics Iris 3000
 \fIiris4d\fR		a Silicon Graphics Iris 4D
+\fIisc386\fR		an Intel 386, running ISC
 \fIm88k\fR			an mc88000 CPU machine
 \fImac2\fR			an Apple Computer Macintosh II, running AUX
 \fImasscomp\fR			a Concurrent (Masscomp), running RTU
 \fImips\fR			another mips CPU
 \fImultimax\fR		an Encore Computer Corp. Multimax (32000 based)
-\fInext\fR			a NeXT computer
 \fInews\fR			a Sony NEWS 800 or 1700 workstation
 \fInews_mips\fR		a NeWS machine with mips CPU
 \fIns32000\fR		an NS32000 CPU machine
+\fInext\fR			a NeXT computer
 \fIpfa50\fR			a PFU/Fujitsu A-xx computer
 \fIps2\fR			an IBM PS/2, running aix
 \fIptx\fR			a Sequent Symmetry running DYNIX/ptx (386/486 based)
@@ -1723,13 +1784,15 @@ The current possible values are:
 \fIrs6000\fR		an IBM RS6000, running aix 
 \fIrt\fR			an IBM PC/RT, running BSD (AOS 4.3) or mach
 \fIrtpc\fR			an IBM PC/RT, running aix
-\fIsun2\fR			a Sun Microsystems series 2 workstation (68010 based)
-\fIsun386i\fR		a Sun Microsystems 386i workstation (386 based)
-\fIsun3\fR			a Sun Microsystems series 3 workstation (68020 based)
-\fIsun4\fR			a Sun Microsystems series 4 workstation (SPARC based)
+\fIsco386\fR		an Intel 386, running SCO
 \fIsun\fR			a Sun workstation of none of the above types
+\fIsun2\fR			a Sun Microsystems series 2 workstation (68010 based)
+\fIsun3\fR			a Sun Microsystems series 3 workstation (68020 based)
+\fIsun386i\fR		a Sun Microsystems 386i workstation (386 based)
+\fIsun4\fR			a Sun Microsystems series 4 workstation (SPARC based)
 \fIsymmetry\fR		a Sequent Symmetry running DYNIX 3 (386/486 based)
 \fItitan\fR		an Stardent Titan
+\fIunixpc\fR		an UNIX/PC running SVR1 att7300 aka att3b1
 \fIvax\fR			a Digital Equipment Corp. Vax (of any flavor)
 .DT
 .fi
@@ -1907,16 +1970,31 @@ now supports a special alias,
 .I cwdcmd,
 which if set holds a command that will be executed after changing the
 value of $cwd.  For example, if the user is running on an X window
-system xterm, and has done
+system 
+.I xterm(1),
+and a reparenting window manager that supports title bars such
+as 
+.I twm(1) and has done:
 .sp
 .RS +.6i
-> alias cwdcmd  'echo -n ^[]2 $hostname $cwd ^G'
+> alias cwdcmd  'echo -n "^[]2;${HOST}:$cwd ^G"'
 .RE
 .sp
 then the shell
-will change the title of the running xterm to be the name of the host,
-a colon, and the full current working directory.  Note that if a user
-defines
+will change the title of the running 
+.I xterm(1)
+to be the name of the host,
+a colon, and the full current working directory.  
+A more fancy way to do that is:
+.sp
+.RS +.6i
+> alias cwdcmd 'echo -n "]2;${HOST}:$cwd]1;${HOST}"'
+.RE
+.sp
+This will put the hostname and working directory on the title bar but
+only the hostname in the icon manager menu.
+.pp
+Note that if a user defines
 .I cwdcmd
 to contain a
 .I cd,
@@ -2240,6 +2318,54 @@ can pass that to the shell. (some versions of csh have it) (+*)
 Make the shell accept SIGQUIT, and behave when it is used under a debugger.
 Job control is disabled. (*)
 .sp
+.SH "32. HISTORY AND VARIABLE MODIFIER ENHANCEMENTS"
+.I Tcsh
+accepts more than one variable modifier per variable or history expansion. 
+For example, in 
+.I csh(1)
+the following command expands to:
+.sp
+.nf
+.RS +.6in
+% set a=/usr/local/foo.bar.baz
+% echo $a:t:r:e
+foo.bar.baz:r:e
+.RE
+.fi
+.sp
+but in 
+.I tcsh:
+.sp
+.nf
+.RS +.6in
+> set a=/usr/local/foo.bar.baz
+> echo $a:t:r:e
+bar
+.RE
+.fi
+.sp
+This bug fix changes slightly the input syntax of 
+.I csh,
+causing expressions of the form to have invalid syntax:
+.sp
+.nf
+.RS +.6in
+> set a=/usr/local/foo.bar.baz
+> echo $a:t:$cwd
+Unknown variable modifier.
+.RE
+.fi
+.sp
+Which is the correct behavior, since after the second colon a variable
+modifier is expected and `$' is found.  Expressions like this should be 
+re-written as:
+.sp
+.nf
+.RS +.6in
+> echo ${a:t}:$cwd
+.RE
+.fi
+.sp
 .SH FYI
 This shell uses cbreak mode but takes typed-ahead characters anyway.
 You can still use
@@ -2247,7 +2373,9 @@ You can still use
 to set some of the modes of your terminal (but not bindings).
 .PP
 This shell will restore your tty to a sane mode if it appears to
-return from some command in raw, cbreak, or noecho mode.
+return from some command in raw, cbreak, or noecho mode. This behavior
+can be changed using 
+.I setty.
 .PP
 .SH ENVIRONMENT
 HPATH -- path to look for command documentation
@@ -2296,6 +2424,12 @@ list possibilities on an ambiguous completion.
 .B autologout 
 number of minutes of inactivity before automatic logout.
 .TP 10
+.B backslash_quote
+makes the backslash quote \\, \', and ". This option changes the
+parsing mechanism for tcsh, and it can cause syntax errors in 
+.I csh
+scripts.
+.TP 10
 .B chase_symlinks 
 always resolve symbolic links to real names on cd, etc.
 .TP 10
@@ -2322,6 +2456,14 @@ is the line as it was input) instead of the shells lexical version. The current
 history line can be toggled between literal and lexical with the
 toggle-literal-history function.
 History lines saved at shell exit are also saved as this variable indicates.
+.TP 10
+.B histfile 
+If set, it contains the full path-name where a history file is read/written.
+It defaults to $home/.history. This is useful when sharing the same home
+directory in different machines, or if one wants to save all the histories
+in the tty sessions. It is usually set in .cshrc for interractive shells,
+because history is sourced between .cshrc and .login so that it is available
+from .login.
 .TP 10
 .B ignore_symlinks 
 don't resolve symbolic links to real names on cd, etc.
@@ -2483,7 +2625,7 @@ the command to be run every time
 wants to echo the terminal bell. 
 .PP
 .SH "SEE ALSO"
-csh(1), chsh(1), termcap(5)
+xterm(1), twm(1), csh(1), chsh(1), termcap(5), termio(7)
 .SH BUGS
 The screen update for lines longer than the screen width is very poor
 if the terminal cannot move the cursor up (i.e. terminal type "dumb").
@@ -2492,7 +2634,7 @@ I am certain that there are bugs.  Bugs (preferably with fixes)
 should be sent to Christos Zoulas (christos@ee.cornell.edu).
 .PP
 .SH VERSION
-This man page documents tcsh 6.00.01 (Cornell) 07/16/91.
+This man page documents tcsh 6.00.02 (Cornell) 08/05/91.
 .PP
 .SH AUTHORS
 Ken Greer, HP Labs, 1981

@@ -100,8 +100,9 @@
 
 /*
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
+ *		Newer versions of mtXinu have dirent.
  */
-#define DIRENT
+#undef DIRENT
 /****************** local defines *********************/
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */

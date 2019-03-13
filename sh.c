@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.c,v 3.2 1991/07/16 16:21:55 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.c,v 3.9 1991/08/06 07:16:11 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -41,7 +41,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif				/* not lint */
 
-RCSID("$Id: sh.c,v 3.2 1991/07/16 16:21:55 christos Exp $")
+RCSID("$Id: sh.c,v 3.9 1991/08/06 07:16:11 christos Exp $")
 
 #include "sh.h"
 #include "tc.h"
@@ -88,7 +88,7 @@ int do_logout;
 #endif				/* TESLA */
 
 Char   *dumphist[] = {STRhistory, STRmh, 0, 0};
-Char   *loadhist[] = {STRsource, STRmh, STRhistfile, 0};
+Char   *loadhist[] = {STRsource, STRmh, STRtildothist, 0};
 
 #ifdef CSHDIRS
 Char   *loaddirs[] = {STRsource, STRdirfile, 0};
@@ -252,24 +252,24 @@ main(argc, argv)
      * for any psudo-terminals (this catches most window systems) and not for
      * any terminal running X windows.
      * 
-     * At Ohio State, we have had problems with a user having his X session drop
-     * out from under him (on a Sun) because the shell in his master xterm
-     * timed out and exited.
+     * At Ohio State, we have had problems with a user having his X session 
+     * drop out from under him (on a Sun) because the shell in his master 
+     * xterm timed out and exited.
      * 
      * Really, this should be done with a program external to the shell, that
      * watches for no activity (and NO running programs, such as dump) on a
      * terminal for a long peroid of time, and then SIGHUPS the shell on that
      * terminal.
      * 
-     * bugfix by Rich Salz <rsalz@PINEAPPLE.BBN.COM>: For root rsh things allways
-     * first check to see if loginsh or really root, then do things with
-     * ttyname()
+     * bugfix by Rich Salz <rsalz@PINEAPPLE.BBN.COM>: For root rsh things 
+     * allways first check to see if loginsh or really root, then do things 
+     * with ttyname()
      * 
      * Also by Jean-Francois Lamy <lamy%ai.toronto.edu@RELAY.CS.NET>: check the
      * value of cp before using it! ("root can rsh too")
      * 
-     * PWP: keep the nested ifs; the order of the tests matters and a good (smart)
-     * C compiler might re-arange things wrong.
+     * PWP: keep the nested ifs; the order of the tests matters and a good 
+     * (smart) C compiler might re-arange things wrong.
      */
 #ifdef AUTOLOGOUT
     if (loginsh || (uid == 0)) {
@@ -323,27 +323,40 @@ main(argc, argv)
      * Grab other useful things from the environment. Should we grab
      * everything??
      */
-    if ((tcp = getenv("LOGNAME")) != NULL || (tcp = getenv("USER")) != NULL)
-	set(STRuser, SAVE(tcp));
-
-    /*
-     * set usefull environment things for the user
-     */
     {
-
+	char *cln, *cus;
 	Char    buff[BUFSIZ];
+	struct passwd *pw;
+
 
 #ifdef apollo
 	int     oid = getoid();
 
 	Itoa(oid, buff);
 	set(STRoid, Strsave(buff));
-#endif				/* apollo */
+#endif /* apollo */
+
 	Itoa(uid, buff);
 	set(STRuid, Strsave(buff));
 
 	Itoa(gid, buff);
 	set(STRgid, Strsave(buff));
+
+	cln = getenv("LOGNAME");
+	cus = getenv("USER");
+	if (cus != NULL)
+	    set(STRuser, SAVE(cus));
+	else if (cln != NULL)
+	    set(STRuser, SAVE(cln));
+	else if ((pw = getpwuid(uid)) == NULL)
+	    set(STRuser, SAVE("unknown"));
+	else
+	    set(STRuser, SAVE(pw->pw_name));
+	if (cln == NULL)
+	    Setenv(STRLOGNAME, value(STRuser));
+	if (cus == NULL)
+	    Setenv(STRUSER, value(STRuser));
+	    
     }
 
     /*
@@ -699,6 +712,14 @@ main(argc, argv)
 	    else
 		f = -1;
 
+#ifdef NeXT
+	    /* NeXT 2.0 /usr/etc/rlogind, does not set our process group! */
+	    if (shpgrp == 0) {
+	        shpgrp = getpid();
+		(void) setpgid(0, shpgrp);
+	        (void) tcsetpgrp(f, shpgrp);
+	    }
+#endif /* NeXT */
     retry:
 #ifdef BSDJOBS			/* if we have tty job control */
 	    if ((tpgrp = tcgetpgrp(f)) != -1) {
@@ -807,7 +828,7 @@ main(argc, argv)
 #ifdef _PATH_DOTCSHRC
 	    (void) srcfile(_PATH_DOTCSHRC, 0, 0);
 #endif
-	    if (!fast && !arginp && !onelflg)
+	    if (!arginp && !onelflg && !havhash)
 		dohash(NULL,NULL);
 #ifdef _PATH_DOTLOGIN
 	    if (loginsh)
@@ -833,6 +854,8 @@ main(argc, argv)
 	/*
 	 * Source history before .login so that it is available in .login
 	 */
+	if ((cp = value(STRhistfile)) != STRNULL)
+	    loadhist[2] = cp;
 	dosource(loadhist, NULL);
 #ifndef LOGINFIRST
 	if (loginsh)
@@ -939,7 +962,7 @@ importpath(cp)
      * i+2 where i is the number of colons in the path. There are i+1
      * directories in the path plus we need room for a zero terminator.
      */
-    pv = (Char **) xcalloc((size_t) (i + 2), sizeof(Char **));
+    pv = (Char **) xcalloc((size_t) (i + 2), sizeof(Char *));
     dp = cp;
     i = 0;
     if (*dp)
@@ -1152,15 +1175,17 @@ srcunit(unit, onlyown, hflg)
 void
 rechist()
 {
-    Char    buf[BUFSIZ];
+    Char    buf[BUFSIZ], *hfile;
     int     fp, ftmp, oldidfds;
 
     if (!fast) {
 	if (value(STRsavehist)[0] == '\0')
 	    return;
-	(void) Strcpy(buf, value(STRhome));
-	(void) Strcat(buf, STRsldthist);
-	fp = creat(short2str(buf), 0600);
+	if ((hfile = value(STRhistfile)) == STRNULL) {
+	    hfile = Strcpy(buf, value(STRhome));
+	    (void) Strcat(buf, STRsldthist);
+	}
+	fp = creat(short2str(hfile), 0600);
 	if (fp == -1) 
 	    return;
 	oldidfds = didfds;
@@ -1210,7 +1235,8 @@ goodbye(v, c)
 void
 exitstat()
 {
-
+    register Char *cp;
+    register int i;
 #ifdef PROF
     monitor(0);
 #endif
@@ -1220,7 +1246,19 @@ exitstat()
      * unwarrantedly (sic).
      */
     child = 1;
-    xexit(getn(value(STRstatus)));
+
+    /* 
+     * PWP: do this step-by-step because we might get a bus error if
+     * status isn't set, so we call getn(NULL).
+     */
+    cp = value(STRstatus);
+
+    if (!cp)
+	i = 13;
+    else
+	i = getn(cp);
+
+    xexit(i);
 }
 
 /*
@@ -1604,7 +1642,7 @@ mailchk()
 	new = stb.st_mtime > time0;
 #endif
 	if (stb.st_size == 0 || stb.st_atime > stb.st_mtime ||
-	    (stb.st_atime < chktim && stb.st_mtime < chktim) ||
+	    (stb.st_atime <= chktim && stb.st_mtime <= chktim) ||
 	    loginsh && !new)
 	    continue;
 	if (cnt == 1)

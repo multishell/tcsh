@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.types.h,v 3.3 1991/07/15 19:37:24 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.types.h,v 3.9 1991/08/06 01:49:40 christos Exp $ */
 /* sh.types.h: Do the necessary typedefs for each system.
  *             Up till now I avoided making this into a separate file
  *	       But I just wanted to eliminate the whole mess from sh.h
@@ -152,6 +152,16 @@ extern char *sbrk();
 #endif
 #endif /* __hpux */
 
+/***
+ *** hp9000s500 running hpux-5.2
+ ***/
+#ifdef hp9000s500
+# ifndef _PTR_T
+#  define _PTR_T
+   typedef char * ptr_t;
+# endif /* _PTR_T */
+#endif /* hp9000s500 */
+
 
 /***
  *** Data General 88000, running dgux ???
@@ -178,6 +188,15 @@ extern char *sbrk();
 
 #endif
 
+
+/***
+ *** Intel 386, ISC 386/ix v2.0.2
+ ***/
+#ifdef ISC202
+# ifndef _SIZE_T
+#  define _SIZE_T
+# endif /* _SIZE_T */
+#endif /* ISC202 */
 
 /***
  *** a PFU/Fujitsu A-xx computer SX/A Edition 60 or later
@@ -207,6 +226,17 @@ extern char *sbrk();
 /*   typedef unsigned int speed_t; */
 # endif /* _SPEED_T */
 #endif /* RENO */
+
+
+/***
+ *** Pyramid, BSD universe
+ *** In addition to the size_t
+ ***/
+#ifdef pyr
+# ifndef _PID_T
+#  define _PID_T
+# endif /* _PID_T */
+#endif /* pyr */
 
 
 /***
@@ -274,11 +304,11 @@ extern char *sbrk();
 /***
  *** Intel 386, Hypercube
  ***/
-#ifdef HYPERCUBE
+#ifdef INTEL
 # ifndef _SIZE_T
 #  define _SIZE_T
 # endif /* _SIZE_T */
-#endif /* HYPERCUBE */
+#endif /* INTEL */
 
 /***
  *** Concurrent (Masscomp) running RTU 4.1A & RTU 5.0.
@@ -310,6 +340,18 @@ extern char *sbrk();
 #  define _SIZE_T
 # endif /* _SIZE_T */
 #endif /* IRIS3D */
+
+/* 
+ * Amdahl running UTS (Sys V3)
+ */
+#ifdef uts
+# ifndef _SIZE_T
+#  define _SIZE_T
+# endif /* _SIZE_T */
+# ifndef _PID_T
+#  define _PID_T
+# endif /* _PID_T */
+#endif /* uts */
 
 /***
  *** Catch all for non POSIX systems.

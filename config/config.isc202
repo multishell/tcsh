@@ -103,6 +103,9 @@
  */
 #define DIRENT
 /****************** local defines *********************/
+#define ISC202
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
+
+#undef NLS

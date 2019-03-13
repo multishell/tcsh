@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.glob.c,v 3.2 1991/07/15 19:37:24 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.glob.c,v 3.9 1991/08/06 01:00:15 christos Exp $ */
 /*
  * sh.glob.c: Regular expression expansion
  */
@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-RCSID("$Id: sh.glob.c,v 3.2 1991/07/15 19:37:24 christos Exp $")
+RCSID("$Id: sh.glob.c,v 3.9 1991/08/06 01:00:15 christos Exp $")
 
 #include "sh.h"
 #include "tc.h"
@@ -291,7 +291,7 @@ globexpand(v)
 	Char   *b;
 	Char  **vp, **bp;
 
-	if (b = Strchr(s, LBRC)) {
+	if ((b = Strchr(s, LBRC)) && b[1] != '\0' && b[1] != RBRC) {
 	    Char  **bl;
 	    int     len;
 
@@ -394,6 +394,9 @@ libglob(vl)
     char   *ptr;
     int     nonomatch = adrof(STRnonomatch) != 0, magic = 0, match = 0;
 
+    if (!vl || !vl[0])
+	return(vl);
+
     globv.gl_offs = 0;
     globv.gl_pathv = 0;
     globv.gl_pathc = 0;
@@ -434,21 +437,23 @@ globone(str, action)
 {
 
     Char   *v[2], **vl, **vo;
+    int gflg;
 
     noglob = adrof(STRnoglob) != 0;
     gflag = 0;
     v[0] = str;
     v[1] = 0;
     tglob(v);
-    if (gflag == G_NONE)
+    gflg = gflag;
+    if (gflg == G_NONE)
 	return (strip(Strsave(str)));
 
-    if (gflag & G_CSH) {
+    if (gflg & G_CSH) {
 	/*
 	 * Expand back-quote, tilde and brace
 	 */
 	vo = globexpand(v);
-	if (noglob || (gflag & G_GLOB) == 0) {
+	if (noglob || (gflg & G_GLOB) == 0) {
 	    if (vo[0] == NULL) {
 		xfree((ptr_t) vo);
 		return (Strsave(STRNULL));
@@ -462,13 +467,13 @@ globone(str, action)
 	    }
 	}
     }
-    else if (noglob || (gflag & G_GLOB) == 0)
+    else if (noglob || (gflg & G_GLOB) == 0)
 	return (strip(Strsave(str)));
     else
 	vo = v;
 
     vl = libglob(vo);
-    if (gflag & G_CSH)
+    if ((gflg & G_CSH) && vl != vo)
 	blkfree(vo);
     if (vl == NULL) {
 	setname(short2str(str));
@@ -492,6 +497,7 @@ globall(v)
     Char  **v;
 {
     Char  **vl, **vo;
+    int gflg = gflag;
 
     if (!v || !v[0]) {
 	gargv = saveblk(v);
@@ -501,7 +507,7 @@ globall(v)
 
     noglob = adrof(STRnoglob) != 0;
 
-    if (gflag & G_CSH)
+    if (gflg & G_CSH)
 	/*
 	 * Expand back-quote, tilde and brace
 	 */
@@ -509,11 +515,13 @@ globall(v)
     else
 	vl = vo = saveblk(v);
 
-    if (!noglob && (gflag & G_GLOB)) {
+    if (!noglob && (gflg & G_GLOB)) {
 	vl = libglob(vo);
-	if (gflag & G_CSH)
+	if ((gflg & G_CSH) && vl != vo)
 	    blkfree(vo);
     }
+    else
+	trim(vl);
 
     gargc = vl ? blklen(vl) : 0;
     return (gargv = vl);

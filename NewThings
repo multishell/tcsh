@@ -1,6 +1,27 @@
 This file contains visible (incompatible) changes to the users.
 This version of tcsh has the following new things:
 
+6.00 PL2
+* setty builtin
+  This is used to specify what tcsh modes can be altered using stty,
+  Modes that should be set are specified as +<mode>, modes that should 
+  be cleared are specified as -<mode>, and the ones that should be 
+  untouched are specified as <mode>. setty with no arguments prints
+  the modes that are affected by tcsh, and setty -a prints all modes.
+* multiple : modifiers in variables and ! escapes. Things like:
+      > set prompt="$host:r:$cwd>"
+  don't work any more, they should be replaced with
+      > set prompt="${host:r}:$cwd>"
+  or
+      > set prompt="$host:r"":$cwd>"
+  the reason is that now you can
+      > set foo=/usr/local/a.b.c
+      > echo $foo:t:r:e
+      b
+  If for some reason you don't like this change you can disable it with
+  -DCOMPAT. -DCOMPAT may go away in future tcsh versions and the way tcsh
+  works now is the way the 4.4BSD csh works.
+
 6.00 PL1
 * There is no more config.iris4d, use config.sgi instead
 

@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.sig.c,v 3.1 1991/07/15 19:37:24 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.sig.c,v 3.3 1991/08/06 01:49:53 christos Exp $ */
 /*
  * sh.sig.c: Signal routine emulations
  */
@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-RCSID("$Id: tc.sig.c,v 3.1 1991/07/15 19:37:24 christos Exp $")
+RCSID("$Id: tc.sig.c,v 3.3 1991/08/06 01:49:53 christos Exp $")
 
 #include "sh.h"
 /*
@@ -74,7 +74,7 @@ RCSID("$Id: tc.sig.c,v 3.1 1991/07/15 19:37:24 christos Exp $")
 static struct mysigstack {
     int     s_w;		/* wait report			 */
     int     s_errno;		/* errno returned;		 */
-    int     s_pid;		/* pid returned			 */
+    pid_t   s_pid;		/* pid returned			 */
 }       stk[MAX_CHLD];
 static int stk_ptr = -1;
 
@@ -90,11 +90,12 @@ sig_ch_queue()
     flush();
 #endif /* JOBDEBUG */
     stk_ptr++;
-    stk[stk_ptr].s_pid = wait(&stk[stk_ptr].s_w);
+    stk[stk_ptr].s_pid = (pid_t) wait(&stk[stk_ptr].s_w);
     stk[stk_ptr].s_errno = errno;
     (void) signal(SIGCHLD, sig_ch_queue);
-    /* shut up the compiler */
+#ifndef SIGVOID
     return(0);
+#endif /* SIGVOID */
 }
 
 /* process all awaiting child signals
@@ -108,8 +109,9 @@ sig_ch_rel()
     xprintf("signal(SIGCHLD, pchild);\n");
 #endif /* JOBDEBUG */
     (void) signal(SIGCHLD, pchild);
-    /* shut up the compiler */
+#ifndef SIGVOID
     return(0);
+#endif /* SIGVOID */
 }
 
 /* libc.a contains these functions in SVID >= 3. */
@@ -131,6 +133,13 @@ sigrelse(what)
 {
     if (what == SIGCHLD)
 	sig_ch_rel();
+
+#ifdef notdef	/* XXX: Should not need that when compiled with SVID=1 */
+# ifdef UNIXPC	
+    if (what == SIGINT)
+    	(void)signal(SIGINT, pintr);
+# endif
+#endif
 }
 
 /* hold signal
@@ -142,6 +151,13 @@ sighold(what)
 {
     if (what == SIGCHLD)
 	(void) signal(SIGCHLD, sig_ch_queue);
+
+#ifdef notdef	/* XXX: Should not need that when compiled with SVID=1 */
+# ifdef UNIXPC	
+    if (what == SIGINT)
+    	(void)signal(SIGINT, SIG_IGN);
+# endif
+#endif
 }
 
 /* ignore signal
@@ -202,11 +218,11 @@ sigpause(what)
 
 /* return either awaiting processes or do a wait now
  */
-int
+pid_t
 ourwait(w)
     int    *w;
 {
-    int     pid;
+    pid_t pid;
 
 #ifdef JOBDEBUG
     xprintf("our wait %d\n", stk_ptr);
@@ -215,7 +231,7 @@ ourwait(w)
 
     if (stk_ptr == -1) {
 	/* stack empty return signal from stack */
-	pid = wait(w);
+	pid = (pid_t) wait(w);
 #ifdef JOBDEBUG
 	xprintf("signal(SIGCHLD, pchild);\n");
 #endif /* JOBDEBUG */

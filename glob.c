@@ -288,14 +288,15 @@ glob(pattern, flags, errfunc, pglob)
 	m_not = M_NOT;
     }
 
-    no_match = *patnext == not;
-    if (no_match)
-	patnext++;
-
     bufnext = patbuf;
     bufend = bufnext + MAXPATHLEN;
     compilebuf = bufnext;
     compilepat = patnext;
+
+    no_match = *patnext == not;
+    if (no_match)
+	patnext++;
+
     if (flags & GLOB_QUOTE) {
 	/* Protect the quoted characters */
 	while (bufnext < bufend && (c = *patnext++) != EOS) 
@@ -400,7 +401,8 @@ glob(pattern, flags, errfunc, pglob)
     }
     else if (!(flags & GLOB_NOSORT))
 	qsort((char *) (pglob->gl_pathv + pglob->gl_offs + oldpathc),
-	      pglob->gl_pathc - oldpathc, sizeof(char *), compare);
+	      pglob->gl_pathc - oldpathc, sizeof(char *),
+	      (int (*) __P((const void *, const void *))) compare);
     return (0);
 }
 
@@ -651,7 +653,7 @@ globfree(pglob)
 	pp = pglob->gl_pathv + pglob->gl_offs;
 	for (i = pglob->gl_pathc; i--; ++pp)
 	    if (*pp)
-		free((ptr_t) *pp);
-	free((ptr_t) pglob->gl_pathv);
+		free((ptr_t) *pp), *pp = NULL;
+	free((ptr_t) pglob->gl_pathv), pglob->gl_pathv = NULL;
     }
 }

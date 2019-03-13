@@ -103,7 +103,7 @@
  */
 #define DIRENT
 /****************** local defines *********************/
-#define HYPERCUBE
+#define INTEL
 
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */

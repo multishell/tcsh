@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.proc.c,v 3.4 1991/07/15 19:37:24 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.proc.c,v 3.9 1991/08/05 23:02:13 christos Exp $ */
 /*
  * sh.proc.c: Job manipulations
  */
@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-RCSID("$Id: sh.proc.c,v 3.4 1991/07/15 19:37:24 christos Exp $")
+RCSID("$Id: sh.proc.c,v 3.9 1991/08/05 23:02:13 christos Exp $")
 
 #include "sh.h"
 #include "ed.h"
@@ -65,11 +65,7 @@ RCSID("$Id: sh.proc.c,v 3.4 1991/07/15 19:37:24 christos Exp $")
 #  endif /* OREO || IRIS4D || POSIX */
 # endif	/* hpux */
 #else /* SVID == 0 */
-# ifndef _IBMR2 /* IBM RS/6000 headers are broken */
-#  include <sys/wait.h>
-# else
-#  include "tc.wait.h"
-# endif
+# include <sys/wait.h>
 #endif /* SVID == 0 */
 
 #if !defined(NSIG) && defined(SIGMAX)
@@ -259,7 +255,7 @@ loop:
     pid = wait3(&w.w_status, WNOHANG, &ru);
 #  endif /* !hpux */
 # else /* !BSDTIMES */
-#  if (SVID > 0) && (SVID < 3)
+#  if SVID < 3
     /* no wait3, therefore no rusage */
     /* on Sys V, this may hang.  I hope it's not going to be a problem */
     pid = ourwait(&w.w_status);
@@ -1063,7 +1059,7 @@ pprint(pp, flag)
 			    && reason != SIGINT
 			    && (reason != SIGPIPE
 				|| (pp->p_flags & PPOU) == 0)))
-			xprintf(format, mesg[pp->p_reason].pname);
+			xprintf(format, mesg[pp->p_reason & ASCII].pname);
 		    else
 			reason = -1;
 		    break;
@@ -1405,8 +1401,8 @@ pkill(v, signum)
     int     signum;
 {
     register struct process *pp, *np;
-    register int jobflags = 0;
-    int     pid, err1 = 0;
+    int jobflags = 0, err1 = 0;
+    pid_t     pid;
 #ifdef BSDSIGS
     sigmask_t omask;
 #endif /* BSDSIGS */
@@ -1467,27 +1463,27 @@ pkill(v, signum)
 		goto cont;
 	    }
 #endif /* BSDJOBS */
-	    if (killpg((pid_t) pp->p_jobid, signum) < 0) {
+	    if (killpg(pp->p_jobid, signum) < 0) {
 		xprintf("%s: %s\n", short2str(cp), strerror(errno));
 		err1++;
 	    }
 #ifdef BSDJOBS
 	    if (signum == SIGTERM || signum == SIGHUP)
-		(void) killpg((pid_t) pp->p_jobid, SIGCONT);
+		(void) killpg(pp->p_jobid, SIGCONT);
 #endif /* BSDJOBS */
 	}
 	else if (!(Isdigit(*cp) || *cp == '-'))
 	    stderror(ERR_NAME | ERR_JOBARGS);
 	else {
 	    pid = atoi(short2str(cp));
-	    if (kill((pid_t) pid, signum) < 0) {
+	    if (kill(pid, signum) < 0) {
 		xprintf("%d: %s\n", pid, strerror(errno));
 		err1++;
 		goto cont;
 	    }
 #ifdef BSDJOBS
 	    if (signum == SIGTERM || signum == SIGHUP)
-		(void) kill((pid_t) pid, SIGCONT);
+		(void) kill(pid, SIGCONT);
 #endif /* BSDJOBS */
 	}
 cont:
@@ -1544,7 +1540,7 @@ pstart(pp, foregnd)
     if (foregnd)
 	(void) tcsetpgrp(FSHTTY, pp->p_jobid);
     if (jobflags & PSTOPPED)
-	(void) killpg((pid_t) pp->p_jobid, SIGCONT);
+	(void) killpg(pp->p_jobid, SIGCONT);
 #endif /* BSDJOBS */
 #ifdef BSDSIGS
     (void) sigsetmask(omask);
@@ -1776,7 +1772,7 @@ pfork(t, wanttty)
 #ifdef F_VER
         if (t->t_dflg & F_VER) {
 	    Setenv(STRSYSTYPE, t->t_systype ? STRbsd43 : STRsys53);
-	    dohash();
+	    dohash(NULL, NULL);
 	}
 #endif /* F_VER */
 #ifdef SIGSYNCH
@@ -1870,8 +1866,11 @@ pgetty(wanttty, pgrp)
      */
     if (wanttty >= 0)
 	if (setpgid(0, pgrp) == -1) {
-	    xprintf("tcsh: setpgid error.\n");
+#  if !defined(ISC) && !defined(SCO)
+	    /* XXX: Wrong but why? */
+	    xprintf("tcsh: setpgid error (%s).\n", strerror(errno));
 	    xexit(0);
+#  endif /* !ISC && !SCO */
 	}
 # endif /* POSIXJOBS */
 
@@ -1881,8 +1880,11 @@ pgetty(wanttty, pgrp)
 # ifndef POSIXJOBS
     if (wanttty >= 0)
 	if (setpgid(0, pgrp) == -1) {
-	    xprintf("tcsh: setpgid error.\n");
+#  if !defined(ISC) && !defined(SCO)
+	    /* XXX: Wrong but why? */
+	    xprintf("tcsh: setpgid error (%s).\n", strerror(errno));
 	    xexit(0);
+#  endif /* !ISC && !SCO */
 	}
 # else /* POSIXJOBS */
     if (wanttty > 0)

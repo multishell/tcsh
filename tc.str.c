@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.str.c,v 3.1 1991/07/15 19:37:24 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.str.c,v 3.2 1991/07/19 01:06:11 christos Exp $ */
 /*
  * tc.str.c: Short string package
  * 	     This has been a lesson of how to write buggy code!
@@ -36,11 +36,11 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-RCSID("$Id: tc.str.c,v 3.1 1991/07/15 19:37:24 christos Exp $")
+RCSID("$Id: tc.str.c,v 3.2 1991/07/19 01:06:11 christos Exp $")
 
 #include "sh.h"
 
-#define MALLOC_INCR	1024
+#define MALLOC_INCR	128
 
 #ifdef SHORT_STRINGS
 Char  **

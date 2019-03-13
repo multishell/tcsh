@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.init.c,v 3.1 1991/07/15 19:37:24 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.init.c,v 3.6 1991/08/06 01:08:03 christos Exp $ */
 /*
  * sh.init.c: Function and signal tables
  */
@@ -35,15 +35,16 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-RCSID("$Id: sh.init.c,v 3.1 1991/07/15 19:37:24 christos Exp $")
+RCSID("$Id: sh.init.c,v 3.6 1991/08/06 01:08:03 christos Exp $")
 
 #include "sh.h"
+#include "ed.h"
 
 /*
  * C shell
  */
 
-#define	INF	1000
+#define	INF	0x7fffffff
 
 struct	biltins bfunc[] = {
     { "@",	dolet,		0,	INF, },
@@ -94,7 +95,9 @@ struct	biltins bfunc[] = {
 #endif
     { "jobs",	dojobs,		0,	1, },
     { "kill",	dokill,		1,	INF, },
+#ifndef HAVENOLIMIT
     { "limit",	dolimit,	0,	3, },
+#endif /* ! HAVENOLIMIT */
     { "linedit",	doecho,		0,	INF, },
 #ifndef KAI
     { "log",	dolog,		0,	0, },
@@ -132,6 +135,7 @@ struct	biltins bfunc[] = {
     { "setspath",	dosetspath,	1,	INF, },
 #endif /* TCF */
     { "settc",	dosettc,	2,	2, },
+    { "setty",  dosetty,	0,      INF },
 #ifdef TCF
     { "setxvers",	dosetxvers,	0,	1, },
 #endif /* TCF */
@@ -148,7 +152,9 @@ struct	biltins bfunc[] = {
 #ifdef masscomp
     { "universe",	douniverse,	0,	1, },
 #endif
+#ifndef HAVENOLIMIT
     { "unlimit",	dounlimit,	0,	INF, },
+#endif /* !HAVENOLIMIT */
     { "unset",	unset,		1,	INF, },
     { "unsetenv",	dounsetenv,	1,	INF, },
 #ifdef apollo
@@ -234,6 +240,16 @@ struct	mesg mesg[] = {
 # endif /* apollo */
 #endif /* IBMAIX */
 
+
+/*
+**  In the UNIXpc these signal *ARE* used!!
+*/
+#ifdef UNIXPC
+/* 20 */	"WIND",		"Window status changed",
+/* 21 */	"PHONE", 	"Phone status changed",
+#endif
+
+
 # ifdef OREO
 #  define _sigextra_
 #  ifdef SUSPENDED
@@ -285,7 +301,7 @@ struct	mesg mesg[] = {
 /* 32 */	"DIL",		"DIL signal",
 # endif /* hpux */
 
-# if (defined(ISC) || defined(SCO)) && defined(POSIX) 
+# if defined(ISC) && defined(POSIX) 
 #  define _sigextra_
 /* 20 */	"WINCH", 	"Window change",
 /* 21 */	0, 		"Unused", /* SIGPHONE used only for UNIXPC */
@@ -308,6 +324,31 @@ struct	mesg mesg[] = {
 /* 31 */	0, 		"Reserved", /* Reserved */
 /* 32 */	0,		"Maximum number of signals",
 # endif /* ISC && POSIX */
+
+# if defined(SCO) && defined(POSIX) 
+#  define _sigextra_
+/* 20 */	"WINCH", 	"Window change",
+/* 21 */	0, 		"Unused", /* SIGPHONE used only for UNIXPC */
+/* 22 */	"POLL", 	"Pollable event occured",
+#  ifdef SUSPENDED
+/* 23 */	"STOP",		"Suspended (signal)",
+/* 24 */	"TSTP",		"Suspended",
+/* 25 */	"CONT", 	"Continued",
+/* 26 */	"TTIN", 	"Suspended (tty input)",
+/* 27 */	"TTOU", 	"Suspended (tty output)",
+#  else /* SUSPENDED */
+/* 23 */	"STOP",		"Stopped (signal)",
+/* 24 */	"TSTP",		"Stopped",
+/* 25 */	"CONT", 	"Continued",
+/* 26 */	"TTIN", 	"Stopped (tty input)",
+/* 27 */	"TTOU", 	"Stopped (tty output)",
+#  endif /* SUSPENDED */
+/* 28 */	0,	  	"number of signals",
+/* 29 */	0,		"Reserved", /* Reserved */
+/* 30 */	0,		"Reserved", /* Reserved */
+/* 31 */	0, 		"Reserved", /* Reserved */
+/* 32 */	0,		"Maximum number of signals",
+# endif /* SCO && POSIX */
 
 # ifdef IRIS4D
 #  define _sigextra_
