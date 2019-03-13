@@ -51,7 +51,7 @@ RCSID("$Id: sh.proc.c,v 3.65 1997/10/27 22:44:31 christos Exp $")
 # define HZ 16
 #endif /* aiws */
 
-#if defined(_BSD) || (defined(IRIS4D) && __STDC__) || defined(__lucid) || defined(linux)
+#if defined(_BSD) || (defined(IRIS4D) && __STDC__) || defined(__lucid)
 # define BSDWAIT
 #endif /* _BSD || (IRIS4D && __STDC__) || __lucid || linux */
 #ifndef WTERMSIG
