@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tc.func.c,v 3.20 1991/12/19 22:34:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.func.c,v 3.29 1992/04/10 16:38:09 christos Exp $ */
 /*
  * tc.func.c: New tcsh builtins.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.func.c,v 3.20 1991/12/19 22:34:14 christos Exp $")
+RCSID("$Id: tc.func.c,v 3.29 1992/04/10 16:38:09 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -60,10 +60,12 @@ static	void	 Reverse	__P((Char *));
 static	void	 auto_logout	__P((void));
 static	char	*xgetpass	__P((char *));
 static	void	 auto_lock	__P((void));
+#ifdef BSDJOBS
 static	void	 insert		__P((struct wordent *, bool));
 static	void	 insert_we	__P((struct wordent *, struct wordent *));
 static	int	 inlist		__P((Char *, Char *));
-
+#endif /* BSDJOBS */
+static  Char    *gethomedir	__P((Char *));
 
 /*
  * Tops-C shell
@@ -116,6 +118,8 @@ expand_lex(buf, bufsiz, sp0, from, to)
 		 */
 		if ((*s & QUOTE)
 		    && (((*s & TRIM) == HIST) ||
+			(((*s & TRIM) == '\'') && (prev_c != '\\')) ||
+			(((*s & TRIM) == '\"') && (prev_c != '\\')) ||
 			(((*s & TRIM) == '\\') && (prev_c != '\\')))) {
 		    *d++ = '\\';
 		}
@@ -190,7 +194,7 @@ dolist(v, c)
     struct stat st;
 
     if (*++v == NULL) {
-	(void) t_search(STRNULL, NULL, LIST, 0, 0, 0);
+	(void) t_search(STRNULL, NULL, LIST, 0, TW_ZERO, 0, STRNULL, 0);
 	return;
     }
     gflag = 0;
@@ -203,7 +207,8 @@ dolist(v, c)
     else
 	v = gargv = saveblk(v);
     trim(v);
-    for (k = 0; v[k] != NULL && v[k][0] != '-'; k++);
+    for (k = 0; v[k] != NULL && v[k][0] != '-'; k++)
+	continue;
     if (v[k]) {
 	/*
 	 * We cannot process a flag therefore we let ls do it right.
@@ -269,7 +274,8 @@ dolist(v, c)
 	Char   *dp, *tmp, buf[MAXPATHLEN];
 
 	for (k = 0, i = 0; v[k] != NULL; k++) {
-	    tmp = dnormalize(v[k]);
+	    tmp = dnormalize(v[k], symlinks == SYM_IGNORE || 
+				   symlinks == SYM_EXPAND);
 	    dp = &tmp[Strlen(tmp) - 1];
 	    if (*dp == '/' && dp != tmp)
 #ifdef apollo
@@ -296,13 +302,14 @@ dolist(v, c)
 		if (k != 0 && v[1] != NULL)
 		    xputchar('\n');
 		xprintf("%s:\n", short2str(tmp));
-		for (cp = tmp, dp = buf; *cp; *dp++ = (*cp++ | QUOTE));
+		for (cp = tmp, dp = buf; *cp; *dp++ = (*cp++ | QUOTE))
+		    continue;
 		if (dp[-1] != (Char) ('/' | QUOTE))
 		    *dp++ = '/';
 		else 
 		    dp[-1] &= TRIM;
 		*dp = '\0';
-		(void) t_search(buf, NULL, LIST, 0, 0, 0);
+		(void) t_search(buf, NULL, LIST, 0, TW_ZERO, 0, STRNULL, 0);
 		i = k + 1;
 	    }
 	    xfree((ptr_t) tmp);
@@ -393,10 +400,10 @@ dowhich(v, c)
     lex[2].word = STRret;
 
     while (*++v) {
-	if (vp = adrof1(*v, &aliases)) {
+	if ((vp = adrof1(*v, &aliases)) != NULL) {
 	    xprintf("%s: \t aliased to ", short2str(*v));
 	    blkpr(vp->vec);
-	    xprintf("\n");
+	    xputchar('\n');
 	}
 	else {
 	    lex[1].word = *v;
@@ -466,6 +473,7 @@ fg_proc_entry(pp)
 #endif
     jmp_buf osetexit;
     bool    ohaderr;
+    bool    oGettingInput;
 
     getexit(osetexit);
 
@@ -474,17 +482,21 @@ fg_proc_entry(pp)
 #else
     (void) sighold(SIGINT);
 #endif
+    oGettingInput = GettingInput;
+    GettingInput = 0;
 
     ohaderr = haderr;		/* we need to ignore setting of haderr due to
 				 * process getting stopped by a signal */
     if (setexit() == 0) {	/* come back here after pjwait */
 	pendjob();
 	pstart(pp, 1);		/* found it. */
+	alarm(0);		/* No autologout */
 	pjwait(pp);
     }
-
+    setalarm(1);		/* Autologout back on */
     resexit(osetexit);
     haderr = ohaderr;
+    GettingInput = oGettingInput;
 
 #ifdef BSDSIGS
     (void) sigsetmask(omask);
@@ -503,7 +515,7 @@ xgetpass(prm)
     sigret_t (*sigint)();
 
     sigint = (sigret_t (*)()) sigset(SIGINT, SIG_IGN);
-    Rawmode();	/* Make sure, cause we want echo off */
+    (void) Rawmode();	/* Make sure, cause we want echo off */
     if ((fd = open("/dev/tty", O_RDWR)) == -1)
 	fd = SHIN;
 
@@ -535,29 +547,55 @@ xgetpass(prm)
 static void
 auto_lock()
 {
+#ifndef NO_CRYPT
+
     int i;
+    char *srpp = NULL;
     struct passwd *pw;
-#ifdef PW_SHADOW
+
+#undef XCRYPT
+
+#if defined(PW_AUTH) && !defined(XCRYPT)
+
+    struct authorization *apw;
+    extern char *crypt16();
+
+# define XCRYPT(a, b) crypt16(a, b)
+
+    if ((pw = getpwuid(geteuid())) != NULL &&	/* effective user passwd  */
+        (apw = getauthuid(geteuid())) != NULL) 	/* enhanced ultrix passwd */
+	srpp = apw->a_password;
+
+#endif /* PW_AUTH && !XCRYPT */
+
+#if defined(PW_SHADOW) && !defined(XCRYPT)
+
     struct spwd *spw;
-#endif /* PW_SHADOW */
     extern char *crypt();
 
+# define XCRYPT(a, b) crypt(a, b)
 
-    /* Get the passwd of our effective user.  */
-    if ((pw = getpwuid(geteuid())) == NULL) {
-      auto_logout();
-      /*NOTREACHED*/
-      return;
-    }
+    if ((pw = getpwuid(geteuid())) != NULL &&	/* effective user passwd  */
+	(spw = getspnam(pw->pw_name)) != NULL)	/* shadowed passwd	  */
+	srpp = spw->sp_pwdp;
 
-#ifdef PW_SHADOW
-    /* Get the shadowed password. */
-    if ((spw = getspnam(pw->pw_name)) == NULL) {
-      auto_logout();
-      /*NOTREACHED*/
-      return;
+#endif /* PW_SHADOW && !XCRYPT */
+
+#ifndef XCRYPT
+    extern char *crypt();
+
+#define XCRYPT(a, b) crypt(a, b)
+
+    if ((pw = getpwuid(geteuid())) != NULL)	/* effective user passwd  */
+	srpp = pw->pw_passwd;
+
+#endif /* !XCRYPT */
+
+    if (srpp == NULL) {
+	auto_logout();
+	/*NOTREACHED*/
+	return;
     }
-#endif /* PW_SHADOW */
 
     setalarm(0);		/* Not for locking any more */
 #ifdef BSDSIGS
@@ -565,17 +603,13 @@ auto_lock()
 #else /* !BSDSIGS */
     (void) sigrelse(SIGALRM);
 #endif /* BSDSIGS */
-    xprintf("\n"); 
+    xputchar('\n'); 
     for (i = 0; i < 5; i++) {
 	char *crpp, *pp;
 	pp = xgetpass("Password:"); 
-#ifdef PW_SHADOW
-	crpp = crypt(pp, spw->sp_pwdp);
-	if (strcmp(crpp, spw->sp_pwdp) == 0) {
-#else /* !PW_SHADOW */
-	crpp = crypt(pp, pw->pw_passwd);
-	if (strcmp(crpp, pw->pw_passwd) == 0) {
-#endif /* PW_SHADOW */
+
+	crpp = XCRYPT(pp, srpp);
+	if (strcmp(crpp, srpp) == 0) {
 	    if (GettingInput && !just_signaled) {
 		(void) Rawmode();
 		ClearLines();	
@@ -587,8 +621,10 @@ auto_lock()
 	}
 	xprintf("\nIncorrect passwd for %s\n", pw->pw_name);
     }
+#endif /* NO_CRYPT */
     auto_logout();
 }
+
 
 static void
 auto_logout()
@@ -611,19 +647,13 @@ sigret_t
 alrmcatch(snum)
 int snum;
 {
-    time_t  cl, nl;
 #ifdef UNRELSIGS
     if (snum)
 	(void) sigset(SIGALRM, alrmcatch);
 #endif /* UNRELSIGS */
 
-    if ((nl = sched_next()) == -1)
-	(*alm_fun)();		/* no other possibility - logout */
-    (void) time(&cl);
-    if (nl <= cl + 1)
-	sched_run();
-    else
-	(*alm_fun)();
+    (*alm_fun)();
+
     setalarm(1);
 #ifndef SIGVOID
     return (snum);
@@ -865,15 +895,17 @@ setalarm(lck)
 {
     struct varent *vp;
     Char   *cp;
-    unsigned alrm_time = 0, lock_time;
+    unsigned alrm_time = 0, logout_time, lock_time;
     time_t cl, nl, sched_dif;
 
-    if (vp = adrof(STRautologout)) {
-	if (cp = vp->vec[0]) {
-	    if ((alrm_time = atoi(short2str(cp)) * 60) > 0)
+    if ((vp = adrof(STRautologout)) != NULL) {
+	if ((cp = vp->vec[0]) != 0) {
+	    if ((logout_time = atoi(short2str(cp)) * 60) > 0) {
+		alrm_time = logout_time;
 		alm_fun = auto_logout;
+	    }
 	}
-	if ((cp = vp->vec[1])) {
+	if ((cp = vp->vec[1]) != 0) {
 	    if ((lock_time = atoi(short2str(cp)) * 60) > 0) {
 		if (lck) {
 		    if (alrm_time == 0 || lock_time < alrm_time) {
@@ -889,9 +921,11 @@ setalarm(lck)
     }
     if ((nl = sched_next()) != -1) {
 	(void) time(&cl);
-	sched_dif = nl - cl;
-	if ((alrm_time == 0) || ((unsigned) sched_dif < alrm_time))
+	sched_dif = nl > cl ? nl - cl : 0;
+	if ((alrm_time == 0) || ((unsigned) sched_dif < alrm_time)) {
 	    alrm_time = ((unsigned) sched_dif) + 1;
+	    alm_fun = sched_run;
+	}
     }
     (void) alarm(alrm_time);	/* Autologout ON */
 }
@@ -976,7 +1010,8 @@ rmstar(cp)
 	}
 	for (we = we->next;
 	     *we->word != ';' && we != cp;
-	     we = we->next);
+	     we = we->next)
+	    continue;
 	if (*we->word == ';')
 	    we = we->next;
     }
@@ -1050,7 +1085,8 @@ continue_jobs(cp)
 	}
 	for (we = we->next;
 	     *we->word != ';' && we != cp;
-	     we = we->next);
+	     we = we->next)
+	    continue;
 	if (*we->word == ';')
 	    we = we->next;
     }
@@ -1095,7 +1131,8 @@ insert(plist, file_args)
 	insert_we(now, plist);
 
 	for (last = now; *last->word != '\n' && *last->word != ';';
-	     last = last->next);
+	     last = last->next)
+	    continue;
 
 	now = (struct wordent *) xcalloc(1, (size_t) sizeof(struct wordent));
 	now->word = (Char *) xcalloc(1, (size_t) (2 * sizeof(Char)));
@@ -1114,10 +1151,12 @@ insert(plist, file_args)
 	*cp1++ = '~';
 	*cp1++ = '/';
 	*cp1++ = '.';
-	while (*cp1++ = *cp2++);
+	while ((*cp1++ = *cp2++) != '\0')
+	    continue;
 	cp1--;
 	cp2 = pause;
-	while (*cp1++ = *cp2++);
+	while ((*cp1++ = *cp2++) != '\0')
+	    continue;
 	insert_we(now, last->prev);
 
 	now = (struct wordent *) xcalloc(1, (size_t) sizeof(struct wordent));
@@ -1128,7 +1167,8 @@ insert(plist, file_args)
 	cp1 = bcmd;
 	cp2 = cmd;
 	*cp1++ = '%';
-	while (*cp1++ = *cp2++);
+	while ((*cp1++ = *cp2++) != '\0')
+	    continue;
 	now = (struct wordent *) xcalloc(1, (size_t) (sizeof(struct wordent)));
 	now->word = bcmd;
 	insert_we(now, last->prev);
@@ -1143,7 +1183,8 @@ insert(plist, file_args)
 	cp1 = now->word;
 	cp2 = cmd;
 	*cp1++ = '%';
-	while (*cp1++ = *cp2++);
+	while ((*cp1++ = *cp2++) != '\0')
+	    continue;
 	for (now = now->next;
 	     *now->word != '\n' && *now->word != ';' && now != plist;) {
 	    now->prev->next = now->next;
@@ -1223,7 +1264,7 @@ tildecompare(p1, p2)
     return Strcmp(p1->user, p2->user);
 }
 
-Char   *
+static Char *
 gethomedir(us)
     Char   *us;
 {
@@ -1313,8 +1354,8 @@ gettilde(us)
     tcache[tlength].home = hd;
     tcache[tlength++].hlen = Strlen(hd);
 
-    (void) qsort((ptr_t) tcache, (size_t) tlength, sizeof(struct tildecache),
-		 (int (*) __P((const void *, const void *))) tildecompare);
+    qsort((ptr_t) tcache, (size_t) tlength, sizeof(struct tildecache),
+	  (int (*) __P((const void *, const void *))) tildecompare);
 
     if (tlength == tsize) {
 	tsize += TILINCR;
@@ -1446,7 +1487,7 @@ doaliases(v, c)
 
 eof:
     (void) close(fd);
-    tw_clear_comm_list();
+    tw_cmd_free();
     if (gargv)
 	blkfree(gargv), gargv = 0;
     resexit(oldexit);

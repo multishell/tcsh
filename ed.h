@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/ed.h,v 3.12 1991/12/19 22:34:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/ed.h,v 3.16 1992/05/11 14:23:58 christos Exp $ */
 /*
  * ed.h: Editor declarations and globals
  */
@@ -68,7 +68,6 @@ extern PFCmd CcFuncTbl[];	/* table of available commands */
 extern KEYCMD CcKeyMap[];	/* keymap table, each index into above tbl */
 extern KEYCMD CcAltMap[];	/* Alt keymap table */
 extern KEYCMD CcEmacsMap[];	/* keymap table for Emacs default bindings */
-extern KEYCMD CcViMap[];	/* keymap table for Vi input mode defaults */
 extern KEYCMD CcViCmdMap[];	/* for Vi command mode defaults */
 extern struct KeyFuncs FuncNames[];	/* string names vs. CcFuncTbl indices */
 
@@ -136,8 +135,6 @@ EXTERN Char WhichBuf[INBUFSIZE];	/* buffer for which command */
 EXTERN Char *LastWhich;		/* points to end of which buffer */
 EXTERN Char *CursWhich;		/* points to the cursor point in which buf */
 EXTERN int HistWhich;		/* Hist_num is saved in this */
-EXTERN Char *SearchPrompt;	/* points to string that holds search prompt */
-EXTERN Char DoingSearch;	/* true if we are doing a history search */
 EXTERN char Expand;		/* true if we are expanding a line */
 EXTERN Char HistLit;		/* true if history lines are shown literal */
 EXTERN Char CurrentHistLit;	/* Literal status of current show history line */
@@ -163,6 +160,9 @@ EXTERN int T_Lines, T_Cols;	/* Rows and Cols of the terminal */
 EXTERN Char T_CanIns;		/* true if I can insert characters */
 EXTERN Char T_CanDel;		/* dito for delete characters */
 EXTERN Char T_Tabs;		/* true if tty interface is passing tabs */
+EXTERN Char T_Margin;		
+#define MARGIN_AUTO  1		/* term has auto margins */
+#define MARGIN_MAGIC 2		/* concept glitch */
 EXTERN speed_t T_Speed;		/* Tty input Baud rate */
 EXTERN Char T_CanCEOL;		/* true if we can clear to end of line */
 EXTERN Char T_CanUP;		/* true if this term can do reverse linefeen */

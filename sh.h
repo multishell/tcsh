@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.h,v 3.26 1991/12/19 22:34:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.h,v 3.35 1992/05/15 23:49:22 christos Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -106,6 +106,24 @@ typedef int sigret_t;
 #ifndef INBUFSIZE
 # define INBUFSIZE	1024	/* Num input characters on the command line */
 #endif /* INBUFSIZE */
+
+
+/*
+ * What our builtin echo looks like
+ */
+#define NONE_ECHO	0
+#define BSD_ECHO	1
+#define SYSV_ECHO	2
+#define BOTH_ECHO	(BSD_ECHO|SYSV_ECHO)
+
+#ifndef ECHO_STYLE
+# if SYSVREL > 0
+#  define ECHO_STYLE SYSV_ECHO
+# else /* SYSVREL == 0 */
+#  define ECHO_STYLE BSD_ECHO
+# endif /* SYSVREL */
+#endif /* ECHO_STYLE */
+
 /*
  * The shell moves std in/out/diag and the old std input away from units
  * 0, 1, and 2 so that it is easy to set up these standards for invoked
@@ -142,24 +160,26 @@ typedef int sigret_t;
 #ifdef _SEQUENT_
 # include <sys/procstats.h>
 #endif /* _SEQUENT_ */
-#if defined(POSIX) || SVID > 0
+#if defined(POSIX) || SYSVREL > 0
 # include <sys/times.h>
-#endif /* POSIX || SVID > 0 */
+#endif /* POSIX || SYSVREL > 0 */
 
 #ifdef NLS
 # include <locale.h>
 #endif 
 
+#ifndef _MINIX
 #include <sys/param.h>
+#endif /* _MINIX */
 #include <sys/stat.h>
 
 #ifdef BSDTIMES
 # include <sys/time.h>
-# if SVID>3
+# if SYSVREL>3
 #  include "/usr/ucbinclude/sys/resource.h"
 # else
 #  include <sys/resource.h>
-# endif /* SVID>3 */
+# endif /* SYSVREL>3 */
 #endif /* BSDTIMES */
 
 #ifndef POSIX
@@ -170,13 +190,17 @@ typedef int sigret_t;
 # endif /* TERMIO */
 #else /* POSIX */
 # include <termios.h>
-# if SVID > 3
+# if SYSVREL > 3
 #  undef TIOCGLTC	/* we don't need those, since POSIX has them */
 #  undef TIOCSLTC
 #  undef CSWTCH
 #  define CSWTCH _POSIX_VDISABLE	/* So job control works */
-# endif /* SVID > 3 */
+# endif /* SYSVREL > 3 */
 #endif /* POSIX */
+#ifdef DGUX
+#  undef CSWTCH
+#  define CSWTCH _POSIX_VDISABLE	/* So job control works */
+#endif /* DGUX */
 
 #ifdef POSIX
 /*
@@ -210,11 +234,14 @@ extern int setpgrp();
 # include <limits.h>
 #endif /* POSIX */
 
-#if SVID > 0 || defined(_IBMR2) || defined(_MINIX)
-# if !defined(pyr) && !defined(aiws) && !defined(stellar)
+#if SYSVREL > 0 || defined(_IBMR2) || defined(_MINIX)
+# if !defined(pyr) && !defined(stellar)
 #  include <time.h>
-# endif /* !aiws && !pyr && !stellar */
-#endif /* SVID > 0 ||  _IBMR2 */
+#  ifdef _MINIX
+#   define HZ CLOCKS_PER_SEC
+#  endif /* _MINIX */
+# endif /* !pyr && !stellar */
+#endif /* SYSVREL > 0 ||  _IBMR2 */
 
 #if !((defined(sun) || defined(_MINIX)) && defined(TERMIO))
 # include <sys/ioctl.h>
@@ -224,8 +251,9 @@ extern int setpgrp();
 # include <sys/filio.h>
 #endif /* !FIOCLEX && sun */
 
-
+#ifndef	_MINIX
 #include <sys/file.h>
+#endif	/* _MINIX */
 
 #if !defined(O_RDONLY) || !defined(O_NDELAY)
 # include <fcntl.h>
@@ -238,7 +266,11 @@ extern int setpgrp();
 #if __STDC__
 # include <stdarg.h>
 #else
+#ifdef	_MINIX
+# include "mi.varargs.h"
+#else
 # include <varargs.h>
+#endif	/* _MINIX */
 #endif 
 
 #ifdef DIRENT
@@ -251,13 +283,16 @@ extern int setpgrp();
 # endif
 # define dirent direct
 #endif /* DIRENT */
-#if defined(hpux) || defined(sgi)
+#if defined(hpux) || defined(sgi) || defined(OREO)
 # include <stdio.h>	/* So the fgetpwent() prototypes work */
-#endif 
+#endif /* hpux || sgi || OREO */
 #include <pwd.h>
 #ifdef PW_SHADOW
 # include <shadow.h>
 #endif /* PW_SHADOW */
+#ifdef PW_AUTH
+# include <auth.h>
+#endif /* PW_AUTH */
 #ifdef BSD
 # include <strings.h>
 # define strchr(a, b) index(a, b)
@@ -347,11 +382,6 @@ extern void		DebugFree	__P((ptr_t, char *, int));
  * April, 1980
  */
 
-#define SIGN_EXTEND_CHAR(a) \
-	((int) ((a) & 0x80 ? ((int) (a)) | 0xffffff00 : ((int) a) & 0x000000ff))
-
-
-
 #if !defined(MAXNAMLEN) && defined(_D_NAME_MAX)
 # define MAXNAMLEN _D_NAME_MAX
 #endif /* MAXNAMLEN */
@@ -416,24 +446,28 @@ EXTERN struct timeval time0;	/* Time at which the shell started */
 EXTERN struct rusage ru0;
 #else
 # ifdef _SEQUENT_
-EXTERN timeval_t time0;		/* Time at which the shell started */
+EXTERN timeval_t time0;		/* time at which shell started */
 EXTERN struct process_stats ru0;
 # else /* _SEQUENT_ */
 #  ifndef POSIX
 EXTERN time_t  time0;		/* time at which shell started */
 #  else	/* POSIX */
 EXTERN clock_t time0;		/* time at which shell started */
+EXTERN clock_t clk_tck;
 #  endif /* POSIX */
 EXTERN struct tms shtimes;	/* shell and child times for process timing */
 # endif /* _SEQUENT_ */
 #endif /* BSDTIMES */
+
+#ifndef HZ
+# define HZ	100		/* for division into seconds */
+#endif
 
 /*
  * Miscellany
  */
 EXTERN Char   *doldol;		/* Character pid for $$ */
 EXTERN int     backpid;		/* pid of the last background job */
-EXTERN time_t  chktim;		/* Time mail last checked */
 
 /*
  * Ideally these should be uid_t, gid_t, pid_t. I cannot do that right now
@@ -442,7 +476,6 @@ EXTERN time_t  chktim;		/* Time mail last checked */
  * make special cases for them. In the future...
  */
 EXTERN int     uid;		/* Invokers uid */
-EXTERN int     gid;		/* Invokers gid */
 EXTERN int     opgrp,		/* Initial pgrp and tty pgrp */
                shpgrp,		/* Pgrp of shell */
                tpgrp;		/* Terminal process group */
@@ -636,8 +669,9 @@ struct command {
 #define	F_NICE		(1<<11)	/* t_nice is meaningful 	 */
 #define	F_NOHUP		(1<<12)	/* nohup this command 		 */
 #define	F_TIME		(1<<13)	/* time this command 		 */
+#define F_BACKQ		(1<<14)	/* execute command under SYSTYPE */
 #ifdef apollo
-#define F_VER		(1<<14)	/* execute command under SYSTYPE */
+#define F_VER		(1<<15)	/* execute command under SYSTYPE */
 #endif 
     union {
 	Char   *T_dlef;		/* Input redirect word 		 */
@@ -763,6 +797,18 @@ EXTERN int   gflag;		/* After tglob -> is globbing needed? */
 # define MAXNAMLEN 512
 #endif /* MAXNAMLEN */
 
+#ifndef HAVENOLIMIT
+/*
+ * resource limits
+ */
+extern struct limits {
+    int     limconst;
+    char   *limname;
+    int     limdiv;
+    char   *limscale;
+} limits[];
+#endif /* !HAVENOLIMIT */
+
 /*
  * Variables for filename expansion
  */
@@ -773,7 +819,6 @@ extern long gargc;		/* Number args in gargv */
  * Variables for command expansion.
  */
 extern Char **pargv;		/* Pointer to the argv list space */
-extern long pargc;		/* Count of arguments in pargv */
 EXTERN Char   *pargs;		/* Pointer to start current word */
 EXTERN long    pnleft;		/* Number of chars left in pargs */
 EXTERN Char   *pargcp;		/* Current index into pargs */

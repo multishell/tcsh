@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.parse.c,v 3.5 1991/11/26 04:41:23 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.parse.c,v 3.6 1992/01/27 04:20:47 christos Exp $ */
 /*
  * sh.parse.c: Interpret a list of tokens
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.parse.c,v 3.5 1991/11/26 04:41:23 christos Exp $")
+RCSID("$Id: sh.parse.c,v 3.6 1992/01/27 04:20:47 christos Exp $")
 
 /*
  * C shell
@@ -260,7 +260,7 @@ syn0(p1, p2, flags)
 	case '|':
 	    if (p->word[1] == '|')
 		continue;
-	    /* fall into ... */
+	    /*FALLTHROUGH*/
 
 	case '>':
 	    if (p->next != p2 && eq(p->next->word, STRand))

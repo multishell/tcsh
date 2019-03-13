@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tc.prompt.c,v 3.9 1991/12/19 22:34:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.prompt.c,v 3.12 1992/03/21 02:46:07 christos Exp $ */
 /*
  * tc.prompt.c: Prompt printing stuff
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.prompt.c,v 3.9 1991/12/19 22:34:14 christos Exp $")
+RCSID("$Id: tc.prompt.c,v 3.12 1992/03/21 02:46:07 christos Exp $")
 
 #include "ed.h"
 
@@ -54,7 +54,7 @@ char   *day_list[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
 void
 printprompt(promptno, str)
     int     promptno;
-    Char   *str;
+    char   *str;
 {
     Char   *p, *z, *q, *ep, *cp;
     register Char attributes = 0;
@@ -63,7 +63,8 @@ printprompt(promptno, str)
     struct tm *t;
     time_t  lclock;
     Char    buff[BUFSIZE];
-    static  Char *ocp = NULL, *ostr = NULL;
+    static  Char *ocp = NULL;
+    static  char *ostr = NULL;
 
     (void) time(&lclock);
     t = localtime(&lclock);
@@ -91,6 +92,7 @@ printprompt(promptno, str)
 	    cp = value(STRprompt);
 	break;
     }
+
     if (promptno < 2) {
 	ocp = cp;
 	ostr = str;
@@ -221,9 +223,9 @@ printprompt(promptno, str)
 			break;
 		    }
 		}
-		/* fall through if ~ not matched */
+		/*FALLTHROUGH*/
 	    case '/':
-		if (z = value(STRcwd)) {
+		if ((z = value(STRcwd)) != NULL) {
 		    while (*z) {
 			*p++ = attributes | *z++;
 			if (p >= ep) break;
@@ -261,7 +263,8 @@ printprompt(promptno, str)
 			}
 			else
 			    q = buff;
-			for (z = q; *z; z++);	/* find the end */
+			for (z = q; *z; z++)
+			    continue;	/* find the end */
 			while (j-- > 0) {
 			    while ((z > q) && (*z != '/'))
 				z--;	/* back up */
@@ -278,14 +281,14 @@ printprompt(promptno, str)
 		}
 		break;
 	    case 'n':
-		if (z = value(STRuser))
+		if ((z = value(STRuser)) != NULL)
 		    while (*z) {
 			*p++ = attributes | *z++;
 			if (p >= ep) break;
 		    }
 		break;
 	    case 'l':
-		if (z = value(STRtty))
+		if ((z = value(STRtty)) != NULL)
 		    while (*z) {
 			*p++ = attributes | *z++;
 			if (p >= ep) break;
@@ -368,7 +371,7 @@ printprompt(promptno, str)
 		ClearToBottom();
 		break;
 	    case '?':
-		if (z = value(STRstatus))
+		if ((z = value(STRstatus)) != NULL)
 		    while (*z) {
 			*p++ = attributes | *z++;
 			if (p >= ep) break;
@@ -398,7 +401,7 @@ printprompt(promptno, str)
 		break;
 	    }
 	}
-	else if (*cp == '\\' | *cp == '^') {
+	else if (*cp == '\\' || *cp == '^') {
 	    *p++ = attributes | parseescape(&cp);
 	}
 	else if (*cp == '!') {	/* EGS: handle '!'s in prompts */

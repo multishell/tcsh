@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tw.h,v 3.2 1991/12/14 20:45:46 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/tw.h,v 3.9 1992/04/03 22:15:14 christos Exp $ */
 /*
  * tw.h: TwENEX functions headers
  */
@@ -37,45 +37,31 @@
 #ifndef _h_tw
 #define _h_tw
 
-#ifdef BSDSIGS
+#define TW_ZERO		-1
+#define TW_NONE		0
+#define TW_COMMAND	1
+#define TW_VARIABLE	2
+#define TW_LOGNAME	3
+#define TW_FILE		4
+#define TW_DIRECTORY	5
+#define TW_VARLIST	6
+#define TW_USER		7
+#define TW_COMPLETION	8
+#define TW_ALIAS	9
+#define TW_SHELLVAR	10
+#define TW_ENVVAR	11
+#define TW_BINDING	12
+#define TW_WORDLIST	13
+#define TW_LIMIT	14
+#define TW_SIGNAL	15
+#define TW_JOB		16
+#define TW_EXPLAIN	17
 
-# define FREE_ITEMS(items,num)\
-{\
-    sigmask_t omask;\
-    omask = sighold (SIGINT);\
-    free_items (items,num);\
-    items = NULL;\
-    (void) sigsetmask(omask);\
-}
-
-# define FREE_DIR(fd)\
-{\
-    sigmask_t omask;\
-    omask = sighold (SIGINT);\
-    (void) closedir (fd);\
-    fd = NULL;\
-    (void) sigsetmask(omask);\
-}
-
-#else
-
-# define FREE_ITEMS(items,num)\
-{\
-    sighold (SIGINT);\
-    free_items (items,num);\
-    items = NULL;\
-    (void) sigrelse (SIGINT);\
-}
-
-# define FREE_DIR(fd)\
-{\
-    sighold (SIGINT);\
-    (void) closedir (fd);\
-    fd = NULL;\
-    (void) sigrelse (SIGINT);\
-}
-
-#endif
+#define TW_EXEC_CHK	0x01
+#define TW_DIR_CHK	0x02
+#define TW_DIR_OK	0x04
+#define TW_PAT_OK	0x08
+#define TW_IGN_OK	0x10
 
 #ifndef TRUE
 # define TRUE		1
@@ -92,7 +78,6 @@
 #define is_set(var)	adrof(var)
 #define ismetahash(a)	(ismeta(a) && (a) != '#')
 
-#define BUILTINS	"/usr/local/lib/builtins/"	/* fake builtin bin */
 #define SEARCHLIST "HPATH"	/* Env. param for helpfile searchlist */
 #define DEFAULTLIST ":/usr/man/cat1:/usr/man/cat8:/usr/man/cat6:/usr/local/man/cat1:/usr/local/man/cat8:/usr/local/man/cat6"	/* if no HPATH */
 
@@ -103,24 +88,8 @@ typedef enum {
     VARS_EXPAND, PATH_NORMALIZE
 }       COMMAND;
 
-
-#define NUMCMDS_START 512	/* was 800 */
-#define NUMCMDS_INCR 256
-#define ITEMS_START 512
-#define ITEMS_INCR 256
-
-#ifndef DONT_EXTERN
-
-extern Char **command_list;	/* the pre-digested list of commands for speed
-				 * and general usefullness */
-extern int numcommands;
-extern int have_sorted;
 extern int non_unique_match;
 
-extern Char dirflag[5];		/* ' nn\0' - dir #s -  . 1 2 ... */
-
-
-#endif
 #include "tw.decls.h"
 
-#endif				/* _h_tw */
+#endif /* _h_tw */

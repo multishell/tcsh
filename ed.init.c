@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/ed.init.c,v 3.23 1991/12/19 22:34:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/ed.init.c,v 3.27 1992/04/03 22:15:14 christos Exp $ */
 /*
  * ed.init.c: Editor initializations
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.init.c,v 3.23 1991/12/19 22:34:14 christos Exp $")
+RCSID("$Id: ed.init.c,v 3.27 1992/04/03 22:15:14 christos Exp $")
 
 #include "ed.h"
 #include "ed.term.h"
@@ -169,6 +169,7 @@ ed_Setup(rst)
     int rst;
 {
     static int havesetup = 0;
+    struct varent *imode;
 
     if (havesetup) 	/* if we have never been called */
 	return(0);
@@ -178,22 +179,29 @@ ed_Setup(rst)
 	long pcret;
 
 	if ((pcret = fpathconf(SHTTY, _PC_VDISABLE)) == -1L)
-	    vdisable = _POSIX_VDISABLE;
+	    vdisable = (unsigned char) _POSIX_VDISABLE;
 	else 
-	    vdisable = pcret;
-	if (vdisable != _POSIX_VDISABLE && rst != 0)
-	    for (rst = 0; rst < C_NCC - 2; rst++) {
-		if (ttychars[ED_IO][rst] == _POSIX_VDISABLE)
+	    vdisable = (unsigned char) pcret;
+	if (vdisable != (unsigned char) _POSIX_VDISABLE && rst != 0)
+	    for (rst = 0; rst < C_NCC; rst++) {
+		if (ttychars[ED_IO][rst] == (unsigned char) _POSIX_VDISABLE)
 		    ttychars[ED_IO][rst] = vdisable;
-		if (ttychars[EX_IO][rst] == _POSIX_VDISABLE)
+		if (ttychars[EX_IO][rst] == (unsigned char) _POSIX_VDISABLE)
 		    ttychars[EX_IO][rst] = vdisable;
 	    }
     }
 #else /* ! POSIX || !_PC_VDISABLE && !defined(BSD4_4) */
-    vdisable = _POSIX_VDISABLE;
+    vdisable = (unsigned char) _POSIX_VDISABLE;
 #endif /* POSIX && _PC_VDISABLE */
 	
-    inputmode = MODE_INSERT;	/* start out in insert mode */
+    if ((imode = adrof(STRinputmode)) != NULL) {
+	if (!Strcmp(*(imode->vec), STRinsert))
+	    inputmode = MODE_INSERT;
+	else if (!Strcmp(*(imode->vec), STRoverwrite))
+	    inputmode = MODE_REPLACE;
+    }
+    else
+	inputmode = MODE_INSERT;
     ed_InitMaps();
     Hist_num = 0;
     Expand = 0;
@@ -251,16 +259,16 @@ ed_Setup(rst)
 	if (tty_cooked_mode(&tstty)) {
 	    tty_getchar(&tstty, ttychars[TS_IO]);
 	    /*
-	     * Don't affect CMIN and CTIME
+	     * Don't affect CMIN and CTIME for the editor mode
 	     */
-	    for (rst = 0; rst < C_NCC - 2; rst++) {
-		if (ttychars[TS_IO][rst] != vdisable &&
-		    ttychars[EX_IO][rst] != vdisable)
-		    ttychars[EX_IO][rst] = ttychars[TS_IO][rst];
+	    for (rst = 0; rst < C_NCC - 2; rst++) 
 		if (ttychars[TS_IO][rst] != vdisable &&
 		    ttychars[ED_IO][rst] != vdisable)
 		    ttychars[ED_IO][rst] = ttychars[TS_IO][rst];
-	    }
+	    for (rst = 0; rst < C_NCC; rst++) 
+		if (ttychars[TS_IO][rst] != vdisable &&
+		    ttychars[EX_IO][rst] != vdisable)
+		    ttychars[EX_IO][rst] = ttychars[TS_IO][rst];
 	}
 	tty_setchar(&extty, ttychars[EX_IO]);
 	if (tty_setty(SHTTY, &extty) == -1) {

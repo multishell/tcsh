@@ -1,15 +1,28 @@
-.\" $Id: tcsh.man,v 3.26 1991/12/19 21:40:06 christos Exp $
+.\" $Id: tcsh.man,v 3.43 1992/05/15 21:54:34 christos Exp $
 .TH TCSH 1 "19 December 1991" "Cornell"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
 .B tcsh 
 [ 
-.B \-bcdefFilmnqstvVxX 
-.B \-Dname[=value]
+.B \-bcdefimnqstvVxX 
 ] 
 [ 
-.I argument .\|.\|.  
+.I argument .\|.\|.
+]
+.sp
+or
+.br
+.B tcsh -l
+.sp
+OS/Dependent Options
+.br
+.B tcsh 
+[ 
+.B \-F
+]
+[
+.B \-Dname[=value]
 ]
 .SH DESCRIPTION
 .I Tcsh
@@ -127,6 +140,9 @@ directory is changed.
 .sp
 .ti -4
 32) Enhanced history/variable modifier expansion
+.sp
+.ti -4
+33) Programmable file/user/variable/alias completion.
 .RE
 .sp
 For a description of standard C-shell features, see the
@@ -810,7 +826,7 @@ several shell variables:
 Setting the
 .I recexact
 variable makes an exact command be expanded rather than just ringing the bell.
-For example, assume the current directory has two subdirectories
+For example, assume the current directory has two sub-directories
 called foo and food, then with
 .I recexact
 set the following could be done:
@@ -883,7 +899,7 @@ available".  Thus, when you have typed, perhaps:
 > cd ~speech/data/fritz/
 .RE
 .sp
-you may wish to know what files or subdirectories exist (in
+you may wish to know what files or sub-directories exist (in
 ~speech/data/fritz), without, of course, aborting the command you are
 typing.  Typing the character Control-D (^D), will list the names
 (files, in this case) available.  The files are listed in multicolumn
@@ -900,7 +916,7 @@ If the user had typed:
 > cd ~speech/data/fr[^D]
 .RE
 .sp
-all files and subdirectories whose prefix was
+all files and sub-directories whose prefix was
 ``fr'' would be printed.  Notice that the example before was simply
 a degenerate case of this with a null trailing file name. 
 (The null string is a prefix of all strings.)
@@ -921,7 +937,8 @@ however, that the degenerate
 > <Spaces>[^D]
 .RE
 .sp
-does not list all of the commands, but only beeps.
+does not list all of the commands, but only the files in the current working
+directory.
 .PP
 Listing/expanding of words that match a name containing wildcard characters 
 can be done via the list-glob/expand-glob function: 
@@ -1349,6 +1366,13 @@ Print the stack entries one in each line, preceded by the stack number.
 Note that popd +n can be used to pop out stack entries of directories that
 do not exist any more.
 .PP
+.I Tcsh 
+always saves the last directory visited. Changing to the previous directory
+can be done by using 
+.I 'cd -' 
+or 
+.I 'pushd -'.
+.PP
 .I Tcsh
 will now allow the user to access all elements in the directory stack directly.
 The syntax "=<digit>" is recognized by 
@@ -1409,27 +1433,54 @@ pushed onto the top of the stack.  Example:
 /usr/spool/uucp /sys/src /usr/net/bin ~
 .RE
 .fi
+.PP 
+In addition, if the shell variable 
+.I dunique 
+is set, only directories that are not already in the directory stack
+will be added when 
+.I push 
+is invoked.
 .PP
 The way symbolic links that point to directories are crossed is
-determined by two variables: 
-.I chase_symlinks 
-and 
-.I ignore_symlinks. 
+determined by the 
+.I symlinks
+variable. By default, it is not set to anything and symbolic links
+are not treated specially. However, it can be set to either:
+.I chase,
+.I ignore,
+or
+.I expand.
 If 
-.I chase_symlinks 
-is set, then every time the directory changes, 
+.I symlinks 
+is set to
+.I chase,
+then every time the directory changes, 
 .I $cwd
 reflects the real directory name, and not the name through the link. 
 A notable exception is the user's home directory, but that should
 be fixed. If 
-.I ignore_symlinks 
-is set, then directory change tries to find where
-you came from before you crossed the link to change the directory 
-relatively. If you chdir through a symbolic link
-and then cd .., 
+.I symlinks 
+is set to either
+.I ignore
+or
+.I expand,
+then tcsh
+tries to determine the current directory name relative to the name of the
+current directory before the link was crossed. In simple terms, if you chdir
+through a symbolic link and then cd .., 
 you will end .. relatively to where you were before
 you crossed the link and not .. relatively to 
-where the symbolic link points.
+where the symbolic link points. While 
+.I ignore 
+affects only builtin commands and completion, 
+.I expand 
+affects command execution too, by `fixing' arguments that it considers
+to be path names. Unfortunately this does not work in every case, specially
+when file arguments are embedded in command line options. 
+.I Expand
+also allows to specify the `real' 
+(as opposed to the one determined relatively to 
+.I $cwd), by quoting the file argument.
 .PP
 For example:
 .sp
@@ -1438,33 +1489,50 @@ For example:
 > cd /tmp
 > mkdir from from/src to
 > ln -s ../from/src to/dst
-> echo $cwd 
-/tmp
 
-> unset ignore_symlinks; unset chase_symlinks
-> cd to/dst; echo $cwd 
+> unset symlinks
+> cd /tmp/to/dst; echo $cwd 
 /tmp/to/dst
-> cd ..
+> cd ..; echo $cwd
 /tmp/from
 
-> unset ignore_symlinks; set chase_symlinks
+> set symlinks=chase
 > cd /tmp/to/dst; echo $cwd
 /tmp/from/src
 > cd ..; echo $cwd
 /tmp/from
 
-> set ignore_symlinks; unset chase_symlinks
+> set symlinks=ignore
 > cd /tmp/to/dst; echo $cwd
 /tmp/to/dst
-> cd ..; echo $pwd
+> cd ..; echo $cwd
 /tmp/to
+
+> set symlinks=expand
+> cd /tmp/to/dst; echo $cwd
+/tmp/to/dst
+> cd ..; echo $cwd		# builtin
+/tmp/to
+> cd /tmp/to/dst; echo $cwd
+/tmp/to/dst
+> cd ".."; echo $cwd		# quoted
+/tmp/from
+> /bin/echo ..			# rewrites non builtin commands.
+/tmp/to
+> /bin/echo ".."
+..
 .RE
 .sp
 .fi
-In case you are wondering what happens when you set both, 
-.I ignore_symlinks 
-will override
-.I chase_symlinks.
+While the
+.I expand
+setting is the most convenient, and makes symbolic links invisible, it
+can sometimes be misleading and confusing in cases where it fails to
+recognize arguments. A compromise is to use the 
+.I ignore 
+setting and use the editor functions "normalize-path", bound by default
+to 
+.I ^Xn.
 .PP
 .SH "15. WATCHING FOR LOGINS AND LOGOUTS"
 .I Tcsh
@@ -1689,12 +1757,17 @@ based on the time of day.
 .SH "17. BUILTIN FOR ls -F"
 There is a new builtin command called
 .I ls-F
-which does the same thing as the command "ls -aF" if the shell
-variable
+which does the same thing as the command "ls -F".
+If the shell variable
 .I showdots
-has been set, and acts like "ls -F" otherwise. Ls-F works like
-ls, only it is generally faster. If other switches are passed
-to 
+has been set, it acts like "ls -aF". If 
+.I showdots 
+is equal to "-A", then 
+.I ls-F
+acts like "ls -AF". Ls-F works like
+ls, only it is generally faster, since it does not need to fork and exec,
+and safer against Trojan horses if the user has `.' in the execution path. 
+If other switches are passed to 
 .I ls-F, 
 then the normal ls is executed. Aliasing ls to ls-F provides
 a fast alternative way of listing files.
@@ -1832,6 +1905,7 @@ The current possible values are:
 \fIaixESA\fR		an IBM ESA, running aix
 \fIalliant\fR		an Alliant FX series
 \fIamdahl\fR		an Amdahl running uts 2.1
+\fIamiga\fR		an amiga running amix 2.02
 \fIapollo\fR		an Apollo running DomainOS
 \fIatt3b15\fR		an AT&T 3b15
 \fIatt3b2\fR		an AT&T 3b2
@@ -1885,9 +1959,11 @@ The current possible values are:
 \fIsun386i\fR		a Sun Microsystems 386i workstation (386 based)
 \fIsun4\fR			a Sun Microsystems series 4 workstation (SPARC based)
 \fIsymmetry\fR		a Sequent Symmetry running DYNIX 3 (386/486 based)
+\fItahoe\fR		a tahoe running 4BSD
 \fItitan\fR		an Stardent Titan
 \fIunixpc\fR		an UNIX/PC running SVR1 att7300 aka att3b1
 \fIvax\fR			a Digital Equipment Corp. Vax (of any flavor)
+\fIvistra800\fR		a Stardent Vistra 800 running SVR4
 .DT
 .fi
 .sp
@@ -1922,6 +1998,9 @@ to believe that the termcap capability `cap' ( as defined in
 .IR termcap (5)
 ) has the value `value'. No checking for sanity is performed, so beware of
 improper use.
+.PP
+Note that Concept terminal users may have to "settc xn no" to get proper
+wrapping at the rightmost column.
 .PP
 .SH "21. SEARCHING FOR THE VISUAL HISTORY"
 Four new editor functions have been added in emacs mode: Two of them,
@@ -2430,9 +2509,10 @@ and then
 if the shell was a login shell.
 .sp
 Note: On 
-.I convexos
-and
+.I convexos,
 .I stellix
+and
+.I INTEL
 the names of the system default files are
 .I "/etc/cshrc",
 .I "/etc/login"
@@ -2445,7 +2525,8 @@ and
 .I "/etc/logout.std"
 Finally on
 .I irix,
-.I A/UX
+.I A/UX,
+.I AMIX,
 and the
 .I cray
 only the file
@@ -2535,6 +2616,13 @@ re-written as:
 .RE
 .fi
 .sp
+.I Tcsh 
+can also use the
+.I l
+and 
+.I u
+modifiers to change the case of a word.
+.sp
 Also 
 .I tcsh 
 has an additional : character
@@ -2592,15 +2680,339 @@ implementation when used with the
 .I s
 modifier. For example :as/f/ff/ will never terminate. This behavior
 might change in the future.
-
+.sp
+.SH "33. PROGRAMMABLE COMPLETION"
+The new 
+.I complete
+and 
+.I uncomplete 
+builtins can change the behavior of the listing and file-completion 
+in tcsh. For example some commands like 
+.I cd,
+.I pushd,
+.I popd ,
+.I mkdir(1),
+.I rmdir(1)
+accept only directories as arguments.
+Normally
+.I tcsh 
+when asked to list or complete an argument for those commands takes
+into account all the files and not only directories. This behavior
+can be changed by telling 
+.I tcsh
+that these commands only expect directory arguments:
+.sp
+.nf
+> complete cd 'n/*/d/'
+.fi
+.sp
+The above command tells 
+.I tcsh
+to complete any following word with a directory.
+.PP 
+The syntax for the
+.I complete 
+and
+.I uncomplete
+builtins is:
+.sp
+.I complete [<command-pattern> [<completion-argument>]]
+.br
+.I uncomplete <command-pattern>
+.PP
+Completion arguments are matched in turn from left to right and
+the first successful match is returned.
+There are three different completion arguments, modeled after the
+.I sed(1) 
+substitute command and they are of the form:
+.sp
+.B <command>/<match-pattern>/<complete-action>/[<suffix>|/]
+.sp
+The five commands available are:
+.TP 
+.B p
+This specifies position-dependent completion. The matching pattern is
+a numeric range similar to the one used to index shell variables. 
+If the current word is within that range, then the completion action is
+taken. For example:
+.sp
+.nf
+> complete cd 'p/1/d/'
+.fi
+.sp
+completes only the first argument of 'cd' with a directory. A special
+useful case of position-dependent completion can be used to disambiguate
+command completion:
+.sp
+.nf
+> set autolist
+> co[TAB]
+complete compress
+> complete -co* 'p/0/(complete)/'
+> co[TAB]
+> complete _
+.fi
+.sp
+The above command tells the completion mechanism to match any word on
+position 0, that matches the pattern
+.I "co*".
+If a match is found, the word is replaced with the literal pattern
+"complete". The leading '-'
+in the pattern signifies that this completion is to be used only with
+ambiguous commands.
+.TP 
+.B n,N
+This command specifies next-word completions. The matching pattern in
+this case is a shell pattern that must match the previous word on
+the command line 
+.I (n),
+or the word before that
+.I (N).
+For example:
+.sp
+.nf
+> complete find 'n/-user/u/'
+.fi
+.sp
+Here the argument of the find command which follows the -user argument is
+completed from the list of users.
+.TP
+.B c,C
+The last two completion commands complete the current word. The matching 
+pattern in this case must match the prefix of the current word. For example:
+.sp
+.nf
+> complete cc 'c/-I/d/'
+.fi
+.sp
+completes the the word containing -I from the list of directories.
+While
+.B `c' 
+discards the matched prefix, 
+.B `C'
+keeps it and applies the completion using it.
+.sp
+.PP
+So far the 
+.I d,
+.I u,
+.I (word)
+completion actions have been mentioned. The complete list of 
+completion actions are:
+.sp
+.RS +.6i
+.ta 1.2i 1.7i
+.nf
+C	Complete completions
+S	Complete signals
+a	Complete aliases
+b	Complete binding
+c	Complete command
+d	Complete directory
+e	Complete environment variable
+f	Complete file or path component
+j	Complete jobs
+l	Complete limits
+n	Complete nothing
+s	Complete shell variable
+v	Complete any variable
+u	Complete username
+x	Explain what argument when listing is requested.
+$var	Complete using words from variable
+(...)	Complete using words from list
+`...`	Complete evaluating word list from the output of command.
+.fi
+.RE
+.DT
+.sp
+All the above completion actions, except 
+.I x,
+.I $var,
+.I (...),
+and
+.I "`...`"
+can have an additional shell pattern which must match the files to be
+completed, separated from the action with a ':'. The 
+.I 'x'
+completion action instead expects the explanation string specified this way.
+For example, in the C compiler, it makes sense to complete only files
+that the compiler understands:
+.sp
+.br
+> complete cc 'n/*/f:*.[cao]/'
+.br
+.PP
+It is also useful to exclude files from the completion list. Normally
+.I tcsh 
+will expand the following command:
+.sp
+.nf
+> set fignore=(.o)
+> ls
+foo.c foo.o
+> vi f[TAB]
+> vi foo.c
+> rm f[TAB]
+> rm foo.c
+.fi
+.sp
+A better way to do this is to use the
+.I complete
+builtin to protect precious files:
+.sp
+.nf
+> complete rm 'n/*/f:^*.{c,h,cc,C,tex,1,man,l,y}/'
+> ls
+foo.c foo.o
+> vi f[TAB]
+> vi foo.c
+> rm f[TAB]
+> rm foo.o
+.fi
+.sp
+Note that 
+.I fignore 
+is not used when a shell pattern is specified in a completion action.
+.PP
+Other commands don't expect files as arguments, so the completion builtin
+can be used to change the list of items to be completed:
+.sp
+.RS +.2i
+.ta 1.5i 2.0i 4.0i
+.nf
+> complete man 	'n/*/c/'		# complete commands 
+> complete which	'n/*/c/'	
+> complete dbx 	'p/2/(core)/' 'n/*/c/'
+> complete alias 	'p/1/a/'		# complete aliases
+> complete set 	'p/1/s/'			# complete variables
+> complete finger 	'p/1/u/'		# complete user-names
+.fi
+.RE
+.sp
+Note that in the 
+.I dbx
+example, the positional completion is specified before the next word 
+completion. Since completions are evaluated from left to right, if
+the next word completion was specified first it would always match
+and the positional completion would never be executed. This is a
+common mistake when defining a completion. 
+.PP
+In some cases the list needs to be customized or dynamically generated.
+.sp
+.nf
+> set hostnames=(prep.ai.mit.edu tesla.ee.cornell.edu)
+> complete rlogin 'p/1/$hostnames/'
+.fi
+.sp
+Consider a complex example using matching patterns to direct argument
+dependent completions:
+.ta 1.2i 1.6i
+.nf
+> complete find	'n/-fstype/(nfs 4.2)/' 'n/-name/f/' \e
+		'n/-type/(c b d f p l s)/' 'n/-user/u/' 'n/-exec/c/' \e
+		'n/-ok/c/' 'n/-cpio/f/' 'n/-ncpio/f/' 'n/-newer/f/' \e
+		'c/-/(fstype name perm prune type user nouser \e
+		      group nogroup size inum atime mtime ctime exec \e
+		      ok print ls cpio ncpio newer xdev depth)/' \e
+		'n/*/d/'
+.fi
+.sp
+.sp
+The words following the
+.I -fstype
+and
+.I -type
+arguments is to be completed from the lists specified.
+The word following the
+.I -name,
+.I -cpio,
+.I -ncpio,
+and
+.I -newer
+arguments are to be completed using files or directory components.
+The word following the
+.I -user
+argument will be completed from the list of user names of the system,
+and the word following the 
+.I -exec 
+and 
+.I -ok
+arguments will be completed from the list of commands.
+The fourth line specifies how the current word will be completed if
+it starts with a 
+.I -.
+Note that the pattern of this completion argument refers to the 
+.I current 
+word and not to the 
+.I previous
+word, like before.
+Finally the last line in the find completion matches all the remaining cases
+and requires a directory component.
+.sp
+.ta 1.2i 3.0i
+.nf
+> cd /usr
+> set autolist
+> find [TAB]
+bin/ include/ lib/ local/ man/ src/
+> find -[TAB]
+atime   depth   group   mtime   newer   ok      prune   user
+cpio    exec    inum    name    nogroup perm    size    xdev
+ctime   fstype  ls      ncpio   nouser  print   type
+> find -u[TAB]
+> find -user [TAB]
+christos root
+> find -user c[TAB]
+> find -user christos 
+.fi
+.PP
+Another useful feature is to override the default suffix rules.
+For example:
+.sp
+.nf
+> complete rcp 'c/*:/f/' 'p/1/$hosts/:'
+> complete finger 'c/*@/$hosts/' 'p/1/u/@'
+.fi
+.sp
+completes from $hosts appending a `:' and then begins expanding files, 
+where finger expands user-names appending an `@' and then begins expanding
+hosts.
+.PP
+Another exotic example that makes use of dynamic command execution is:
+.sp
+.nf
+> complete talk p/1/'`users | tr " " "\e012" | uniq`'/ \e
+           n/\e*/\e`who\e \e|\e grep\e \e$:1\e \e|\e awk\e \e'\e{\e print\e \e$2\e \e}\e'\e`/
+.fi
+.sp
+Here we want to get a list of the active users, as an argument to talk,
+then we want to pick the user, and find his tty...
+Note that there is no quoting performed inside the completion patterns.
+If the character '/' is used in the matched pattern, then another
+punctuation character can be used as a separator. The only pattern
+recognized is
+.B $:<number>
+which is substituted by the n'th word of the current line.
+.PP
+Notes:
+.TP 
+1. 
+The completion command-patterns are overridden when the internal
+parsing mechanism determines that the completion is a login name,
+or a variable.
+.TP
+2.
+This is an experimental feature and the syntax/behavior may change in
+future versions.
+.sp
 .SH FYI
-This shell uses cbreak mode but takes typed-ahead characters anyway.
+This shell uses CBREAK mode but takes typed-ahead characters anyway.
 You can still use
 .IR stty (1)
 to set some of the modes of your terminal (but not bindings).
 .PP
 This shell will restore your tty to a sane mode if it appears to
-return from some command in raw, cbreak, or noecho mode. This behavior
+return from some command in raw, CBREAK, or noecho mode. This behavior
 can be changed using 
 .I setty.
 .PP
@@ -2661,9 +3073,6 @@ parsing mechanism for tcsh, and it can cause syntax errors in
 .I csh
 scripts.
 .TP 10
-.B chase_symlinks 
-always resolve symbolic links to real names on cd, etc.
-.TP 10
 .B correct 
 automatically try to correct the spelling of commands.
 Must be set to either correct=cmd, only command name will be corrected,
@@ -2671,6 +3080,26 @@ or correct=all, the whole line will be corrected.
 .TP 10
 .B dextract 
 extract a directory on pushd rather than rotating.
+.TP 10
+.B dunique 
+Push only directories that are not already in the directory stack.
+.TP 10
+.B echo_style
+Set the style of the builtin echo. Valid values are:
+.RS 0.7in
+.TP 8
+.I "bsd":
+if the first argument is -n, don't echo a newline.
+.TP 8
+.I "sysv":
+recognize \e escape sequences in echo strings.
+.TP 8
+.I "both":
+recognize both -n and \e escape sequences.
+.TP 8
+.I "none":
+the purist's echo.
+.RE
 .TP 10
 .B edit 
 use the input editor, set by default.
@@ -2696,8 +3125,12 @@ in the tty sessions. It is usually set in .cshrc for interactive shells,
 because history is sourced between .cshrc and .login so that it is available
 from .login.
 .TP 10
-.B ignore_symlinks 
-don't resolve symbolic links to real names on cd, etc.
+.B inputmode
+Can be set to either
+.I insert
+or 
+.I overwrite
+to control the line editing behavior, as described in section 1.
 .TP 10
 .B listjobs 
 list all jobs when suspending. set listjobs=long, produces long
@@ -2719,6 +3152,17 @@ never beeps.
 .TP 10
 .B nobeep 
 Disables beeping completely.
+.TP 10
+.B nokanji
+If kanji support is enable, setting this variable disables it, so that
+the meta key can be used.
+.TP 10
+.B nostat
+An list of directories that should not be stat'ed during a completion
+operation. Some directories e.g. "/afs", can take too much time to
+complete a 
+.I stat(2) 
+operation, making them prime candidates for membership in this list.
 .TP 10
 .B oid
 The organization id number (Domain OS only).
@@ -2753,15 +3197,32 @@ in the path that are executable (slow).
 .B rmstar
 Prompt the user before execution of `rm *'.
 .TP 10
+.B savedirs 
+Before exiting, create a file called $HOME/.cshdirs that contains 
+the necessary commands to restore the current directory stack. 
+.I Tcsh
+will read this file during startup and restore the directory stack.
+.TP 10
 .B savehist 
 number of history items to save between login sessions.
+If it is just set, the number of items is taken from $history.
 .TP 10
 .B shlvl
 Integer value indicating the number
 of nested shells. 
 .TP 10
 .B showdots 
-show hidden files in list and complete operations.
+show hidden files in list and complete operations. If it is set to -A,
+then "." and ".." are not displayed, similarly to the BSD ls -A.
+.TP 10
+.B symlinks
+can be set to: 
+.I "chase",
+in order to resolve the full path names,
+.I "ignore",
+in order to use $cwd to resolve relative directory references for builtins.
+.I "expand",
+in order to use $cwd and rewrite the arguments for commands.
 .TP 10
 .B tcsh
 Contains the current version of the shell as R.VV.PP. The 
@@ -2865,7 +3326,7 @@ I am certain that there are bugs.  Bugs (preferably with fixes)
 should be sent to Christos Zoulas (christos@ee.cornell.edu).
 .PP
 .SH VERSION
-This man page documents tcsh 6.01.00 (Cornell) 12/19/91.
+This man page documents tcsh 6.02.00 (Cornell) 05/15/92.
 .PP
 .SH AUTHORS
 Ken Greer, HP Labs, 1981
@@ -2917,6 +3378,11 @@ James J Dempsey, BBN, 1988, and Paul Placeway, OSU, 1988
 Re-ported tcsh to A/UX.
 .sp
 .SH "BUGFIXES AND ENHANCEMENTS"
+.sp
+Mika Liljeberg, liljeber@kruuna.Helsinki.FI
+.br
+Linux port.
+.sp
 Scott Krotz, Motorola, 1991
 .br
 Minix port.

@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tc.os.h,v 3.22 1991/11/26 04:28:26 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.os.h,v 3.29 1992/05/09 04:03:53 christos Exp $ */
 /*
  * tc.os.h: Shell os dependent defines
  */
@@ -39,13 +39,13 @@
 
 #define NEEDstrerror		/* Too hard to find which systems have it */
 
-#if SVID > 3
+#if SYSVREL > 3
 /*
  * for SVR4 we fork pipelines backwards. 
  * more info in sh.sem.c
  */
 # define BACKPIPE
-#endif /* SVID > 3 */
+#endif /* SYSVREL > 3 */
 
 #ifdef OREO
 # include <sys/time.h>
@@ -122,11 +122,10 @@ struct ucred {
 
 /*
  * XXX: This will be changed soon to 
- * #if (SVID > 0) && defined(TIOCGWINSZ)
+ * #if (SYSVREL > 0) && defined(TIOCGWINSZ)
  * If that breaks on your machine, let me know.
  */
-#if defined(INTEL) || defined(u3b2) || defined (u3b5) || \
-    defined(ub15) || defined(u3b20d) || defined(ISC) || defined(SCO) 
+#if defined(INTEL) || defined(u3b2) || defined (u3b5) || defined(ub15) || defined(u3b20d) || defined(ISC) || defined(SCO) 
 #ifdef TIOCGWINSZ
 /*
  * for struct winsiz
@@ -146,11 +145,13 @@ struct ucred {
 #ifdef IRIS4D
 # include <sys/time.h>
 # include <sys/resource.h>
+# ifndef POSIX
 /*
  * BSDsetpgrp() and BSDgetpgrp() are BSD versions of setpgrp, etc.
  */
-# define setpgrp BSDsetpgrp
-# define getpgrp BSDgetpgrp
+#  define setpgrp BSDsetpgrp
+#  define getpgrp BSDgetpgrp
+# endif
 #endif /* IRIS4D */
 
 /*
@@ -324,29 +325,29 @@ struct ucred {
 # ifndef NOFILE
 #  define NOFILE 64
 # endif /* NOFILE */
+# define NEEDgethostname
+# define NEEDnice
 /*
  * Minix does not have these, so...
  */
-# define nice(a)		/**/
 # define ulimit(a, b)		(0x003fffff)
 # define getpgrp()		getpid()
-# define gethostname(a, b)	(strncpy((a), "minix") == NULL)
 #endif /* _MINIX */
 
 #ifndef POSIX
 # define mygetpgrp()    getpgrp(0)
 #else /* POSIX */
-# if defined(BSD) || defined(sun)
+# if defined(BSD) || defined(sun) || defined(IRIS4D)
 #  define mygetpgrp()    getpgrp(0)
-# else /* BSD || sun */
+# else /* BSD || sun || IRIS4D */
 #  define mygetpgrp()    getpgrp()
 # endif	/* BSD || sun */
 #endif /* POSIX */
 
 
-#if SVID > 0 && !defined(OREO) && !defined(sgi)
+#if SYSVREL > 0 && !defined(OREO) && !defined(sgi)
 # define NEEDgetwd
-#endif /* SVID > 0 && !OREO && !sgi */
+#endif /* SYSVREL > 0 && !OREO && !sgi */
 
 #ifndef S_IFLNK
 # define lstat stat
@@ -375,7 +376,9 @@ extern int atoi();
 extern char *ttyname();
 
 # ifndef hpux
+#  if __GNUC__ != 2
 extern int abort();
+#  endif /* __GNUC__ != 2 */
 # ifndef fps500
 extern int qsort();
 # endif /* fps500 */
@@ -390,15 +393,15 @@ extern int gethostname();
 #endif
 
 # ifdef BSDSIGS
-#  if defined(_AIX370) || defined(MACH) || defined(NeXT) || defined(_AIXPS2)
+#  if defined(_AIX370) || defined(MACH) || defined(NeXT) || defined(_AIXPS2) || defined(ardent)
 extern int sigvec();
 extern int sigpause();
-#  else	/* _AIX370 || MACH || NeXT || _AIXPS2 */
+#  else	/* _AIX370 || MACH || NeXT || _AIXPS2 || ardent */
 #   if !defined(apollo) || !defined(__STDC__)
-# ifndef fps500
+#    ifndef fps500
 extern sigret_t sigvec();
 extern void sigpause();
-# endif /* fps500 */
+#    endif /* fps500 */
 #   endif /* !apollo || !__STDC__ */
 #  endif /* _AIX370 || MACH || NeXT || _AIXPS2 */
 extern sigmask_t sigblock();
@@ -447,11 +450,11 @@ extern int waitpid();
 #   endif /* POSIXJOBS || _SEQUENT_ */
 #  endif /* ! BSDTIMES */
 # else /* !BSDJOBS */
-#  if SVID < 3
+#  if SYSVREL < 3
 extern int ourwait();
-#  else	/* SVID >= 3 */
+#  else	/* SYSVREL >= 3 */
 extern int wait();
-#  endif /* SVID >= 3 */
+#  endif /* SYSVREL >= 3 */
 # endif	/* ! BSDJOBS */
 
 # ifdef BSDNICE
@@ -470,6 +473,9 @@ extern struct passwd *getpwuid(), *getpwnam(), *getpwent();
 #ifdef PW_SHADOW
 extern struct spwd *getspnam(), *getspent();
 #endif /* PW_SHADOW */
+#ifdef PW_AUTH
+extern struct authorization *getauthuid();
+#endif /* PW_AUTH */
 #endif /* __STDC__ */
 
 # ifndef getwd
@@ -485,6 +491,22 @@ extern char *getwd();
 extern char *ttyname();   
 # endif /* SCO */
 
+
 #endif /* POSIX */
+
+# if defined(sun) && __GNUC__ == 2
+/*
+ * Somehow these are missing
+ */
+extern int ioctl __P((int, int, ...));
+extern int readlink __P((const char *, char *, size_t));
+# endif /* sun && __GNUC__ == 2 */
+
+#ifdef linux
+extern int		tcgetpgrp	__P((int));
+extern int		tcsetpgrp	__P((int, int));
+extern int		gethostname	__P((char *, int));
+extern int		readlink	__P(());
+#endif /* linux */
 
 #endif /* _h_tc_os */

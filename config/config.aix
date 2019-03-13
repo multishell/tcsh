@@ -5,19 +5,27 @@
  *
  * Edit this to match your system type.
  */
+#ifdef PL8CC
 /* for an RT running the IBM Sys. V version of AIX. -- tells the compiler
    reasonable things. MUST BE the fist thing the compiler sees */
-#ifdef PL8CC
 \option MAXD(20000,20000) MAXS(50000,50000) MAXL(20000,20000) MAXH(20000,20000);
 \option MAXA(20000,20000) MAXP(500) EL_SIZE(20000) ET_SIZE(30000);
 \option OPTIONS UNSAFE;
 #endif
 
+#if defined(_AIX) && defined(_I386) && defined(aiws)
+# undef aiws	/* not an rt */
+#endif /* _AIX && _386 && aiws */
+
 /****************** System dependant compilation flags ****************/
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
  */
+#if defined(_IBMR2)
+#define POSIX
+#else
 #undef POSIX
+#endif
 
 /*
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
@@ -84,7 +92,7 @@
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
- * 		This is usually the case for SVID systems, where
+ * 		This is usually the case for SYSV systems, where
  *		BSD uses sgttyb. POSIX systems should define this
  *		anyway, even though they use struct termios.
  */
@@ -95,16 +103,16 @@
 #endif /* _IBMR2 || aiws */
 
 /*
- * SVID		Your machine is SVID complient (Sys V, HPUX, A/UX)
+ * SYSVRELYour machine is SYSV based (HPUX, A/UX)
  *		NOTE: don't do this if you are on a Pyramid -- tcsh is
  *		built in a BSD universe.
- *		Set SVID to 1, 2, 3, or 4, depending the version of System V
- *		you are running. Or set it to 0 if you are not SVID based
+ *		Set SYSVREL to 1, 2, 3, or 4, depending the version of System V
+ *		you are running. Or set it to 0 if you are not SYSV based
  */
 #ifndef aiws
-# define SVID	0
+# define SYSVREL	0
 #else
-# define SVID	2
+# define SYSVREL	2
 #endif /* aiws */
 
 /*

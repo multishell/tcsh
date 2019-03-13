@@ -1,5 +1,5 @@
 /**/#
-/**/# $Id: Imakefile,v 1.5 1991/11/26 04:28:26 christos Exp $
+/**/# $Id: Imakefile,v 1.15 1992/05/15 23:49:22 christos Exp $
 /**/#
 /**/# Imakefile for for tcsh 6.00
 /**/# Marc Horowitz, MIT SIPB
@@ -7,6 +7,9 @@
 
 #ifdef DestDir
 #undef DestDir
+#endif
+#ifdef ManSuffix
+#undef ManSuffix
 #endif
 
 /* All config options go in a separate file. */
@@ -80,6 +83,22 @@ ones.  Please send in your fixes and additions! */
 
 #ifdef SQNTArchitecture
 #define ConfigH sequent
+#endif
+
+#ifdef MacIIArchitecture
+#define ConfigH mac2
+#endif
+
+#ifdef MinixArchitecture
+/* Maybe conditional on MACH? */
+SYSSRCS=mi.termios.c mi.wait.h mi.varargs.h
+SYSOBJS=mi.termios.${SUF}
+EXTF=ma.setp.c
+#else
+/* Maybe conditional on MACH? */
+SYSSRCS=ma.setp.c
+SYSOBJS=ma.setp.${SUF}
+EXTF=mi.termios.c mi.wait.h
 #endif
 
 /* generic os's */
@@ -225,8 +244,12 @@ platform, unless you have a really weird architecture. */
 #ifdef MyCC
 CC = MyCC
 #else
-# ifdef HasGCC
+# if HasGcc || HasGCC
+#  ifdef HasGcc2
+CC = gcc 
+#  else
 CC = gcc -fcombine-regs -finline-functions -fstrength-reduce
+#  endif
 # else
 CC = cc
 # endif
@@ -250,21 +273,24 @@ HESDEF =
 and it shouldn't hurt to have it here, so here it is */
 PARALLEL=12				# Make the multi-max run fast.
 
-#ifndef DestDir
-#define DestDir /usr/local
+#ifndef TcshTop
+#define TcshTop /usr/local
 #endif
 
-DESTDIR = DestDir
+TCSHTOP = TcshTop
 MANSUFFIX = 1
+#ifndef ManSuffix
+#define ManSuffix $(MANSUFFIX)
+#endif
 #ifdef DestBin
 BINDIR = DestBin
 #else
-BINDIR = $(DESTDIR)/bin
+BINDIR = $(TCSHTOP)/bin
 #endif
 #ifdef DestMan
 MANDIR = DestMan
 #else
-MANDIR = $(DESTDIR)/man/man$(MANSUFFIX)
+MANDIR = $(TCSHTOP)/man/man$(MANSUFFIX)
 #endif
 
 #ifndef MyCflags
@@ -286,7 +312,11 @@ MANDIR = $(DESTDIR)/man/man$(MANSUFFIX)
 #ifdef CDebugFlags
 CDEBUGFLAGS = CDebugFlags
 #else
+# ifdef HasGcc2
+CDEBUGFLAGS = -O2
+# else
 CDEBUGFLAGS = -O
+# endif
 #endif
 
 #ifdef AOSArchitecture
@@ -306,21 +336,23 @@ INCLUDES = -I. MyIncludes
 LDLIBS = MyLibs
 
 SUF = o
-VERSION = 6.00
+VERSION = 6.02
 
 SHSRCS=	sh.c sh.dir.c sh.dol.c sh.err.c sh.exec.c sh.char.c \
 	sh.exp.c sh.file.c sh.func.c sh.glob.c sh.hist.c sh.init.c \
 	sh.lex.c sh.misc.c sh.parse.c sh.print.c sh.proc.c sh.sem.c \
 	sh.set.c sh.time.c sh.char.h sh.dir.h sh.proc.h sh.h \
-	sh.decls.h glob.c glob.h mi.wait.h mi.termios.c
+	sh.decls.h glob.c glob.h ${SYSSRCS}
 SHOBJS=	sh.${SUF} sh.dir.${SUF} sh.dol.${SUF} sh.err.${SUF} sh.exec.${SUF} \
 	sh.char.${SUF} sh.exp.${SUF} sh.func.${SUF} sh.glob.${SUF} \
 	sh.hist.${SUF} sh.init.${SUF} sh.lex.${SUF} sh.misc.${SUF} \
 	sh.parse.${SUF} sh.print.${SUF} sh.proc.${SUF} sh.sem.${SUF} \
-	sh.set.${SUF} sh.time.${SUF} glob.${SUF} mi.termios.${SUF}
+	sh.set.${SUF} sh.time.${SUF} glob.${SUF} ${SYSOBJS}
 
-TWSRCS= tw.decls.h tw.h tw.help.c tw.init.c tw.parse.c tw.spell.c
-TWOBJS=	tw.help.${SUF} tw.init.${SUF} tw.parse.${SUF} tw.spell.${SUF}
+TWSRCS= tw.decls.h tw.h tw.help.c tw.init.c tw.parse.c tw.spell.c \
+	tw.comp.c
+TWOBJS=	tw.help.${SUF} tw.init.${SUF} tw.parse.${SUF} tw.spell.${SUF} \
+	tw.comp.${SUF}
 
 EDSRCS= ed.chared.c ed.decls.h ed.defns.c ed.h ed.init.c ed.inputl.c \
 	ed.refresh.c ed.screen.c ed.xmap.c ed.term.c ed.term.h
@@ -339,14 +371,14 @@ TCOBJS=	tc.alloc.${SUF} tc.bind.${SUF} tc.const.${SUF} tc.disc.${SUF} \
 MISCF = Makefile Fixes MAKEDIFFS MAKESHAR NewThings README FAQ \
 	WishList config_f.h eight-bit.me glob.3 patchlevel.h \
 	pathnames.h tcsh.man Ported src.desc Imakefile imake.config \
-	README.imake
+	README.imake complete.tcsh
 CONFSRCS=config/config.*
 
 
 SRCS = $(SHSRCS) $(TWSRCS) $(EDSRCS) $(TCSRCS)
 OBJS = $(SHOBJS) $(TWOBJS) $(EDOBJS) $(TCOBJS)
 
-ALLSRCS= $(MISCF) $(SRCS)
+ALLSRCS= $(MISCF) $(SRCS) $(EXTF)
 
 all:: tcsh
 
@@ -390,8 +422,8 @@ shar:
 	mkdir tcsh-${VERSION} tcsh-${VERSION}/config
 	cp ${ALLSRCS} tcsh-${VERSION}
 	cp ${CONFSRCS} tcsh-${VERSION}/config
-	MAKESHAR ${VERSION} tcsh-${VERSION}/[a-zA-Z]* \
-			    tcsh-${VERSION}/config/config.*
+	MAKESHAR -v -n tcsh-${VERSION} tcsh-${VERSION} \
+		 tcsh-${VERSION}/?* tcsh-${VERSION}/config/?*
 	rm -rf tcsh-${VERSION}
 
 world:

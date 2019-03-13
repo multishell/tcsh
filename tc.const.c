@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tc.const.c,v 3.7 1991/11/22 02:28:12 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.const.c,v 3.12 1992/04/03 22:15:14 christos Exp $ */
 /*
  * sh.const.c: String constants for tcsh.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.const.c,v 3.7 1991/11/22 02:28:12 christos Exp $")
+RCSID("$Id: tc.const.c,v 3.12 1992/04/03 22:15:14 christos Exp $")
 
 Char STRlogout[]        = { 'l', 'o', 'g', 'o', 'u', 't', '\0' };
 Char STRautologout[]    = { 'a', 'u', 't', 'o', 'l', 'o', 'g', 'o', 'u', 't', 
@@ -61,6 +61,7 @@ Char STRHOST[]          = { 'H', 'O', 'S', 'T', '\0' };
 Char STRHOSTTYPE[]      = { 'H', 'O', 'S', 'T', 'T', 'Y', 'P', 'E', '\0' };
 Char STRedit[]          = { 'e', 'd', 'i', 't', '\0' };
 Char STRaddsuffix[]     = { 'a', 'd', 'd', 's', 'u', 'f', 'f', 'i', 'x', '\0' };
+Char STRnostat[]        = { 'n', 'o', 's', 't', 'a', 't', '\0' };
 Char STRshell[]         = { 's', 'h', 'e', 'l', 'l', '\0' };
 Char STRtmpsh[]         = { '/', 't', 'm', 'p', '/', 's', 'h', '\0' };
 Char STRverbose[]       = { 'v', 'e', 'r', 'b', 'o', 's', 'e', '\0' };
@@ -78,6 +79,10 @@ Char STRsource[]        = { 's', 'o', 'u', 'r', 'c', 'e', '\0' };
 Char STRmh[]            = { '-', 'h', '\0' };
 Char STRtildothist[]    = { '~', '/', '.', 'h', 'i', 's', 't', 'o', 'r', 
 		            'y', '\0' };
+
+#ifdef KANJI
+Char STRnokanji[]       = { 'n', 'o', 'k', 'a', 'n', 'j', 'i', '\0' };
+#endif
 
 #ifdef CSHDIRS
 Char STRdirfile[]     = { '~', '/', '.', 'c', 's', 'h', 'd', 'i', 'r',
@@ -114,10 +119,17 @@ Char STRpushdtohome[]	= { 'p', 'u', 's', 'h', 'd', 't', 'o', 'h', 'o', 'm',
 Char STRpushdsilent[]	= { 'p', 'u', 's', 'h', 'd', 's', 'i', 'l', 'e', 'n',
 			    't', '\0' };
 Char STRdextract[]	= { 'd', 'e', 'x', 't', 'r', 'a', 'c', 't', '\0' };
-Char STRignore_symlinks[] = { 'i', 'g', 'n', 'o', 'r', 'e', '_', 's', 'y', 'm',
-			    'l', 'i', 'n', 'k', 's', '\0' };
-Char STRchase_symlinks[] = { 'c', 'h', 'a', 's', 'e', '_', 's', 'y', 'm', 'l', 
-			    'i', 'n', 'k', 's', '\0' };
+Char STRdunique[]	= { 'd', 'u', 'n', 'i', 'q', 'u', 'e', '\0' };
+Char STRsymlinks[]      = { 's', 'y', 'm', 'l', 'i', 'n', 'k', 's', '\0' };
+Char STRignore[] 	= { 'i', 'g', 'n', 'o', 'r', 'e', '\0' };
+Char STRchase[]		= { 'c', 'h', 'a', 's', 'e', '\0' };
+Char STRexpand[]	= { 'e', 'x', 'p', 'a', 'n', 'd', '\0' };
+Char STRecho_style[]	= { 'e', 'c', 'h', 'o', '_', 's', 't', 'y', 'l', 'e', 
+			    '\0' };
+Char STRbsd[]		= { 'b', 's', 'd', '\0' };
+Char STRsysv[]		= { 's', 'y', 's', 'v', '\0' };
+Char STRboth[]		= { 'b', 'o', 't', 'h', '\0' };
+Char STRnone[]		= { 'n', 'o', 'n', 'e', '\0' };
 Char STRPWD[]		= { 'P', 'W', 'D', '\0' };
 Char STRor2[]		= { '|', '|', '\0' };
 Char STRand2[]		= { '&', '&', '\0' };
@@ -226,8 +238,6 @@ Char STRoverwrite[]	= { 'o', 'v', 'e', 'r', 'w', 'r', 'i', 't', 'e', '\0' };
 Char STRinsert[]	= { 'i', 'n', 's', 'e', 'r', 't', '\0' };
 Char STRnohup[]		= { 'n', 'o', 'h', 'u', 'p', '\0' };
 Char STRnice[]		= { 'n', 'i', 'c', 'e', '\0' };
-Char STRlistpathnum[]	= { 'l', 'i', 's', 't', 'p', 'a', 't', 'h', 'n', 'u', 
-			    'm', '\0' };
 Char STRshowdots[]	= { 's', 'h', 'o', 'w', 'd', 'o', 't', 's', '\0' };
 Char STRthen[]		= { 't', 'h', 'e', 'n', '\0' };
 Char STReof[]		= { '^', 'D', '\b', '\b', '\0' };

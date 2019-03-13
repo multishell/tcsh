@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tc.decls.h,v 3.10 1991/12/14 20:45:46 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.decls.h,v 3.15 1992/05/09 04:03:53 christos Exp $ */
 /*
  * tc.decls.h: Function declarations from all the tcsh modules
  */
@@ -103,7 +103,8 @@ extern	void		  shlvl		__P((int));
  */
 #ifdef MACH
 extern	void		  dosetpath	__P((Char **, struct command *));
-#endif
+#endif /* MACH */
+
 #ifdef TCF
 extern	void		  dogetxvers	__P((Char **, struct command *));
 extern	void		  dosetxvers	__P((Char **, struct command *));
@@ -111,18 +112,22 @@ extern	void		  dogetspath	__P((Char **, struct command *));
 extern	void		  dosetspath	__P((Char **, struct command *));
 extern	char		 *sitename	__P((pid_t));
 extern	void		  domigrate	__P((Char **, struct command *));
-#endif
+#endif /* TCF */
+
 #ifdef WARP
 extern	void 		  dowarp	__P((Char **, struct command *));
-#endif
+#endif /* WARP */
+
 #ifdef masscomp
 extern	void		  douniverse	__P((Char **, struct command *));
-#endif
+#endif /* masscomp */
+
 #ifdef _SEQUENT_
 extern	void	 	  pr_stat_sub	__P((struct process_stats *, 
 					     struct process_stats *, 
 					     struct process_stats *));
-#endif
+#endif /* _SEQUENT_ */
+
 #ifdef NEEDtcgetpgrp
 extern	int	 	  xtcgetpgrp	__P((int));
 extern	int		  xtcsetpgrp	__P((int, int));
@@ -130,32 +135,44 @@ extern	int		  xtcsetpgrp	__P((int, int));
 # define tcgetpgrp(a) 	  xtcgetpgrp(a)
 # undef tcsetpgrp
 # define tcsetpgrp(a, b)  xtcsetpgrp(a, b)
-#endif
+#endif /* NEEDtcgetpgrp */
+
 #ifdef YPBUGS
 extern	void	 	  fix_yp_bugs	__P((void));
-#endif
+#endif /* YPBUGS */
+
 extern	void	 	  osinit	__P((void));
+
 #ifdef NEEDgetwd
 extern	char		 *xgetwd	__P((char *));
-#undef getwd
-#define getwd(a) xgetwd(a)
-#endif
+# undef getwd
+# define getwd(a) xgetwd(a)
+#endif /* NEEDgetwd */
+
 #ifdef NEEDgethostname
 extern	int	 	  xgethostname	__P((char *, int));
-#undef gethostname
-#define gethostname(a, b) xgethostname(a, b)
-#endif
+# undef gethostname
+# define gethostname(a, b) xgethostname(a, b)
+#endif /* NEEDgethostname */
+
+#ifdef NEEDnice
+extern	int	 	  xnice	__P((int));
+# undef nice
+# define nice(a)	  xnice(a)
+#endif /* NEEDnice */
+
 #ifdef NEEDstrerror
 extern	char	 	 *xstrerror	__P((int));
-#undef strerror
-#define strerror(a) 	  xstrerror(a)
-#endif
+# undef strerror
+# define strerror(a) 	  xstrerror(a)
+#endif /* NEEDstrerror */
+
 #ifdef apollo
 extern	void		  doinlib	__P((Char **, struct command *));
 extern	void		  dover		__P((Char **, struct command *));
 extern	void		  dorootnode	__P((Char **, struct command *));
 extern	int		  getv		__P((Char *));
-#endif
+#endif /* apollo */
 
 
 /*
@@ -169,7 +186,7 @@ extern	void		  xvsprintf	__P((char *, char *, va_list));
 /*
  * tc.prompt.c
  */
-extern	void		  printprompt	__P((int, Char *));
+extern	void		  printprompt	__P((int, char *));
 
 /*
  * tc.sched.c
@@ -182,7 +199,7 @@ extern	void		  sched_run	__P((void));
  * tc.sig.c
  */
 #ifndef BSDSIGS
-# if SVID < 3 || defined(UNIXPC)
+# if SYSVREL < 3 || defined(UNIXPC)
 extern	sigret_t	(*sigset	__P((int, sigret_t (*)(int)))) ();
 extern	void		  sigrelse	__P((int));
 extern	void		  sighold	__P((int));
@@ -198,16 +215,15 @@ extern	pid_t 		  ourwait	__P((int *));
 extern	sigret_t	(*xsignal	__P((int, sigret_t (*)(int)))) ();
 #define signal(a, b)	  xsignal(a, b)
 #endif
-#ifdef _SEQUENT_
+#if defined(_SEQUENT_) || defined(linux)
 extern	sigmask_t	  sigsetmask	__P((sigmask_t));
 extern	sigmask_t	  sigblock	__P((sigmask_t));
 extern	void		  bsd_sigpause	__P((sigmask_t));
-#endif
+extern  sigret_t        (*bsd_signal    __P((int, sigret_t (*)(int)))) ();
+#endif /* _SEQUENT_ || linux */
 #ifdef SIGSYNCH
 extern	sigret_t	  synch_handler	__P((int));
 #endif
-
-
 
 
 /*

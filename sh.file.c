@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.file.c,v 3.3 1991/12/19 22:34:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.file.c,v 3.4 1992/05/09 04:03:53 christos Exp $ */
 /*
  * sh.file.c: File completion for csh. This file is not used in tcsh.
  */
@@ -34,10 +34,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#ifdef FILEC
 #include "sh.h"
 
-RCSID("$Id: sh.file.c,v 3.3 1991/12/19 22:34:14 christos Exp $")
+RCSID("$Id: sh.file.c,v 3.4 1992/05/09 04:03:53 christos Exp $")
+
+#ifdef FILEC
 
 /*
  * Tenex style file name recognition, .. and more.

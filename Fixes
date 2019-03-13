@@ -1,3 +1,138 @@
+V6.02.00, ...
+94. Default echo_style was not being set correctly.
+93. $< did not work correctly with NLS chars.
+92. 6.01.15 (5/11/92)
+91. Minor cleanups in refresh code.
+90. 6.01.14 (5/8/92)
+89. Print \n in the right margin always to be consistent.
+88. Linux patches.
+87. 6.01.13 (5/2/92) 
+86. Fixes in listing and completion of non-unique commands.
+85. Fix =stack entries > 9... from Bill Petro
+84. Fix for last character at margin. [on terminals that have am & xm move
+    the cursor manually to the next line]
+83. Fix for complete completions 
+82. small typo in tc.alloc.c from Mark Moraes.
+81. small typo in tw.parse.c from Richard.
+80. Man page fixes from Per.
+79. 6.01.12 (4/24/92) [release version for 6.02]
+78. Autosuffix was not getting reset all the time.
+77. Don't limit completion patterns to 1K.
+76. Naming changes in ed.screen.c from Justin.
+75. 6.01.11 (4/10/92)
+74. Fixed magic-space ! expand bug:
+    > echo a b123 45.{6,7}
+    > echo !:2!:3[magic-space]
+73. Work-around for apollo optimizer in tc.bind.c
+72. Problem with setjmp in tw.parse.c
+71. symlinks=expand from Yumin.
+70. tenematch() fixes from Michael;
+69. 6.01.10 (4/3/92)
+68. Fixed Gnmatch.
+67. Removed ignore_symlinks and chase_symlinks. Replaced by symlinks variable.
+66. Backquote from completion was broken for machines with no dup2()
+65. No $printexitvalue for `` jobs.
+64. Added ultrix stuff for PW_AUTH [from Mike Potter mpotter@lampf.lanl.gov]
+63. Fixed bug in Gnmatch(), added 'N' command 'x' completion.
+62. Fixed fg_proc_entry() so autologout gets disabled when a process
+    is foregrounded.
+61. 6.01.09 (3/26/92)
+60. source builtin takes arguments now that are passed in the script e.g.:
+    > ./tcsh -i a b c
+    > cat test
+    echo $argv
+    > echo $argv
+    a b c
+    > source test 1 2 3
+    1 2 3
+    > echo $argv
+    a b c
+59. Eliminate $margin_bug, add more intelligent margin code [from Justin]
+58. expand_symlinks variable Urgh...
+57. SGI CONTROL() fixes...
+56. new dnormalize(), expand_symlinks flag.
+55. interrupting completion restores the current line. [from Marc]
+54. 6.01.08 (3/20/92)
+53. inputmode affects the first line too.
+52. Searches in vi do not destroy the current line.
+51. -drwX test enhancement.
+50. Generalized completion syntax and added more completion builtins.
+49. Don't print '\n' on the right margin if we can avoid it.
+48. 6.01.07 (3/9/92)
+47. New completion style. [[<pattern>[ ]],=<completion action>]
+46. 6.01.06 (3/7/92)
+45. complete styles are ignored after shell metachars eg.
+    > complete mail =u
+    > mail christos < [tab]
+    completes filenames.
+44. $echo_style is initialized to the default style of the machine.
+43. SGI 4.0 CTRL() macro is busted. So we ignore it.
+42. Fixed bug with the new margin code (thanks justin)
+41. Fixed mirroring of variables. Now set and setenv affect
+    HOME, TERM, PATH, SHLVL, USER and their csh counterparts. Unset affects
+    affects only the csh copies of the variables, and unsetenv only the
+    environment variables.
+40. Fixed gcc-2.0 warnings in sh.sem.c (needed for vfork() -O2 optimization)
+39. 6.01.05 (2/21/92)
+38. signal masking for BSD machines was still wrong in tw.init.c
+37. Added $margin_bug, and now the editor outputs on the rightmost 
+    column by default. This should fix the xterm cut-n-paste problem.
+36. AU/X 2.0 and SGI compiles with POSIX as a default now.
+35. sysv_echo is gone too. Now we have a variable called echo_style
+    which can be set to "none", "bsd", "sysv", "both" that defines
+    the builtin echo_style. The default is "bsd" for systems with
+    SYSVREL == 0, "sysv" otherwise. This can be overriden in config.h
+    by defining ECHO_STYLE ro be BSD_ECHO, SYSV_ECHO, BOTH_ECHO, 
+    or NONE_ECHO.
+34. asynchronous notification in run-fg-editor would try to change the 
+    tty settings and print an extra prompt.
+    > set notify 
+    > sleep 10 &
+    > vi^Z
+    > ^[^Z
+33. alias x /bin/true
+    x<esc>?
+    reported .//bin/true instead of /bin/true
+32. 6.01.04 (2/12/92)
+31. fixed vi_substitute_line
+30. binding completion addition.
+29. showdots=-A addition
+28. sysv_echo addition; deleted bsd_echo which is now the default.
+27. dunique could crash.
+26. Don't clear lines after an asynchronous notification, because it
+    might erase the message.
+25. 6.01.03 (1/29/92)
+24. `` were not working correctly when tcsh is started with 0,1,2 closed.
+23. Correction was picking up the wrong thing in cases like .rhosts hosts
+22. Correction with names with quoted spaces was broken.
+21. Added sysv_echo and bsd_echo.
+20. Added and documented the complete builtin.
+19. Added dunique and cd -.
+18. Per's fix for alarm functions. Things would break if time went backwards.
+17. Realloc bug fix (copy min of old and new size)
+16. Fix for csh compatible braces.
+15. Brace globbing and negation globbing for Gmatch.
+14. 6.01.02 (1/16/92)
+13. Completion builtin, new tw* files.
+12. 6.01.01 (1/6/92)
+11. Changed w_ fields in tc.who.c to who_ to avoid redefinitions in
+    <sys/wait.h> in some os's.
+10. Setting savehist to an empty string makes savehist use the value
+    in $history.
+9.  echotc did not use the internal termcap descriptions.
+8.  echotc did not work right for single argument termcap strings.
+7.  DGUX needs SAVESIGVEC, updated type protection, and disabled CSWTCH.
+6.  Changed SVID to SYSVREL, since there is no SVID == 4 (yet).
+5.  Typo in tc.sig.h: UNRELSIGS was not getting defined.
+4.  Globbing bug fix. tglob() should ignore globbing characters inside 
+    backquotes otherwise things get expanded twice:
+    % echo 'bar?' > 'foo?'
+    % echo `cat foo\?`
+    echo: No match.
+3.  Mach setpath fix.
+2.  Alliant process group fix.
+1.  Xenix fixes for broken vi and help path with no suffixes.
+
 V6.01.00, 12/19/91 [for comp.sources.unix]
 22. Restore the original prompt in automatic correction when the user
     asks to re-edit the command.

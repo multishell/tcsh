@@ -74,7 +74,7 @@ typedef void * ptr_t;
 #undef ismeta
 #undef Strchr
 
-#include <glob.h>
+#include "glob.h"
 
 #ifndef S_ISDIR
 #define S_ISDIR(a)	(((a) & S_IFMT) == S_IFDIR)
@@ -153,7 +153,8 @@ Opendir(str)
 
     if (!*str)
 	return (opendir("."));
-    while (*dc++ = *str++);
+    while ((*dc++ = *str++) != '\0')
+	continue;
     return (opendir(buf));
 }
 
@@ -166,7 +167,8 @@ Lstat(fn, sb)
     char    buf[MAXPATHLEN];
     register char *dc = buf;
 
-    while (*dc++ = *fn++);
+    while ((*dc++ = *fn++) != '\0')
+	continue;
 # ifdef NAMEI_BUG
     {
 	int     st;
@@ -192,7 +194,8 @@ Stat(fn, sb)
     char    buf[MAXPATHLEN];
     register char *dc = buf;
 
-    while (*dc++ = *fn++);
+    while ((*dc++ = *fn++) != '\0')
+	continue;
 #ifdef NAMEI_BUG
     {
 	int     st;
@@ -304,14 +307,14 @@ glob(pattern, flags, errfunc, pglob)
 		    c = QUOTE;
 		    --patnext;
 		}
-		*bufnext++ = c | M_PROTECT;
+		*bufnext++ = (Char) (c | M_PROTECT);
 	    }
 	    else
-		*bufnext++ = c;
+		*bufnext++ = (Char) c;
     }
     else 
 	while (bufnext < bufend && (c = *patnext++) != EOS) 
-	    *bufnext++ = c;
+	    *bufnext++ = (Char) c;
     *bufnext = EOS;
 
     bufnext = patbuf;
@@ -380,7 +383,8 @@ glob(pattern, flags, errfunc, pglob)
 	    Char *dp = compilebuf;
 	    const unsigned char *sp = compilepat;
 
-	    while (*dp++ = *sp++);
+	    while ((*dp++ = *sp++) != '\0')
+		continue;
 	}
 	else {
 	    /*
@@ -511,15 +515,17 @@ glob3(pathbuf, pathend, pattern, restpattern, pglob, no_match)
     err = 0;
 
     /* search directory for matching names */
-    while ((dp = readdir(dirp))) {
+    while ((dp = readdir(dirp)) != NULL) {
 	register unsigned char *sc;
 	register Char *dc;
 
 	/* initial DOT must be matched literally */
 	if (dp->d_name[0] == DOT && *pattern != DOT)
 	    continue;
-	for (sc = (unsigned char *) dp->d_name, dc = pathend; *dc++ = *sc++;);
-	if (match(pathend, pattern, restpattern, m_not) == no_match) {
+	for (sc = (unsigned char *) dp->d_name, dc = pathend; 
+	     (*dc++ = *sc++) != '\0';)
+	    continue;
+	if (match(pathend, pattern, restpattern, (int) m_not) == no_match) {
 	    *pathend = EOS;
 	    continue;
 	}
@@ -560,8 +566,8 @@ globextend(path, pglob)
 
     newsize = sizeof(*pathv) * (2 + pglob->gl_pathc + pglob->gl_offs);
     pathv = (char **) (pglob->gl_pathv ?
-		       realloc((ptr_t) pglob->gl_pathv, newsize) :
-		       malloc((size_t) newsize));
+		       xrealloc((ptr_t) pglob->gl_pathv, (size_t) newsize) :
+		       xmalloc((size_t) newsize));
     if (pathv == NULL)
 	return (GLOB_NOSPACE);
 
@@ -573,12 +579,14 @@ globextend(path, pglob)
     }
     pglob->gl_pathv = pathv;
 
-    for (p = path; *p++;);
+    for (p = path; *p++;)
+	continue;
     if ((copy = (char *) malloc((size_t) (p - path))) != NULL) {
 	register char *dc = copy;
 	register Char *sc = path;
 
-	while (*dc++ = *sc++);
+	while ((*dc++ = *sc++) != '\0')
+	    continue;
 	pathv[pglob->gl_offs + pglob->gl_pathc++] = copy;
     }
     pathv[pglob->gl_offs + pglob->gl_pathc] = NULL;
@@ -617,7 +625,7 @@ match(name, pat, patend, m_not)
 	    ok = 0;
 	    if ((k = *name++) == EOS)
 		return (0);
-	    if (negate_range = ((*pat & M_MASK) == m_not))
+	    if ((negate_range = ((*pat & M_MASK) == m_not)) != 0)
 		++pat;
 	    while (((c = *pat++) & M_MASK) != M_END) {
 		if ((*pat & M_MASK) == M_RNG) {
@@ -652,7 +660,7 @@ globfree(pglob)
 	pp = pglob->gl_pathv + pglob->gl_offs;
 	for (i = pglob->gl_pathc; i--; ++pp)
 	    if (*pp)
-		free((ptr_t) *pp), *pp = NULL;
-	free((ptr_t) pglob->gl_pathv), pglob->gl_pathv = NULL;
+		xfree((ptr_t) *pp), *pp = NULL;
+	xfree((ptr_t) pglob->gl_pathv), pglob->gl_pathv = NULL;
     }
 }

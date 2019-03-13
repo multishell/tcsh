@@ -61,20 +61,20 @@
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
- * 		This is usually the case for SVID systems, where
+ * 		This is usually the case for SYSV systems, where
  *		BSD uses sgttyb. POSIX systems should define this
  *		anyway, even though they use struct termios.
  */
 #undef TERMIO
 
 /*
- * SVID		Your machine is SVID complient (Sys V, HPUX, A/UX)
+ * SYSVREL	Your machine is SYSV based (HPUX, A/UX)
  *		NOTE: don't do this if you are on a Pyramid -- tcsh is
  *		built in a BSD universe.
- *		Set SVID to 1, 2, 3, or 4, depending the version of System V
- *		you are running. Or set it to 0 if you are not SVID based
+ *		Set SYSVREL to 1, 2, 3, or 4, depending the version of System V
+ *		you are running. Or set it to 0 if you are not SYSV based
  */
-#define SVID	0
+#define SYSVREL	0
 
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
@@ -96,7 +96,7 @@
 /*
  * UTHOST	Does the utmp file have a host field?
  */
-#undef UTHOST
+#define UTHOST
 
 /*
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
@@ -106,6 +106,7 @@
 /*
  * Make dgux look like BSD...
  */
+#define _BSD_SOURCE
 #define _BSD_WAIT_FLAVOR 
 #define _BSD_TTY_FLAVOR
 #define _BSD_SIGNAL_FLAVOR 

@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tw.help.c,v 3.4 1991/10/20 01:38:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/tw.help.c,v 3.7 1992/03/21 02:46:07 christos Exp $ */
 /* tw.help.c: actually look up and print documentation on a file.
  *	      Look down the path for an appropriate file, then print it.
  *	      Note that the printing is NOT PAGED.  This is because the
@@ -39,7 +39,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tw.help.c,v 3.4 1991/10/20 01:38:14 christos Exp $")
+RCSID("$Id: tw.help.c,v 3.7 1992/03/21 02:46:07 christos Exp $")
 
 #include "tw.h"
 #include "tc.h"
@@ -51,7 +51,7 @@ static	Char    	*skipslist	__P((Char *));
 static	void		 nextslist 	__P((Char *, Char *));
 
 static char *h_ext[] = {
-    ".help", ".1", ".8", ".6", NULL
+    ".help", ".1", ".8", ".6", "", NULL
 };
 
 void
@@ -99,7 +99,7 @@ do_help(command)
 	    hpath = str2short(DEFAULTLIST);
 	thpath = hpath = Strsave(hpath);
 
-	while (1) {
+	for (;;) {
 	    if (!*hpath) {
 		xprintf("No help file for %s\n", short2str(name));
 		break;
@@ -190,6 +190,7 @@ static Char *
 skipslist(sl)
     register Char *sl;
 {
-    while (*sl && *sl++ != ':');
+    while (*sl && *sl++ != ':')
+	continue;
     return (sl);
 }

@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.proc.c,v 3.19 1991/11/26 04:28:26 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.proc.c,v 3.28 1992/05/15 23:49:22 christos Exp $ */
 /*
  * sh.proc.c: Job manipulations
  */
@@ -36,27 +36,16 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.proc.c,v 3.19 1991/11/26 04:28:26 christos Exp $")
+RCSID("$Id: sh.proc.c,v 3.28 1992/05/15 23:49:22 christos Exp $")
 
 #include "ed.h"
 #include "tc.h"
 #include "tc.wait.h"
 
-#if !defined(NSIG) && defined(SIGMAX)
-# define NSIG (SIGMAX+1)
-#endif /* !NSIG && SIGMAX */
-#if !defined(NSIG) && defined(_NSIG)
-# define NSIG _NSIG
-#endif /* !NSIG && _NSIG */
-
 #ifdef aiws
 # undef HZ
 # define HZ 16
 #endif /* aiws */
-
-#ifndef HZ
-# define HZ	100		/* for division into seconds */
-#endif
 
 #if (defined(_BSD) && defined(_BSD_INCLUDES)) || (defined(IRIS4D) && __STDC__)
 # define BSDWAIT
@@ -129,6 +118,7 @@ static	void		 pads		__P((Char *));
 static	void		 pkill		__P((Char **, int));
 static	struct process	*pgetcurr	__P((struct process *));
 static	void		 okpcntl	__P((void));
+static  struct process  *pfind		__P((Char *));
 
 /*
  * pchild - called at interrupt level by the SIGCHLD signal
@@ -145,7 +135,9 @@ int snum;
     register struct process *pp;
     register struct process *fp;
     register int pid;
+#if defined(BSDJOBS) || (!defined(BSDTIMES) && (defined(ODT) || defined(aiws) || defined(uts)))
     extern int insource;
+#endif /* BSDJOBS */
 #ifdef BSDWAIT
     union wait w;
 #else /* !BSDWAIT */
@@ -198,7 +190,7 @@ loop:
 #ifdef BSDJOBS
 # ifdef BSDTIMES
     /* both a wait3 and rusage */
-#  if !defined(BSDWAIT) || defined(NeXT) || (defined(IRIS4D) && __STDC__)
+#  if !defined(BSDWAIT) || defined(NeXT) || defined(MACH) || (defined(IRIS4D) && __STDC__)
     pid = wait3(&w,
        (setintr && (intty || insource) ? WNOHANG | WUNTRACED : WNOHANG), &ru);
 #  else /* BSDWAIT */
@@ -258,7 +250,7 @@ loop:
      * but then again, SVR4 falls into the POSIX/BSDJOBS category.
      */
     pid = wait(&w.w_status);
-#  endif /* SVID >= 3 */
+#  endif /* SYSVREL >= 3 */
 # endif /* HAVEwait3 */
 # endif	/* BSDTIMES */
 # ifndef BSDSIGS
@@ -285,6 +277,11 @@ loop:
 	    goto loop;
 	}
 	pnoprocesses = pid == -1;
+#ifdef linux
+# ifdef UNRELSIGS
+	(void) sigset(SIGCHLD, pchild);
+# endif /* UNRELSIGS */
+#endif /* linux */
 #ifndef SIGVOID
 	return (0);
 #else /* !SIGVOID */
@@ -361,7 +358,7 @@ found:
 #  ifndef POSIX
 	    (fp->p_utime + fp->p_stime) / HZ
 #  else /* POSIX */
-	    (fp->p_utime + fp->p_stime) / CLK_TCK
+	    (fp->p_utime + fp->p_stime) / clk_tck
 #  endif /* POSIX */
 # endif /* !_SEQUENT_ */
 #endif /* !BSDTIMES */
@@ -390,24 +387,24 @@ found:
 	else
 	    pclrcurr(fp);
 	if (jobflags & PFOREGND) {
-	    if (jobflags & (PSIGNALED | PSTOPPED | PPTIME) ||
+	    if (!(jobflags & (PSIGNALED | PSTOPPED | PPTIME) ||
 #ifdef IIASA
 		jobflags & PAEXITED ||
 #endif /* IIASA */
-		!eq(dcwd->di_name, fp->p_cwd->di_name)) {
-		;		/* print in pjwait */
-	    }
+		!eq(dcwd->di_name, fp->p_cwd->di_name))) {
 	    /* PWP: print a newline after ^C */
-	    else if (jobflags & PINTERRUPTED)
+		if (jobflags & PINTERRUPTED) {
 #ifdef SHORT_STRINGS
-		xputchar('\r' | QUOTE), xputchar('\n');
+		    xputchar('\r' | QUOTE), xputchar('\n');
 #else /* !SHORT_STRINGS */
-		xprintf("\215\n");	/* \215 is a quoted ^M */
+		    xprintf("\215\n");	/* \215 is a quoted ^M */
 #endif /* !SHORT_STRINGS */
+		}
 #ifdef notdef
 		else if ((jobflags & (PTIME|PSTOPPED)) == PTIME)
-				ptprint(fp);
+		    ptprint(fp);
 #endif
+	    }
 	}
 	else {
 	    if (jobflags & PNOTIFY || adrof(STRnotify)) {
@@ -425,7 +422,14 @@ found:
 		    if (GettingInput) {
 			errno = 0;
 			(void) Rawmode();
+#ifdef notdef
+			/*
+			 * don't really want to do that, because it
+			 * will erase our message in case of multi-line
+			 * input
+			 */
 			ClearLines();
+#endif
 			ClearDisp();
 			Refresh();
 		    }
@@ -531,7 +535,6 @@ pjwait(pp)
 #ifdef UNRELSIGS
     sigret_t (*inthandler)();
 #endif /* UNRELSIGS */
-
     while (pp->p_procid != pp->p_jobid)
 	pp = pp->p_friends;
     fp = pp;
@@ -588,7 +591,7 @@ pjwait(pp)
     if ((jobflags & (PSIGNALED | PSTOPPED | PTIME)) ||
 	!eq(dcwd->di_name, fp->p_cwd->di_name)) {
 	if (jobflags & PSTOPPED) {
-	    xprintf("\n");
+	    xputchar('\n');
 	    if (adrof(STRlistjobs)) {
 		Char   *jobcommand[3];
 
@@ -622,7 +625,12 @@ pjwait(pp)
 	    reason = fp->p_flags & (PSIGNALED | PINTERRUPTED) ?
 		fp->p_reason | META : fp->p_reason;
     } while ((fp = fp->p_friends) != pp);
-    if ((reason != 0) && (adrof(STRprintexitvalue)))	/* PWP */
+    /*
+     * Don't report on backquoted jobs, cause it will mess up 
+     * their output.
+     */
+    if ((reason != 0) && (adrof(STRprintexitvalue)) && 
+	(pp->p_flags & PBACKQ) == 0)
 	xprintf("Exit %d\n", reason);
     set(STRstatus, putn(reason));
     if (reason && exiterr)
@@ -761,9 +769,11 @@ palloc(pid, t)
 
     pp = (struct process *) xcalloc(1, (size_t) sizeof(struct process));
     pp->p_procid = pid;
-    pp->p_flags = t->t_dflg & F_AMPERSAND ? PRUNNING : PRUNNING | PFOREGND;
+    pp->p_flags = ((t->t_dflg & F_AMPERSAND) ? 0 : PFOREGND) | PRUNNING;
     if (t->t_dflg & F_TIME)
 	pp->p_flags |= PPTIME;
+    if (t->t_dflg & F_BACKQ)
+	pp->p_flags |= PBACKQ;
     cmdp = command;
     cmdlen = 0;
     padd(t);
@@ -782,7 +792,8 @@ palloc(pid, t)
 	pp->p_index = pcurrjob->p_index;
 	pp->p_friends = pcurrjob;
 	pp->p_jobid = pcurrjob->p_procid;
-	for (fp = pcurrjob; fp->p_friends != pcurrjob; fp = fp->p_friends);
+	for (fp = pcurrjob; fp->p_friends != pcurrjob; fp = fp->p_friends)
+	    continue;
 	fp->p_friends = pp;
     }
     else {
@@ -963,7 +974,7 @@ pendjob()
 	    xprintf(" %d", pp->p_procid);
 	    pp = pp->p_friends;
 	} while (pp != tp);
-	xprintf("\n");
+	xputchar('\n');
     }
     pholdjob = pcurrjob = 0;
 }
@@ -991,7 +1002,7 @@ pprint(pp, flag)
     char   *format;
 
 #ifdef BACKPIPE
-    struct process *pipehead, *pipetail, *pmarker;
+    struct process *pipehead = NULL, *pipetail = NULL, *pmarker = NULL;
     int inpipe = 0;
 #endif /* BACKPIPE */
 
@@ -1033,10 +1044,10 @@ pprint(pp, flag)
 	if (pcond && linp != linbuf && !(flag & FANCY) &&
 	    ((pstatus == status && pp->p_reason == reason) ||
 	     !(flag & REASON)))
-	    xprintf(" ");
+	    xputchar(' ');
 	else {
 	    if (pcond && linp != linbuf)
-		xprintf("\n");
+		xputchar('\n');
 	    if (flag & NUMBER) {
 #ifdef BACKPIPE
 		pcond = ((pp == tp && !inpipe) ||
@@ -1168,7 +1179,7 @@ prcomd:
 #endif /* BACKPIPE */
 	if (pcond) {
 	    if (linp != linbuf)
-		xprintf("\n");
+		xputchar('\n');
 	    if (flag & SHELLDIR && !eq(tp->p_cwd->di_name, dcwd->di_name)) {
 		xprintf("(wd now: ");
 		dtildepr(value(STRhome), dcwd->di_name);
@@ -1439,13 +1450,13 @@ dokill(v, c)
 		if ((name = mesg[signum].iname) != NULL) {
 		    len += strlen(name) + 1;
 		    if (len >= T_Cols - 1) {
-			xprintf("\n");
+			xputchar('\n');
 			len = strlen(name) + 1;
 		    }
 		    xprintf("%s ", name);
 		}
 	    }
-	    xprintf("\n");
+	    xputchar('\n');
 	    return;
 	}
 	if (Isdigit(v[0][1])) {
@@ -1637,7 +1648,7 @@ panystop(neednl)
 	    stderror(ERR_STOPPED, neednl ? "\n" : "");
 }
 
-struct process *
+static struct process *
 pfind(cp)
     Char   *cp;
 {
@@ -1683,7 +1694,7 @@ pfind(cp)
 	}
     if (np)
 	return (np);
-    stderror(ERR_NAME | cp[1] == '?' ? ERR_JOBPAT : ERR_NOSUCHJOB);
+    stderror(ERR_NAME | (cp[1] == '?' ? ERR_JOBPAT : ERR_NOSUCHJOB));
     /* NOTREACHED */
     return (0);
 }

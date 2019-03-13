@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tw.spell.c,v 3.3 1991/10/12 04:23:51 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/tw.spell.c,v 3.7 1992/03/27 01:59:46 christos Exp $ */
 /*
  * tw.spell.c: Spell check words
  */
@@ -36,12 +36,9 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tw.spell.c,v 3.3 1991/10/12 04:23:51 christos Exp $")
+RCSID("$Id: tw.spell.c,v 3.7 1992/03/27 01:59:46 christos Exp $")
 
 #include "tw.h"
-
-extern Char **command_list;
-extern int numcommands;
 
 /* spell_me : return corrrectly spelled filename.  From K&P spname */
 int
@@ -87,11 +84,12 @@ spell_me(oldname, oldsize, looking_for_cmd)
 	 */
 	/* (*should* say "looking for directory" whenever '/' is next...) */
 	retval = t_search(guess, p, SPELL, FILSIZ,
-			  looking_for_cmd && (foundslash || *old != '/'), 1);
+			  looking_for_cmd && (foundslash || *old != '/') ?
+			  TW_COMMAND : TW_ZERO, 1, STRNULL, 0);
 	if (retval >= 4 || retval < 0)
 	    return -1;		/* hopeless */
-	for (p = ws; *new = *p++;)
-	    new++;
+	for (p = ws; (*new = *p++) != '\0'; new++)
+	    continue;
     }
 /*NOTREACHED*/
 #ifdef notdef
@@ -143,11 +141,15 @@ spdir(extended_name, tilded_dir, entry, name)
     Char   *entry;
     Char   *name;
 {
-    Char    path[1024];
+    Char    path[MAXPATHLEN + 1];
     Char   *s;
     Char    oldch;
 
-    for (s = name; *s != 0 && (*s & TRIM) == (*entry & TRIM); s++, entry++);
+    if (ISDOT(entry) || ISDOTDOT(entry))
+	return 0;
+
+    for (s = name; *s != 0 && (*s & TRIM) == (*entry & TRIM); s++, entry++)
+	continue;
     if (*s == 0 || s[1] == 0 || *entry != 0)
 	return 0;
 

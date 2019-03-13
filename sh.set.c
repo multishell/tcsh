@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.set.c,v 3.7 1991/12/19 22:34:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.set.c,v 3.15 1992/05/09 04:03:53 christos Exp $ */
 /*
  * sh.set.c: Setting and Clearing of variables
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.set.c,v 3.7 1991/12/19 22:34:14 christos Exp $")
+RCSID("$Id: sh.set.c,v 3.15 1992/05/09 04:03:53 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -93,7 +93,7 @@ doset(v, c)
 	    hadsub++;
 	    p = getinx(p, &subscr);
 	}
-	if (op = *p) {
+	if ((op = *p) != 0) {
 	    *p++ = 0;
 	    if (*p == 0 && *v && **v == '(')
 		p = *v++;
@@ -133,7 +133,7 @@ doset(v, c)
 	    dohash(NULL, NULL);
 	}
 	else if (eq(vp, STRhistchars)) {
-	    register Char *pn = value(STRhistchars);
+	    register Char *pn = value(vp);
 
 	    HIST = *pn++;
 	    HISTSUB = *pn;
@@ -148,17 +148,28 @@ doset(v, c)
 	else if (eq(vp, STRwordchars)) {
 	    word_chars = value(vp);
 	}
+	else if (eq(vp, STRsymlinks)) {
+	    register Char *pn = value(vp);
+
+	    if (eq(pn, STRignore))
+		symlinks = SYM_IGNORE;
+	    else if (eq(pn, STRexpand))
+		symlinks = SYM_EXPAND;
+	    else if (eq(pn, STRchase))
+		symlinks = SYM_CHASE;
+	    else
+		symlinks = 0;
+	}
 	else if (eq(vp, STRterm)) {
 #ifdef DOESNT_WORK_RIGHT
 	    register Char *cp;
-
-#endif
+#endif /* DOESNT_WORK_RIGHT */
 	    Setenv(STRTERM, value(vp));
 #ifdef DOESNT_WORK_RIGHT
 	    cp = getenv("TERMCAP");
 	    if (cp && (*cp != '/'))	/* if TERMCAP and not a path */
 		Unsetenv(STRTERMCAP);
-#endif				/* DOESNT_WORK_RIGHT */
+#endif /* DOESNT_WORK_RIGHT */
 	    GotTermCaps = 0;
 	    ed_Init();		/* reset the editor */
 	}
@@ -191,12 +202,12 @@ doset(v, c)
 	    bslash_quote = 1;
 	}
 	else if (eq(vp, STRrecognize_only_executables)) {
-	    tw_clear_comm_list();
+	    tw_cmd_free();
 	}
 	else if (eq(vp, STRwatch)) {
 	    resetwatch();
 	}
-    } while (p = *v++);
+    } while ((p = *v++) != NULL);
 }
 
 static Char *
@@ -272,7 +283,7 @@ dolet(v, dummy)
 	}
 	if (*p == 0 && *v)
 	    p = *v++;
-	if (op = *p)
+	if ((op = *p) != 0)
 	    *p++ = 0;
 	else
 	    stderror(ERR_NAME | ERR_ASSIGN);
@@ -327,7 +338,7 @@ dolet(v, dummy)
 	xfree((ptr_t) vp);
 	if (c != '=')
 	    xfree((ptr_t) p);
-    } while (p = *v++);
+    } while ((p = *v++) != NULL);
 }
 
 static Char *
@@ -392,7 +403,7 @@ putn(n)
 	n = 2768;
 #ifdef pdp11
     }
-#else
+#else /* !pdp11 */
     }
     else {
 	num = 4;		/* confuse lint */
@@ -401,7 +412,7 @@ putn(n)
 	    n = 147483648;
 	}
     }
-#endif
+#endif /* pdp11 */
     putn1(n);
     *putp = 0;
     return (Strsave(nbuf));
@@ -464,8 +475,8 @@ madrof(pat, vp)
 {
     register struct varent *vp1;
 
-    for (; vp; vp = vp->v_right) {
-	if (vp->v_left && (vp1 = madrof(pat, vp->v_left)))
+    for (vp = vp->v_left; vp; vp = vp->v_right) {
+	if (vp->v_left && (vp1 = madrof(pat, vp)) != NULL)
 	    return vp1;
 	if (Gmatch(vp->v_name, pat))
 	    return vp;
@@ -481,7 +492,8 @@ adrof1(name, v)
     register cmp;
 
     v = v->v_left;
-    while (v && ((cmp = *name - *v->v_name) || (cmp = Strcmp(name, v->v_name))))
+    while (v && ((cmp = *name - *v->v_name) != 0 || 
+		 (cmp = Strcmp(name, v->v_name)) != 0))
 	if (cmp < 0)
 	    v = v->v_left;
 	else
@@ -535,7 +547,7 @@ setq(name, vec, p)
     register f;
 
     f = 0;			/* tree hangs off the header's left link */
-    while (c = p->v_link[f]) {
+    while ((c = p->v_link[f]) != 0) {
 	if ((f = *name - *c->v_name) == 0 &&
 	    (f = Strcmp(name, c->v_name)) == 0) {
 	    blkfree(c->vec);
@@ -560,9 +572,9 @@ unset(v, c)
     Char   **v;
     struct command *c;
 {
-    register bool did_only;
+    bool did_only;
 
-    did_only = adrof(STRrecognize_only_executables) != 0;
+    did_only = adrof(STRrecognize_only_executables) != NULL;
     unset1(v, &shvhed);
     if (adrof(STRhistchars) == 0) {
 	HIST = '!';
@@ -576,8 +588,10 @@ unset(v, c)
 	editing = 0;
     if (adrof(STRbackslash_quote) == 0)
 	bslash_quote = 0;
+    if (adrof(STRsymlinks) == 0)
+	symlinks = 0;
     if (did_only && adrof(STRrecognize_only_executables) == 0)
-	tw_clear_comm_list();
+	tw_cmd_free();
 }
 
 void
@@ -590,7 +604,7 @@ unset1(v, head)
 
     while (*++v) {
 	cnt = 0;
-	while (vp = madrof(*v, head->v_left))
+	while ((vp = madrof(*v, head)) != NULL)
 	    unsetv1(vp), cnt++;
 	if (cnt == 0)
 	    setname(short2str(*v));
@@ -630,18 +644,20 @@ unsetv1(p)
     else if (p->v_left == 0)
 	c = p->v_right;
     else {
-	for (c = p->v_left; c->v_right; c = c->v_right);
+	for (c = p->v_left; c->v_right; c = c->v_right)
+	    continue;
 	p->v_name = c->v_name;
 	p->vec = c->vec;
 	p = c;
 	c = p->v_left;
     }
+
     /*
      * Move c into where p is.
      */
     pp = p->v_parent;
     f = pp->v_right == p;
-    if (pp->v_link[f] = c)
+    if ((pp->v_link[f] = c) != 0)
 	c->v_parent = pp;
     /*
      * Free the deleted node, and rebalance.
@@ -706,33 +722,35 @@ exportpath(val)
   * Lint thinks these have null effect
   */
  /* macros to do single rotations on node p */
-#define rright(p) (\
+# define rright(p) (\
 	t = (p)->v_left,\
 	(t)->v_parent = (p)->v_parent,\
-	((p)->v_left = t->v_right) ? (t->v_right->v_parent = (p)) : 0,\
+	(((p)->v_left = t->v_right) != NULL) ?\
+	    (t->v_right->v_parent = (p)) : 0,\
 	(t->v_right = (p))->v_parent = t,\
 	(p) = t)
-#define rleft(p) (\
+# define rleft(p) (\
 	t = (p)->v_right,\
-	(t)->v_parent = (p)->v_parent,\
-	((p)->v_right = t->v_left) ? (t->v_left->v_parent = (p)) : 0,\
+	((t)->v_parent = (p)->v_parent,\
+	((p)->v_right = t->v_left) != NULL) ? \
+		(t->v_left->v_parent = (p)) : 0,\
 	(t->v_left = (p))->v_parent = t,\
 	(p) = t)
 #else
-struct varent *
+static struct varent *
 rleft(p)
     struct varent *p;
 {
     return (p);
 }
-struct varent *
+static struct varent *
 rright(p)
     struct varent *p;
 {
     return (p);
 }
 
-#endif				/* ! lint */
+#endif /* ! lint */
 
 
 /*
@@ -749,16 +767,18 @@ balance(p, f, d)
 
 #ifndef lint
     register struct varent *t;	/* used by the rotate macros */
-
+#endif /* !lint */
+    register int ff;
+#ifdef lint
+    ff = 0;	/* Sun's lint is dumb! */
 #endif
-    register ff;
 
     /*
      * Ok, from here on, p is the node we're operating on; pp is it's parent; f
      * is the branch of p from which we have come; ff is the branch of pp which
      * is p.
      */
-    for (; pp = p->v_parent; p = pp, f = ff) {
+    for (; (pp = p->v_parent) != 0; p = pp, f = ff) {
 	ff = pp->v_right == p;
 	if (f ^ d) {		/* right heavy */
 	    switch (p->v_bal) {
@@ -853,9 +873,9 @@ plist(p)
     if (setintr)
 #ifdef BSDSIGS
 	(void) sigsetmask(sigblock((sigmask_t) 0) & ~sigmask(SIGINT));
-#else				/* BSDSIGS */
+#else /* !BSDSIGS */
 	(void) sigrelse(SIGINT);
-#endif				/* BSDSIGS */
+#endif /* BSDSIGS */
 
     for (;;) {
 	while (p->v_left)
@@ -864,8 +884,7 @@ x:
 	if (p->v_parent == 0)	/* is it the header? */
 	    return;
 	len = blklen(p->vec);
-	xprintf(short2str(p->v_name));
-	xputchar('\t');
+	xprintf("%s\t", short2str(p->v_name));
 	if (len != 1)
 	    xputchar('(');
 	blkpr(p->vec);

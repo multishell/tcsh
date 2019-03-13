@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/pathnames.h,v 3.4 1991/12/14 20:45:46 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/pathnames.h,v 3.7 1992/05/15 23:49:22 christos Exp $ */
 /*
  * pathnames.h: Location of things to find
  */
@@ -48,15 +48,15 @@
 #define _PATH_USRBSD		"/usr/bsd"
 #define _PATH_BIN		"/bin"
 
-#if defined(convex) || defined(__convex__) || defined(stellar)
+#if defined(convex) || defined(__convex__) || defined(stellar) || defined(INTEL)
 # define _PATH_DOTLOGIN		"/etc/login"
 # define _PATH_DOTLOGOUT	"/etc/logout"
 # define _PATH_DOTCSHRC		"/etc/cshrc"
-#endif /* convex || __convex__ || stellar */
+#endif /* convex || __convex__ || stellar || INTEL */
 
-#if defined(sgi) || defined(OREO) || defined(cray)
+#if defined(sgi) || defined(OREO) || defined(cray) || defined(AMIX)
 # define _PATH_DOTLOGIN		"/etc/cshrc"
-#endif /* sgi || OREO || cray */
+#endif /* sgi || OREO || cray || AMIX */
 
 #if defined(NeXT)
 # define _PATH_DOTLOGIN		"/etc/login.std"
@@ -77,7 +77,11 @@
 # define _PATH_CSHELL 		"/bin/csh"
 #endif
 #ifndef _PATH_TCSHELL
+#ifdef	_MINIX
+#define _PATH_TCSHELL		"/local/bin/tcsh"	/* use ram disk */
+#else
 #define _PATH_TCSHELL		"/usr/local/bin/tcsh"
+#endif	/* _MINIX */
 #endif
 
 #define _PATH_LOGIN		"/bin/login"

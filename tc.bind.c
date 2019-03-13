@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tc.bind.c,v 3.6 1991/12/19 21:40:06 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.bind.c,v 3.8 1992/04/10 16:38:09 christos Exp $ */
 /*
  * tc.bind.c: Key binding functions
  */
@@ -36,12 +36,11 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.bind.c,v 3.6 1991/12/19 21:40:06 christos Exp $")
+RCSID("$Id: tc.bind.c,v 3.8 1992/04/10 16:38:09 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"
 
-static	int    str7cmp		__P((char *, char *));
 static	int    tocontrol	__P((int));
 static	char  *unparsekey	__P((int));
 static	KEYCMD getkeycmd	__P((Char **));
@@ -57,18 +56,20 @@ static	void   pkeys		__P((int, int));
 
 extern int MapsAreInited;
 
-/* like strcmp, but comparisons are striped to 7 bits
-   (due to shell stupidness) */
-static int
-str7cmp(a, b)
-    register char *a, *b;
-{
-    while ((*a & TRIM) == (*b++ & TRIM))
-	if (!*a++)
-	    return (0);
-    b--;
-    return ((*a & TRIM) - (*b & TRIM));
-}
+/*
+ * Unfortunately the apollo optimizer does not like & operations
+ * with 0377, and produces illegal instructions. So we make it
+ * an unsigned char, and hope for the best.
+ * Of-course the compiler is smart enough to produce bad assembly
+ * language instructions, but dumb when it comes to fold the constant :-)
+ */
+#ifdef apollo
+static unsigned char APOLLO_0377 = 0377;
+#else /* sane */
+# define APOLLO_0377    0377
+#endif /* apollo */
+
+
 static int
 tocontrol(c)
     int    c;
@@ -97,7 +98,7 @@ unparsekey(c)			/* 'c' -> "c", '^C' -> "^" + "C" */
     if (c & 0400) {
 	*cp++ = 'A';
 	*cp++ = '-';
-	c &= 0377;
+	c &= APOLLO_0377;
     }
     if ((c & META) && !(Isprint(c) || (Iscntrl(c) && Isprint(c | 0100)))) {
 	*cp++ = 'M';
@@ -208,7 +209,7 @@ parsekey(sp)
     (void) strip(s);		/* trim to 7 bits. */
 
     if (s[1] == 0)		/* single char */
-	return (s[0] & 0377);
+	return (s[0] & APOLLO_0377);
 
     if ((s[0] == 'F' || s[0] == 'f') && s[1] == '-') {
 	if (s[2] == 0) {
@@ -297,21 +298,21 @@ parsekey(sp)
 	    char   *ts;
 
 	    ts = short2str(s);
-	    if (!str7cmp(ts, "space") || !str7cmp(ts, "Spc"))
+	    if (!strcmp(ts, "space") || !strcmp(ts, "Spc"))
 		c = ' ';
-	    else if (!str7cmp(ts, "return") || !str7cmp(ts, "Ret"))
+	    else if (!strcmp(ts, "return") || !strcmp(ts, "Ret"))
 		c = '\r';
-	    else if (!str7cmp(ts, "newline") || !str7cmp(ts, "Lfd"))
+	    else if (!strcmp(ts, "newline") || !strcmp(ts, "Lfd"))
 		c = '\n';
-	    else if (!str7cmp(ts, "linefeed"))
+	    else if (!strcmp(ts, "linefeed"))
 		c = '\n';
-	    else if (!str7cmp(ts, "tab"))
+	    else if (!strcmp(ts, "tab"))
 		c = '\t';
-	    else if (!str7cmp(ts, "escape") || !str7cmp(ts, "Esc"))
+	    else if (!strcmp(ts, "escape") || !strcmp(ts, "Esc"))
 		c = '\033';
-	    else if (!str7cmp(ts, "backspace"))
+	    else if (!strcmp(ts, "backspace"))
 		c = '\b';
-	    else if (!str7cmp(ts, "delete"))
+	    else if (!strcmp(ts, "delete"))
 		c = '\177';
 	    else {
 		xprintf("bad key specification -- unknown name \"%s\"\n", s);
@@ -438,7 +439,7 @@ dobindkey(v, c)
 	    map[(unsigned char) *in] = F_XKEY;
 	}
 	else {
-	    (void) ClearXkey(map, in);
+	    ClearXkey(map, in);
 	    map[(unsigned char) *in] = cmd;
 	}
 	break;
@@ -464,9 +465,8 @@ printkey(map, in)
 	    }
 	}
     }
-    else {
-	(void) PrintXkey(in);
-    }
+    else 
+	PrintXkey(in);
 }
 
 static  KEYCMD
@@ -476,7 +476,7 @@ parsecmd(str)
     register struct KeyFuncs *fp;
 
     for (fp = FuncNames; fp->name; fp++) {
-	if (str7cmp(short2str(str), fp->name) == 0) {
+	if (strcmp(short2str(str), fp->name) == 0) {
 	    return fp->func;
 	}
     }
@@ -546,7 +546,7 @@ parseescape(ptr)
 		    xprintf("Octal constant does not fit in a char.\n");
 		    return 0;
 		}
-		c = val;
+		c = (Char) val;
 		--p;
 	    }
 	    break;
@@ -663,7 +663,7 @@ print_all_keys()
     }
     printkeys(CcAltMap, prev, i - 1);
     xprintf("Multi-character bindings\n");
-    (void) PrintXkey(STRNULL);	/* print all Xkey bindings */
+    PrintXkey(STRNULL);	/* print all Xkey bindings */
 }
 
 static void
@@ -768,7 +768,7 @@ dobind(v, dummy)
 
     if (v[1] && v[2]) {		/* if bind FUNCTION KEY */
 	for (fp = FuncNames; fp->name; fp++) {
-	    if (str7cmp(short2str(v[1]), fp->name) == 0) {
+	    if (strcmp(short2str(v[1]), fp->name) == 0) {
 		Char   *s = v[2];
 
 		if ((c = parsekey(&s)) == -1)
@@ -783,7 +783,7 @@ dobind(v, dummy)
 				*p++ = i & ASCII;
 			    }
 			    else {
-				*p++ = i;
+				*p++ = (Char) i;
 			    }
 			    for (l = s; *l != 0; l++) {
 				*p++ = *l;
@@ -796,7 +796,7 @@ dobind(v, dummy)
 		}
 		if (c & 0400) {
 		    if (VImode) {
-			CcAltMap[c & 0377] = fp->func;	
+			CcAltMap[c & APOLLO_0377] = fp->func;	
 			/* bind the vi cmd mode key */
 			if (c & META) {
 			    buf[0] = 033;
@@ -807,7 +807,7 @@ dobind(v, dummy)
 		    }
 		    else {
 			buf[0] = 030;	/* ^X */
-			buf[1] = c & 0377;
+			buf[1] = c & APOLLO_0377;
 			buf[2] = 0;
 			AddXkey(buf, XmapCmd(fp->func), XK_CMD);
 			CcKeyMap[030] = F_XKEY;
@@ -830,29 +830,29 @@ dobind(v, dummy)
     else if (v[1]) {
 	char   *cv = short2str(v[1]);
 
-	if (str7cmp(cv, "list") == 0) {
+	if (strcmp(cv, "list") == 0) {
 	    for (fp = FuncNames; fp->name; fp++) {
 		xprintf("%s\n", fp->name);
 	    }
 	    return;
 	}
-	if ((str7cmp(cv, "emacs") == 0) ||
+	if ((strcmp(cv, "emacs") == 0) ||
 #ifndef VIDEFAULT
-	    (str7cmp(cv, "defaults") == 0) ||
-	    (str7cmp(cv, "default") == 0) ||
+	    (strcmp(cv, "defaults") == 0) ||
+	    (strcmp(cv, "default") == 0) ||
 #endif
-	    (str7cmp(cv, "mg") == 0) ||
-	    (str7cmp(cv, "gnumacs") == 0)) {
+	    (strcmp(cv, "mg") == 0) ||
+	    (strcmp(cv, "gnumacs") == 0)) {
 	    /* reset keys to default */
 	    ed_InitEmacsMaps();
 #ifdef VIDEFAULT
 	}
-	else if ((str7cmp(cv, "vi") == 0)
-		 || (str7cmp(cv, "default") == 0)
-		 || (str7cmp(cv, "defaults") == 0)) {
+	else if ((strcmp(cv, "vi") == 0)
+		 || (strcmp(cv, "default") == 0)
+		 || (strcmp(cv, "defaults") == 0)) {
 #else
 	}
-	else if (str7cmp(cv, "vi") == 0) {
+	else if (strcmp(cv, "vi") == 0) {
 #endif
 	    ed_InitVIMaps();
 	}
@@ -862,7 +862,7 @@ dobind(v, dummy)
 	    if ((c = parsekey(&s)) == -1)
 		return;
 	    if (c == -2) {	/* extended key */
-		(void) PrintXkey(s);
+		PrintXkey(s);
 		return;
 	    }
 	    pkeys(c, c);	/* must be regular key */
@@ -879,13 +879,13 @@ dobind(v, dummy)
 	pkeys(prev, i - 1);
 	prev = 0;
 	for (i = 256; i < 512; i++) {
-	    if (CcAltMap[prev & 0377] == CcAltMap[i & 0377])
+	    if (CcAltMap[prev & APOLLO_0377] == CcAltMap[i & APOLLO_0377])
 		continue;
 	    pkeys(prev, i - 1);
 	    prev = i;
 	}
 	pkeys(prev, i - 1);
-	(void) PrintXkey(STRNULL);	/* print all Xkey bindings */
+	PrintXkey(STRNULL);	/* print all Xkey bindings */
     }
     return;
 }
@@ -896,36 +896,34 @@ pkeys(first, last)
 {
     register struct KeyFuncs *fp;
     register KEYCMD *map;
+    int mask;
     char    buf[8];
 
     if (last & 0400) {
 	map = CcAltMap;
-	first &= 0377;
-	last &= 0377;
+	first &= APOLLO_0377;
+	last &= APOLLO_0377;
+	mask = 0400;
     }
     else {
 	map = CcKeyMap;
+	mask = 0;
     }
     if (map[first] == F_UNASSIGNED) {
 	if (first == last)
-	    xprintf(" %s\t\tis undefined\n",
-		    unparsekey(map == CcAltMap ? first | 0400 : first));
+	    xprintf(" %s\t\tis undefined\n", unparsekey(first | mask));
 	return;
     }
 
     for (fp = FuncNames; fp->name; fp++) {
 	if (fp->func == map[first]) {
-	    if (first == last) {
-		xprintf(" %s\t\t%s\n",
-		    unparsekey((first & 0377) | (map == CcAltMap ? 0400 : 0)),
-			fp->name);
-	    }
+	    if (first == last) 
+		xprintf(" %s\t\t%s\n", 
+			unparsekey((first & APOLLO_0377) | mask), fp->name);
 	    else {
-		(void) strcpy(buf, unparsekey((first & 0377) |
-					      (map == CcAltMap ? 0400 : 0)));
+		(void) strcpy(buf, unparsekey((first & APOLLO_0377) | mask));
 		xprintf(" %s..%s\t\t%s\n", buf,
-		     unparsekey((last & 0377) | (map == CcAltMap ? 0400 : 0)),
-			fp->name);
+		        unparsekey((last & APOLLO_0377) | mask), fp->name);
 	    }
 	    return;
 	}

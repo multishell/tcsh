@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.err.c,v 3.7 1991/12/19 22:34:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.err.c,v 3.10 1992/05/11 14:23:58 christos Exp $ */
 /*
  * sh.err.c: Error printing routines. 
  */
@@ -34,10 +34,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#define _h_tc_err		/* Don't redefine the errors	 */
+#define _h_sh_err		/* Don't redefine the errors	 */
 #include "sh.h"
 
-RCSID("$Id: sh.err.c,v 3.7 1991/12/19 22:34:14 christos Exp $")
+RCSID("$Id: sh.err.c,v 3.10 1992/05/11 14:23:58 christos Exp $")
 
 /*
  * C Shell
@@ -323,7 +323,13 @@ static char *errorlist[] =
     "Unknown option: -%s\nUsage: tcsh [ -bcdefilmnqstvVxX ] [ argument ... ]",
 # endif /* __convex__ || convex */
 #endif /* apollo */
-#define ERR_INVALID	127
+#define ERR_COMPCOM	127
+    "Illegal completion: \"%s\"",
+#define ERR_COMPILL	128
+    "Illegal %s: '%c'",
+#define ERR_COMPINC	129
+    "Incomplete %s: \"%s\"",
+#define ERR_INVALID	130
     "Invalid Error"
 };
 
@@ -442,9 +448,9 @@ stderror(va_alist)
 	seterr = NULL;
     }
 
-    if (v = pargv)
+    if ((v = pargv) != 0)
 	pargv = 0, blkfree(v);
-    if (v = gargv)
+    if ((v = gargv) != 0)
 	gargv = 0, blkfree(v);
 
     didfds = 0;			/* Forget about 0,1,2 */

@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.dol.c,v 3.9 1991/12/19 22:34:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.dol.c,v 3.15 1992/05/15 21:54:34 christos Exp $ */
 /*
  * sh.dol.c: Variable substitutions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.dol.c,v 3.9 1991/12/19 22:34:14 christos Exp $")
+RCSID("$Id: sh.dol.c,v 3.15 1992/05/15 21:54:34 christos Exp $")
 
 /*
  * C shell
@@ -108,7 +108,7 @@ Dfix(t)
     if (noexec)
 	return;
     /* Note that t_dcom isn't trimmed thus !...:q's aren't lost */
-    for (pp = t->t_dcom; p = *pp++;)
+    for (pp = t->t_dcom; (p = *pp++) != NULL;) {
 	for (; *p; p++) {
 	    if (cmap(*p, _DOL | QUOTES)) {	/* $, \, ', ", ` */
 		Dfix2(t->t_dcom);	/* found one */
@@ -118,6 +118,7 @@ Dfix(t)
 		return;
 	    }
 	}
+    }
 }
 
 /*
@@ -202,7 +203,7 @@ Dpack(wbuf, wp)
 	}
 	if (--i <= 0)
 	    stderror(ERR_WTOOLONG);
-	*wp++ = c;
+	*wp++ = (Char) c;
     }
 }
 
@@ -232,7 +233,7 @@ Dword()
 		return (0);
 	    /* finish this word and catch the code above the next time */
 	    unDredc(c);
-	    /* fall into ... */
+	    /*FALLTHROUGH*/
 
 	case '\n':
 	    *wp = 0;
@@ -246,7 +247,8 @@ Dword()
 
 	case '`':
 	    /* We preserve ` quotations which are done yet later */
-	    *wp++ = c, --i;
+	    *wp++ = (Char) c, --i;
+	    /*FALLTHROUGH*/
 	case '\'':
 	case '"':
 	    /*
@@ -282,7 +284,7 @@ Dword()
 
 		case '`':
 		    /* Leave all text alone for later */
-		    *wp++ = c;
+		    *wp++ = (Char) c;
 		    break;
 
 		default:
@@ -340,7 +342,7 @@ DgetC(flag)
     register int c;
 
 top:
-    if (c = Dpeekc) {
+    if ((c = Dpeekc) != 0) {
 	Dpeekc = 0;
 	return (c);
     }
@@ -356,7 +358,7 @@ quotspec:
 	return (c);
     }
     if (dolp) {
-	if (c = *dolp++ & (QUOTE | TRIM))
+	if ((c = *dolp++ & (QUOTE | TRIM)) != 0)
 	    goto quotspec;
 	if (dolcnt > 0) {
 	    setDolp(*dolnxt++);
@@ -442,10 +444,10 @@ Dgetdol()
 	if (dimen)
 	    stderror(ERR_NOTALLOWED, "$?#");
 	for (np = wbuf; read(OLDSTD, &tnp, 1) == 1; np++) {
-	    *np = tnp;
+	    *np = (unsigned char) tnp;
 	    if (np >= &wbuf[BUFSIZE - 1])
 		stderror(ERR_LTOOLONG);
-	    if (SIGN_EXTEND_CHAR(tnp) <= 0 || tnp == '\n')
+	    if (tnp == '\n')
 		break;
 	}
 	*np = 0;
@@ -662,7 +664,7 @@ fixDolMod()
 	    if (c == 's') {	/* [eichin:19910926.0755EST] */
 		int delimcnt = 2;
 		int delim = DgetC(0);
-		dolmod[dolnmod++] = c;
+		dolmod[dolnmod++] = (Char) c;
 		dolmod[dolnmod++] = delim;
 		
 		if (!delim || letter(delim)
@@ -671,7 +673,7 @@ fixDolMod()
 		    break;
 		}	
 		while ((c = DgetC(0)) != (-1)) {
-		    dolmod[dolnmod++] = c;
+		    dolmod[dolnmod++] = (Char) c;
 		    if(c == delim) delimcnt--;
 		    if(!delimcnt) break;
 		}
@@ -681,12 +683,12 @@ fixDolMod()
 		}
 		continue;
 	    }
-	    if (!any("htrqxes", c))
+	    if (!any("luhtrqxes", c))
 		stderror(ERR_BADMOD, c);
 #ifndef COMPAT
-	    dolmod[dolnmod++] = c;
+	    dolmod[dolnmod++] = (Char) c;
 #else
-	    dolmod = c;
+	    dolmod = (Char) c;
 #endif /* COMPAT */
 	    if (c == 'q')
 		dolmcnt = 10000;
@@ -777,7 +779,7 @@ setDolp(cp)
 	    int didmod = 0;
 
 	    do {
-		if ((dp = domod(cp, dolmod[i]))) {
+		if ((dp = domod(cp, dolmod[i])) != NULL) {
 		    didmod = 1;
 		    if (Strcmp(cp, dp) == 0) {
 			xfree((ptr_t) cp);
@@ -832,7 +834,7 @@ Dredc()
 {
     register int c;
 
-    if (c = Dpeekrd) {
+    if ((c = Dpeekrd) != 0) {
 	Dpeekrd = 0;
 	return (c);
     }
@@ -903,7 +905,7 @@ heredoc(term)
 	    if (c < 0 || c == '\n')
 		break;
 	    if (c &= TRIM) {
-		*lbp++ = c;
+		*lbp++ = (Char) c;
 		if (--lcnt < 0) {
 		    setname("<<");
 		    stderror(ERR_NAME | ERR_OVERFLOW);
@@ -927,8 +929,8 @@ heredoc(term)
 	if (quoted || noexec) {
 	    *lbp++ = '\n';
 	    *lbp = 0;
-	    for (lbp = lbuf; c = *lbp++;) {
-		*obp++ = c;
+	    for (lbp = lbuf; (c = *lbp++) != 0;) {
+		*obp++ = (Char) c;
 		if (--ocnt == 0) {
 		    (void) write(0, short2str(obuf), BUFSIZE);
 		    obp = obuf;
@@ -960,7 +962,7 @@ heredoc(term)
 		else
 		    c |= QUOTE;
 	    }
-	    *mbp++ = c;
+	    *mbp++ = (Char) c;
 	    if (--mcnt == 0) {
 		setname("<<");
 		stderror(ERR_NAME | ERR_OVERFLOW);

@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/ed.inputl.c,v 3.15 1991/12/19 22:34:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/ed.inputl.c,v 3.21 1992/04/10 16:45:27 christos Exp $ */
 /*
  * ed.inputl.c: Input line handling.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.inputl.c,v 3.15 1991/12/19 22:34:14 christos Exp $")
+RCSID("$Id: ed.inputl.c,v 3.21 1992/04/10 16:45:27 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -156,11 +156,11 @@ Inputl()
 
 	case CC_REFRESH:
 	    Refresh();
-	    /* fall through */
+	    /*FALLTHROUGH*/
 	case CC_NORM:		/* normal char */
 	    Argument = 1;
 	    DoingArg = 0;
-	    /* fall through */
+	    /*FALLTHROUGH*/
 	case CC_ARGHACK:	/* Suggested by Rich Salz */
 	    /* <rsalz@pineapple.bbn.com> */
 	    break;		/* keep going... */
@@ -197,7 +197,7 @@ Inputl()
 		    CorrChar = LastChar;	/* Save the corrected end */
 		    LastChar = InputBuf;	/* Null the current line */
 		    Beep();
-		    printprompt(2, Change);
+		    printprompt(2, short2str(Change));
 		    Refresh();
 		    (void) read(SHIN, (char *) &tch, 1);
 		    ch = tch;
@@ -206,7 +206,7 @@ Inputl()
 			xprintf("yes\n");
 		    }
 		    else {
-			(void) copyn(InputBuf, Origin, INBUFSIZE);
+			copyn(InputBuf, Origin, INBUFSIZE);
 			LastChar = SaveChar;
 			if (ch == 'e') {
 			    xprintf("edit\n");
@@ -241,8 +241,7 @@ Inputl()
 	    break;
 
 	case CC_CORRECT:
-	    if (tenematch(InputBuf, INBUFSIZE, Cursor - InputBuf,
-			  SPELL) < 0)
+	    if (tenematch(InputBuf, Cursor - InputBuf, SPELL) < 0)
 		Beep();		/* Beep = No match/ambiguous */
 	    if (NeedsRedraw) {
 		ClearLines();
@@ -277,8 +276,7 @@ Inputl()
 	     * completion, independently of autolisting.
 	     */
 	    expnum = Cursor - InputBuf;
-	    switch (matchval = 
-		    tenematch(InputBuf, INBUFSIZE, Cursor-InputBuf, RECOGNIZE)) {
+	    switch (matchval = tenematch(InputBuf, Cursor-InputBuf, RECOGNIZE)){
 	    case 1:
 		if (non_unique_match && matchbeep &&
 		    (Strcmp(*(matchbeep->vec), STRnotunique) == 0))
@@ -315,7 +313,7 @@ Inputl()
 		if (autol && (Strcmp(*(autol->vec), STRambiguous) != 0 || 
 				     expnum == Cursor - InputBuf)) {
 		    PastBottom();
-		    (void) tenematch(InputBuf, INBUFSIZE, Cursor-InputBuf, LIST);
+		    (void) tenematch(InputBuf, Cursor-InputBuf, LIST);
 		}
 		break;
 	    }
@@ -332,7 +330,7 @@ Inputl()
 
 	case CC_LIST_CHOICES:
 	    /* should catch ^C here... */
-	    if (tenematch(InputBuf, INBUFSIZE, Cursor - InputBuf, LIST) < 0)
+	    if (tenematch(InputBuf, Cursor - InputBuf, LIST) < 0)
 		Beep();
 	    Refresh();
 	    Argument = 1;
@@ -340,7 +338,7 @@ Inputl()
 	    break;
 
 	case CC_LIST_GLOB:
-	    if (tenematch(InputBuf, INBUFSIZE, Cursor - InputBuf, GLOB) < 0)
+	    if (tenematch(InputBuf, Cursor - InputBuf, GLOB) < 0)
 		Beep();
 	    Refresh();
 	    Argument = 1;
@@ -348,8 +346,7 @@ Inputl()
 	    break;
 
 	case CC_EXPAND_GLOB:
-	    if (tenematch(InputBuf, INBUFSIZE, Cursor - InputBuf,
-			  GLOB_EXPAND) <= 0)
+	    if (tenematch(InputBuf, Cursor - InputBuf, GLOB_EXPAND) <= 0)
 		Beep();		/* Beep = No match */
 	    if (NeedsRedraw) {
 		ClearLines();
@@ -362,8 +359,7 @@ Inputl()
 	    break;
 
 	case CC_NORMALIZE_PATH:
-	    if (tenematch(InputBuf, INBUFSIZE, Cursor - InputBuf,
-			  PATH_NORMALIZE) <= 0)
+	    if (tenematch(InputBuf, Cursor - InputBuf, PATH_NORMALIZE) <= 0)
 		Beep();		/* Beep = No match */
 	    if (NeedsRedraw) {
 		ClearLines();
@@ -376,8 +372,7 @@ Inputl()
 	    break;
 
 	case CC_EXPAND_VARS:
-	    if (tenematch(InputBuf, INBUFSIZE, Cursor - InputBuf,
-			  VARS_EXPAND) <= 0)
+	    if (tenematch(InputBuf, Cursor - InputBuf, VARS_EXPAND) <= 0)
 		Beep();		/* Beep = No match */
 	    if (NeedsRedraw) {
 		ClearLines();
@@ -392,8 +387,7 @@ Inputl()
 	case CC_HELPME:
 	    xputchar('\n');
 	    /* should catch ^C here... */
-	    (void) tenematch(InputBuf, INBUFSIZE, LastChar - InputBuf,
-			     PRINT_HELP);
+	    (void) tenematch(InputBuf, LastChar - InputBuf, PRINT_HELP);
 	    Refresh();
 	    Argument = 1;
 	    DoingArg = 0;
@@ -443,7 +437,7 @@ PushMacro(str)
 /*
  * Like eval, only using the current file descriptors
  */
-static Char **gv = NULL;
+static Char **gv = NULL, **gav = NULL;
 
 static void
 doeval1(v)
@@ -458,20 +452,21 @@ doeval1(v)
     oevalvec = evalvec;
     oevalp = evalp;
     savegv = gv;
+    gav = v;
 
 
-    gflag = 0, tglob(v);
+    gflag = 0, tglob(gav);
     if (gflag) {
-	gv = v = globall(v);
+	gv = gav = globall(gav);
 	gargv = 0;
-	if (v == 0)
+	if (gav == 0)
 	    stderror(ERR_NOMATCH);
-	v = copyblk(v);
+	gav = copyblk(gav);
     }
     else {
 	gv = NULL;
-	v = copyblk(v);
-	trim(v);
+	gav = copyblk(gav);
+	trim(gav);
     }
 
     getexit(osetexit);
@@ -484,7 +479,7 @@ doeval1(v)
 #else /* !cray */
     if ((my_reenter = setexit()) == 0) {
 #endif /* cray */
-	evalvec = v;
+	evalvec = gav;
 	evalp = 0;
 	process(0);
     }
@@ -508,7 +503,7 @@ RunCommand(str)
 {
     Char *cmd[2];
 
-    xprintf("\n");	/* Start on a clean line */
+    xputchar('\n');	/* Start on a clean line */
 
     cmd[0] = str;
     cmd[1] = NULL;
@@ -534,7 +529,7 @@ GetNextCommand(cmdnum, ch)
 	    return num;
 	}
 #ifdef	KANJI
-	if (*ch & META) {
+	if (!adrof(STRnokanji) && (*ch & META)) {
 	    MetaNext = 0;
 	    cmd = CcViMap[' '];
 	    break;
@@ -669,8 +664,10 @@ SpellLine(cmdonly)
 	while (ismetahash(*argptr) || iscmdmeta(*argptr))
 	    argptr++;
 	for (Cursor = argptr;
-	     *Cursor != '\0' && !ismetahash(*Cursor) && !iscmdmeta(*Cursor);
-	     Cursor++);
+	     *Cursor != '\0' && ((Cursor != argptr && Cursor[-1] == '\\') ||
+				 (!ismetahash(*Cursor) && !iscmdmeta(*Cursor)));
+	     Cursor++)
+	     continue;
 	if (*Cursor == '\0') {
 	    Cursor = LastChar;
 	    if (LastChar[-1] == '\n')
@@ -679,7 +676,7 @@ SpellLine(cmdonly)
 	}
 	if (!Strchr(mismatch, *argptr) &&
 	    (!cmdonly || starting_a_command(argptr, InputBuf))) {
-	    switch (tenematch(InputBuf, INBUFSIZE, Cursor - InputBuf, SPELL)) {
+	    switch (tenematch(InputBuf, Cursor - InputBuf, SPELL)) {
 	    case 1:		/* corrected */
 		matchval = 1;
 		break;

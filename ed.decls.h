@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/ed.decls.h,v 3.11 1991/11/26 04:28:26 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/ed.decls.h,v 3.11 1991/11/26 04:28:26 christos Exp $ */
 /*
  * ed.decls.h: Editor external definitions
  */

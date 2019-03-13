@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/ed.xmap.c,v 3.5 1991/11/26 04:28:26 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/ed.xmap.c,v 3.6 1992/01/27 04:20:47 christos Exp $ */
 /*
  * ed.xmap.c: This module contains the procedures for maintaining
  *	      the extended-key map.
@@ -92,7 +92,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.xmap.c,v 3.5 1991/11/26 04:28:26 christos Exp $")
+RCSID("$Id: ed.xmap.c,v 3.6 1992/01/27 04:20:47 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"
@@ -137,7 +137,7 @@ XmapCmd(cmd)
     int cmd;
 {
     static XmapVal xm;
-    xm.cmd = cmd;
+    xm.cmd = (KEYCMD) cmd;
     return &xm;
 }
 

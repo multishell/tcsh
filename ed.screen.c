@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/ed.screen.c,v 3.11 1991/12/19 22:34:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/ed.screen.c,v 3.22 1992/05/11 14:23:58 christos Exp $ */
 /*
  * ed.screen.c: Editor/termcap-curses interface
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.screen.c,v 3.11 1991/12/19 22:34:14 christos Exp $")
+RCSID("$Id: ed.screen.c,v 3.22 1992/05/11 14:23:58 christos Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -226,17 +226,35 @@ static struct termcapval {
     char   *long_name;
     int     val;
 }       tval[] = {
-#define T_pt	0
-    {	"pt",	"can use physical tabs", 0 },
-#define T_li	1
-    {	"li",	"Number of lines",	 0 },
-#define T_co	2
-    {	"co",	"Number of columns",	 0 },
-#define T_km	3
-    {	"km",	"Has meta key",		 0 },
-#define T_val	4
-    {	NULL, NULL,		 0 }
+#define T_am	0
+    {	"am",	"Has automatic margins",		0 },
+#define T_pt	1
+    {	"pt",	"Can use physical tabs", 		0 },
+#define T_li	2
+    {	"li",	"Number of lines",	 		0 },
+#define T_co	3
+    {	"co",	"Number of columns",	 		0 },
+#define T_km	4
+    {	"km",	"Has meta key",		 		0 },
+#define T_xn	5
+    {	"xn",	"Newline ignored at right margin",	0 },
+#define T_val	6
+    {	NULL, 	NULL,		 			0 }
 };
+
+
+/*
+ * A very useful table from justin@crim.ca (Justin Bur) :-)
+ * (Modified by per@erix.ericsson.se (Per Hedeland)
+ *  - first (and second:-) case fixed)
+ *
+ * Description     Termcap variables       tcsh behavior
+ * 		   am      xn              UseRightmost    SendCRLF
+ * --------------  ------- -------         ------------    ------------
+ * Automargins     yes     no              yes             no
+ * Magic Margins   yes     yes             yes             no
+ * No Wrap         no      --              yes             yes
+ */
 
 static bool me_all = 0;		/* does two or more of the attributes use me */
 
@@ -293,7 +311,8 @@ TCalloc(t, cap)
 	if (t != ts && ts->str != NULL && ts->str[0] != '\0') {
 	    char   *ptr;
 
-	    for (ptr = ts->str; *ptr != '\0'; termbuf[tlen++] = *ptr++);
+	    for (ptr = ts->str; *ptr != '\0'; termbuf[tlen++] = *ptr++)
+		continue;
 	    termbuf[tlen++] = '\0';
 	}
     copy(termcap_alloc, termbuf, TC_BUFSIZE);
@@ -321,11 +340,14 @@ TellTC(what)
 	    Val(T_co), Val(T_li));
     xprintf("\tIt has %s meta key\n", T_HasMeta ? "a" : "no");
     xprintf("\tIt can%suse tabs\n", T_Tabs ? " " : "not ");
+    xprintf("\tIt %s automatic margins\n", (T_Margin&MARGIN_AUTO)?"has":"does not have");
+    if (T_Margin&MARGIN_AUTO)
+	xprintf("\tIt %s magic margins\n", (T_Margin&MARGIN_MAGIC)?"has":"does not have");
 
     for (t = tstr; t->name != NULL; t++)
 	xprintf("\t%25s (%s) == %s\n", t->long_name, t->name,
 		t->str && *t->str ? t->str : "(empty)");
-    xprintf("\n");
+    xputchar('\n');
 }
 
 
@@ -350,8 +372,7 @@ ReBufferDisplay()
 	    xfree((ptr_t) * bufp);
 	xfree((ptr_t) b);
     }
-    /* make this public, -1 to avoid wraps */
-    TermH = Val(T_co) - 1;
+    TermH = Val(T_co);
     TermV = (INBUFSIZE * 4) / TermH + 1;
     b = (Char **) xmalloc((size_t) (sizeof(Char *) * (TermV + 1)));
     for (i = 0; i < TermV; i++)
@@ -406,7 +427,8 @@ SetTC(what, how)
 	    break;
 
     if (tv->name != NULL) {
-	if (tv == &tval[T_pt] || tv == &tval[T_km]) {
+	if (tv == &tval[T_pt] || tv == &tval[T_km] || 
+	    tv == &tval[T_am] || tv == &tval[T_xn]) {
 	    if (strcmp(how, "yes") == 0)
 		tv->val = 1;
 	    else if (strcmp(how, "no") == 0)
@@ -417,6 +439,10 @@ SetTC(what, how)
 	    }
 	    T_Tabs = Val(T_pt);
 	    T_HasMeta = Val(T_km);
+	    T_Margin = Val(T_am) ? MARGIN_AUTO : 0;
+	    T_Margin |= Val(T_xn) ? MARGIN_MAGIC : 0;
+	    if (tv == &tval[T_am] || tv == &tval[T_xn]) 
+		ChangeSize(Val(T_li), Val(T_co));
 	    return;
 	}
 	else {
@@ -445,6 +471,7 @@ EchoTC(v)
     int     verbose = 0, silent = 0;
     char   *area;
     static char *fmts = "%s\n", *fmtd = "%d\n";
+    struct termcapstr *t;
     char    buf[TC_BUFSIZE];
 
     area = buf;
@@ -490,6 +517,16 @@ EchoTC(v)
 	flush();
 	return;
     }
+    else if (strcmp(cv, "xn") == 0) {
+	xprintf(fmts, T_Margin & MARGIN_MAGIC ? "yes" : "no");
+	flush();
+	return;
+    }
+    else if (strcmp(cv, "am") == 0) {
+	xprintf(fmts, T_Margin & MARGIN_AUTO ? "yes" : "no");
+	flush();
+	return;
+    }
     else if (strcmp(cv, "baud") == 0) {
 	int     i;
 
@@ -514,10 +551,17 @@ EchoTC(v)
 	return;
     }
 
-    /*
-     * Count home many values we need for this capability.
+    /* 
+     * Try to use our local definition first
      */
-    scap = tgetstr(cv, &area);
+    scap = NULL;
+    for (t = tstr; t->name != NULL; t++)
+	if (strcmp(t->name, cv) == 0) {
+	    scap = t->str;
+	    break;
+	}
+    if (t->name == NULL)
+	scap = tgetstr(cv, &area);
     if (!scap || scap[0] == '\0') {
 	if (silent)
 	    return;
@@ -525,6 +569,9 @@ EchoTC(v)
 	    stderror(ERR_NAME | ERR_TCCAP, cv);
     }
 
+    /*
+     * Count home many values we need for this capability.
+     */
     for (cap = scap, arg_need = 0; *cap; cap++)
 	if (*cap == '%')
 	    switch (*++cap) {
@@ -568,8 +615,8 @@ EchoTC(v)
 	v++;
 	if (!*v || *v[0] == '\0')
 	    stderror(ERR_NAME | ERR_TCNARGS, cv, 1);
-	arg_rows = 0;
-	arg_cols = atoi(short2str(*v));
+	arg_cols = 0;
+	arg_rows = atoi(short2str(*v));
 	v++;
 	if (*v && *v[0]) {
 	    if (silent)
@@ -583,6 +630,7 @@ EchoTC(v)
 	/* This is wrong, but I will ignore it... */
 	if (verbose)
 	    stderror(ERR_NAME | ERR_TCARGS, cv, arg_need);
+	/*FALLTHROUGH*/
     case 2:
 	v++;
 	if (!*v || *v[0] == '\0') {
@@ -758,12 +806,24 @@ MoveToLine(where)		/* move to line <where> (first line == 0) */
     }
 
     if ((del = where - CursorV) > 0) {
-	if ((del > 1) && GoodStr(T_DO))
-	    (void) tputs(tgoto(Str(T_DO), del, del), del, putpure);
-	else {
-	    for (i = 0; i < del; i++)
-		(void) putraw('\n');
-	    CursorH = 0;	/* because the \n will become \r\n */
+	while (del > 0) {
+	    if ((T_Margin & MARGIN_AUTO) && Display[CursorV][0] != '\0') {
+		/* move without newline */
+		MoveToChar(TermH - 1);
+		so_write(&Display[CursorV][CursorH], 1); /* updates CursorH/V*/
+		del--;
+	    }
+	    else {
+		if ((del > 1) && GoodStr(T_DO)) {
+		    (void) tputs(tgoto(Str(T_DO), del, del), del, putpure);
+		    del = 0;
+		}
+		else {
+		    for ( ; del > 0; del--) 
+			(void) putraw('\n');
+		    CursorH = 0;	/* because the \n will become \r\n */
+		}
+	    }
 	}
     }
     else {			/* del < 0 */
@@ -788,7 +848,7 @@ mc_again:
     if (where == CursorH)
 	return;
 
-    if (where > (TermH + 1)) {
+    if (where >= TermH) {
 #ifdef DEBUG_SCREEN
 	xprintf("MoveToChar: where is riduculous: %d\r\n", where);
 	flush();
@@ -818,6 +878,11 @@ mc_again:
 			for (i = (CursorH & 0370); i < (where & 0370); i += 8)
 			    (void) putraw('\t');	/* then tab over */
 			CursorH = where & 0370;
+			if (CursorH < where && where == (TermH - 1)) {
+			    /* optimize: we can tab to the last column */
+			    (void) putraw('\t');
+			    CursorH = where;
+			}
 		    }
 		}
 		/* it's usually cheaper to just write the chars, so we do. */
@@ -854,7 +919,7 @@ so_write(cp, n)
     if (n <= 0)
 	return;			/* catch bugs */
 
-    if (n > (TermH + 1)) {
+    if (n > TermH) {
 #ifdef DEBUG_SCREEN
 	xprintf("so_write: n is riduculous: %d\r\n", n);
 	flush();
@@ -880,6 +945,24 @@ so_write(cp, n)
 	    (void) putraw(*cp++);
 	CursorH++;
     } while (--n);
+
+    if (CursorH >= TermH) { /* wrap? */
+	if (T_Margin & MARGIN_AUTO) { /* yes */
+	    CursorH = 0;
+	    CursorV++;
+	    if (T_Margin & MARGIN_MAGIC) {
+		/* force the wrap to avoid the "magic" situation */
+		Char c;
+		if ((c = Display[CursorV][CursorH]) != '\0')
+		    so_write(&c, 1);
+		else
+		    putraw(' ');
+		CursorH = 1;
+	    }
+	}
+	else			/* no wrap, but cursor stays on screen */
+	    CursorH = TermH - 1;
+    }
 }
 
 
@@ -949,7 +1032,7 @@ Insert_write(cp, num)		/* Puts terminal in insert character mode, */
     if (GoodStr(T_IC))		/* if I have multiple insert */
 	if ((num > 1) || !GoodStr(T_ic)) {	/* if ic would be more expen. */
 	    (void) tputs(tgoto(Str(T_IC), num, num), num, putpure);
-	    so_write(cp, num);	/* this updates CursorH */
+	    so_write(cp, num);	/* this updates CursorH/V */
 	    return;
 	}
 
@@ -988,6 +1071,9 @@ ClearEOL(num)			/* clear to end of line.  There are num */
     int     num;		/* characters to clear */
 {
     register int i;
+
+    if (num == 0)
+	return;
 
     if (T_CanCEOL && GoodStr(T_ce))
 	(void) tputs(Str(T_ce), 1, putpure);
@@ -1048,7 +1134,6 @@ GetTermCaps()
     char    buf[TC_BUFSIZE];
     static char bp[TC_BUFSIZE];
     char   *area;
-    extern char *getenv();
     struct termcapstr *t;
 
 
@@ -1073,7 +1158,7 @@ GetTermCaps()
     ptr = getenv("TERM");
 
 #ifdef apollo
-    /*
+    /* 
      * If we are on a pad, we pretend that we are dumb. Otherwise the termcap
      * library will put us in a weird screen mode, thinking that we are going
      * to use curses
@@ -1090,11 +1175,11 @@ GetTermCaps()
     i = tgetent(bp, ptr);
     if (i <= 0) {
 	if (i == -1) {
-#if (SVID == 0) || defined(IRIS3D)
+#if (SYSVREL == 0) || defined(IRIS3D)
 	    xprintf("tcsh: Cannot open /etc/termcap.\n");
 	}
 	else if (i == 0) {
-#endif /* SVID */
+#endif /* SYSVREL */
 	    xprintf("tcsh: No entry for terminal type \"%s\"\n",
 		    getenv("TERM"));
 	}
@@ -1109,6 +1194,8 @@ GetTermCaps()
 	Val(T_pt) = tgetflag("pt") && !tgetflag("xt");
 	/* do we have a meta? */
 	Val(T_km) = (tgetflag("km") || tgetflag("MT"));
+	Val(T_am) = tgetflag("am");
+	Val(T_xn) = tgetflag("xn");
 	Val(T_co) = tgetnum("co");
 	Val(T_li) = tgetnum("li");
 	for (t = tstr; t->name != NULL; t++)
@@ -1124,6 +1211,8 @@ GetTermCaps()
     if (T_Tabs)
 	T_Tabs = Val(T_pt);
     T_HasMeta = Val(T_km);
+    T_Margin = Val(T_am) ? MARGIN_AUTO : 0;
+    T_Margin |= Val(T_xn) ? MARGIN_MAGIC : 0;
     T_CanCEOL = GoodStr(T_ce);
     T_CanDel = GoodStr(T_dc) || GoodStr(T_DC);
     T_CanIns = GoodStr(T_im) || GoodStr(T_ic) || GoodStr(T_IC);
@@ -1250,7 +1339,7 @@ ChangeSize(lins, cols)
 	    Setenv(STRLINES, buf);
 	}
 
-	if (tptr = getenv("TERMCAP")) {
+	if ((tptr = getenv("TERMCAP")) != NULL) {
 	    Char    termcap[1024], backup[1024], *ptr;
 	    int     i;
 

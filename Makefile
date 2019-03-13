@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.15 1991/12/19 22:05:32 christos Exp $
+# $Id: Makefile,v 1.32 1992/05/15 23:49:22 christos Exp $
 #	Makefile	4.3	6/11/83
 #
 # C Shell with process control; VM/UNIX VAX Makefile
@@ -8,7 +8,7 @@
 # things; Paul Placeway, CIS Dept., Ohio State University
 #
 SHELL=/bin/sh
-VERSION=6.01
+VERSION=6.02
 BUILD=tcsh
 
 ################################################################
@@ -34,16 +34,28 @@ LFLAGS=$(INCLUDES)
 #CFLAGS= -g -pg $(INCLUDES) -DPROF
 #CFLAGS= -O -pg $(INCLUDES) -DPROF
 
-# gcc 1.37-
+# gcc 1.00-1.37
 #CFLAGS=-O $(INCLUDES) -finline-functions -fstrength-reduce 
 
-# gcc 1.37+
-CFLAGS=-O $(INCLUDES) -fcombine-regs -finline-functions -fstrength-reduce 
+# gcc 1.37-1.40
+#CFLAGS=-O $(INCLUDES) -fcombine-regs -finline-functions -fstrength-reduce 
 # add -msoft-float for 68881 machines.
 
-#hpux 8.0
+# gcc 2.0
+# On the sparc, don't use -O2; it breaks setjmp() and vfork()
+CFLAGS=-O $(INCLUDES)
 
-#CFLAGS=  $(INCLUDES) +O3 -Aa
+# gcc-2.1
+CFLAGS=-O2 $(INCLUDES)
+
+# gcc 2.0+ on linux
+#CFLAGS=-O6 $(INCLUDES) -finline-functions -fstrength-reduce
+
+#hpux 8.0
+#CFLAGS= $(INCLUDES) +O3 -Aa
+
+# Ultrix 4.2a
+#CFLAGS= $(INCLUDES) -O -Olimit 2000
 
 # for silicon graphics (and other mips compilers) -- use the
 # global optimizer! (-O3).
@@ -59,13 +71,10 @@ CFLAGS=-O $(INCLUDES) -fcombine-regs -finline-functions -fstrength-reduce
 # for at&t machines
 #CFLAGS= -O -Ksd $(INCLUDES)
 
-# for convexen
-#CFLAGS= $(INCLUDES) -ext -tm c1
-
 # Stardent Titan
 #CFLAGS = $(INCLUDES) -O -43
 
-# Stardent Stellar
+# Stardent Stellar or sunos4 w/o gcc
 #CFLAGS = $(INCLUDES) -O4
 
 # Apollo's with cc [apollo builtins don't work with gcc]
@@ -77,6 +86,8 @@ CFLAGS=-O $(INCLUDES) -fcombine-regs -finline-functions -fstrength-reduce
 #DFLAGS=-D_IBMESA
 # On aix2.2.1 we need more compiler space.
 #DFLAGS=-Nd4000 -Nn3000
+# AU/X 2.0 needs a flag for POSIX (read the config file)
+#DFLAGS=-Zp
 DFLAGS=
 
 
@@ -84,11 +95,13 @@ DFLAGS=
 ## LDLAGS.  Define something here if you need to
 ################################################################
 LDFLAGS= 			## The simplest, suitable for all.
+#LDFLAGS= -static -s		## Stripped. No shared libs. (linux)
 #LDFLAGS= -s			## Stripped. Takes less space on disk.
 #LDFLAGS= -s -n			## Pure executable. Spares paging over
 # 				## the network for machines with local
 #				## swap but external /usr/local/bin .
 #LDFLAGS= -s -n -Bstatic	## Without dynamic links. (SunOS)
+#LDFLAGS= -Wl,-s,-n		## Stripped, shared text (Unicos)
 
 ################################################################
 ## LIBES.  Pick one, or roll your own.
@@ -120,6 +133,10 @@ LIBES= -ltermcap		## BSD style things, hpux
 #LIBES= -shlib -ldirent -lcurses ## att3b1 gcc1.40 w/ shared lib & directory lib
 #LIBES=				## Minix.
 #LIBES= -lcurses		## For a stellar
+#LIBES= -lcurses -lnsl -lsocket -lc /usr/ucblib/libucb.a ## Stardent Vistra
+#LIBES= -ltermcap -lndir -lsocket -ljobs ## masscomp RTU6.0
+#LIBES= -ltermcap -lauth        ## for Ultrix with Enhanced Security
+
 
 
 # The difficult choice of a c-compiler...
@@ -127,10 +144,12 @@ LIBES= -ltermcap		## BSD style things, hpux
 # Gcc -traditional is also a safe choice. 
 # If you think that you have good include files try gcc -Wall...
 # If you want to take out -traditional, make sure that your sys/ioctl.h
-# is fixed correctly, otherwise you'll be stopped for tty input!
+# is fixed correctly, otherwise you'll be stopped for tty input, or you
+# will lose the editor and job control.
 CC=	gcc -Wall 
 #CC=	cc
 #CC=	occ
+#CC=	acc
 #CC=	/bin/cc	# For suns, w/o gcc and SVR4
 #CC=	/usr/lib/sun.compile/cc  # FPS 500 (+FPX) with Sun C compiler
 ED=	-ed
@@ -148,22 +167,27 @@ DESTDIR=/usr/local
 MANSECT=1
 DESTBIN=${DESTDIR}/bin
 DESTMAN=${DESTDIR}/man/man${MANSECT}
+# DESTMAN=${DESTDIR}/usr/share/man/man${MANSECT} # Stardent Vistra (SysVR4)
+# DESTMAN=/usr/catman/1l	# Amiga unix (SysVR4)
 FTPAREA=/usr/spool/ftp
 
 ASSRCS=	sh.c sh.dir.c sh.dol.c sh.err.c sh.exec.c sh.char.c \
 	sh.exp.c sh.file.c sh.func.c sh.glob.c sh.hist.c sh.init.c \
 	sh.lex.c sh.misc.c sh.parse.c sh.print.c sh.proc.c sh.sem.c \
 	sh.set.c sh.time.c sh.char.h sh.dir.h sh.proc.h sh.h 
-PSSRCS= sh.decls.h glob.c glob.h mi.termios.c mi.wait.h
+PSSRCS= sh.decls.h glob.c glob.h mi.termios.c mi.wait.h mi.varargs.h ma.setp.c
 SHSRCS= ${ASSRCS} ${PSSRCS}
 SHOBJS=	sh.${SUF} sh.dir.${SUF} sh.dol.${SUF} sh.err.${SUF} sh.exec.${SUF} \
 	sh.char.${SUF} sh.exp.${SUF} sh.func.${SUF} sh.glob.${SUF} \
 	sh.hist.${SUF} sh.init.${SUF} sh.lex.${SUF} sh.misc.${SUF} \
 	sh.parse.${SUF} sh.print.${SUF} sh.proc.${SUF} sh.sem.${SUF} \
-	sh.set.${SUF} sh.time.${SUF} glob.${SUF} mi.termios.${SUF}
+	sh.set.${SUF} sh.time.${SUF} glob.${SUF} mi.termios.${SUF} \
+	ma.setp.${SUF}
 
-TWSRCS= tw.decls.h tw.h tw.help.c tw.init.c tw.parse.c tw.spell.c
-TWOBJS=	tw.help.${SUF} tw.init.${SUF} tw.parse.${SUF} tw.spell.${SUF}
+TWSRCS= tw.decls.h tw.h tw.help.c tw.init.c tw.parse.c tw.spell.c \
+	tw.comp.c
+TWOBJS=	tw.help.${SUF} tw.init.${SUF} tw.parse.${SUF} tw.spell.${SUF} \
+	tw.comp.${SUF}
 
 EDSRCS= ed.chared.c ed.decls.h ed.defns.c ed.h ed.init.c ed.inputl.c \
 	ed.refresh.c ed.screen.c ed.xmap.c ed.term.c ed.term.h
@@ -183,7 +207,7 @@ PVSRCS= Makefile
 AVSRCS= Fixes MAKEDIFFS MAKESHAR NewThings README FAQ \
 	WishList config_f.h eight-bit.me glob.3 patchlevel.h \
 	pathnames.h tcsh.man Ported src.desc Imakefile imake.config \
-	README.imake
+	README.imake complete.tcsh
 VHSRCS=${PVSRCS} ${AVSRCS}
 
 CONFSRCS=config/config.* 
@@ -269,6 +293,9 @@ sh.prof.${SUF}:
 lint: tc.const.h ed.defns.h
 	lint ${LFLAGS} sh*.c tw*.c ed*.c tc.*.c ${LIBES}
 
+alint: tc.const.h ed.defns.h
+	alint ${LFLAGS} sh*.c tw*.c ed*.c tc.*.c ${LIBES}
+
 print:
 	@pr READ_ME
 	@pr makefile makefile.*
@@ -293,14 +320,21 @@ vgrind:
 	@vgrind -t -x -h Index index >/crp/bill/csh/index.t
 
 install: tcsh 
-	-mv  ${DESTBIN}/tcsh  ${DESTBIN}/tcsh.old
+	-mv -f ${DESTBIN}/tcsh  ${DESTBIN}/tcsh.old
 	cp tcsh ${DESTBIN}/tcsh
-	strip ${DESTBIN}/tcsh
+	-strip ${DESTBIN}/tcsh
 	chmod 555 ${DESTBIN}/tcsh
 
 manpage: tcsh.man
+	-rm -f ${DESTMAN}/tcsh.${MANSECT}
 	cp tcsh.man ${DESTMAN}/tcsh.${MANSECT}
 	chmod 444 ${DESTMAN}/tcsh.${MANSECT}
+
+# Amiga Unix
+#manpage: tcsh.man
+#        compress tcsh.man
+#	cp tcsh.man.Z ${DESTMAN}/tcsh.Z
+#	chmod 444 ${DESTMAN}/tcsh.Z
 
 clean:
 	${RM} -f a.out strings x.c xs.c tcsh _MAKE_LOG core
@@ -327,7 +361,8 @@ shar:
 	mkdir tcsh-${VERSION} tcsh-${VERSION}/config 
 	cp ${ALLSRCS} tcsh-${VERSION}
 	cp ${CONFSRCS} tcsh-${VERSION}/config
-	MAKESHAR ${VERSION} tcsh-${VERSION}/* tcsh-${VERSION}/config/*
+	MAKESHAR -v -n tcsh-${VERSION} tcsh-${VERSION} \
+		 tcsh-${VERSION}/* tcsh-${VERSION}/config/*
 	rm -rf tcsh-${VERSION}
 
 tcsh-${VERSION}.tar.Z:

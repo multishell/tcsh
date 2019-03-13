@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/ed.chared.c,v 3.18 1991/12/19 22:34:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/ed.chared.c,v 3.23 1992/04/10 16:38:09 christos Exp $ */
 /*
  * ed.chared.c: Character editing functions.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.chared.c,v 3.18 1991/12/19 22:34:14 christos Exp $")
+RCSID("$Id: ed.chared.c,v 3.23 1992/04/10 16:38:09 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -332,7 +332,8 @@ c_number(p, num, dval)
 	sign = -1;		/* Handle $- */
 	++p;
     }
-    for (i = 0; *p >= '0' && *p <= '9'; i = 10 * i + *p++ - '0');
+    for (i = 0; *p >= '0' && *p <= '9'; i = 10 * i + *p++ - '0')
+	continue;
     *num = (sign < 0 ? dval - i : i);
     return(--p);
 }
@@ -368,7 +369,7 @@ excl_sw:
 	break;
 
     case '$':
-	if ((l = (h->Hlex).prev))
+	if ((l = (h->Hlex).prev) != 0)
 	    bend = expand_lex(buf, INBUFSIZE, l->prev->prev, 0, 0);
 	break;
 
@@ -425,7 +426,7 @@ excl_sw:
 	    }
 	    else {
 		for (i = q - p; h; h = h->Hnext) {
-		    if ((l = &h->Hlex)) {
+		    if ((l = &h->Hlex) != 0) {
 			if (!Strncmp(p + 1, l->next->word, i))
 			    break;
 		    }
@@ -453,8 +454,9 @@ excl_sw:
 	     * Dval will be fed to number.
 	     */
 	    dval = 0;
-	    if ((l = h->Hlex.prev)) {
-		for (l = l->prev; l != h->Hlex.next; l = l->prev, dval++);
+	    if ((l = h->Hlex.prev) != 0) {
+		for (l = l->prev; l != h->Hlex.next; l = l->prev, dval++)
+		    continue;
 	    }
 	    if (!dval)
 		goto excl_err;
@@ -520,6 +522,7 @@ excl_sw:
     LastChar += (bend - buf) - (q - op);
     Cursor += (bend - buf) - (q - op);
     c_copy(buf, op, (bend - buf));
+    *LastChar = '\0';
     return(op + (bend - buf));
 excl_err:
     Beep();
@@ -546,7 +549,8 @@ c_excl(p)
      */
     if ((p[1] == ' ' || p[1] == '\t') &&
 	(p[-1] == ' ' || p[-1] == '\t' || p[-1] == '>')) {
-	for (q = p - 1; q > InputBuf && (*q == ' ' || *q == '\t'); --q);
+	for (q = p - 1; q > InputBuf && (*q == ' ' || *q == '\t'); --q)
+	    continue;
 	if (*q == '>')
 	    ++p;
     }
@@ -563,7 +567,8 @@ c_excl(p)
     for (;;) {
 	while (*p != HIST && p < Cursor)
 	    ++p;
-	for (i = 1; (p - i) >= InputBuf && p[-i] == '\\'; i++);
+	for (i = 1; (p - i) >= InputBuf && p[-i] == '\\'; i++)
+	    continue;
 	if (i % 2 == 0)
 	    ++p;
 	if (p >= Cursor)
@@ -584,7 +589,8 @@ c_substitute()
      * for white space, the beginning of the line, or a history character.
      */
     for (p = Cursor - 1; 
-	 p > InputBuf && *p != ' ' && *p != '\t' && *p != HIST; --p);
+	 p > InputBuf && *p != ' ' && *p != '\t' && *p != HIST; --p)
+	continue;
 
     /*
      * If we found a history character, go expand it.
@@ -786,9 +792,11 @@ e_inc_search(dir)
 	done = redo = 0;
 	*LastChar++ = '\n';
 	for (cp = newdir == F_UP_SEARCH_HIST ? STRbck : STRfwd; 
-	     *cp; *LastChar++ = *cp++);
+	     *cp; *LastChar++ = *cp++)
+	    continue;
 	*LastChar++ = pchar;
-	for (cp = &patbuf[1]; cp < &patbuf[patlen]; *LastChar++ = *cp++);
+	for (cp = &patbuf[1]; cp < &patbuf[patlen]; *LastChar++ = *cp++)
+	    continue;
 	*LastChar = '\0';
 	Refresh();
 
@@ -860,7 +868,7 @@ e_inc_search(dir)
 	    default:		/* Terminate and execute cmd */
 		endcmd[0] = ch;
 		PushMacro(endcmd);
-		/* fall through */
+		/*FALLTHROUGH*/
 
 	    case 0033:		/* ESC: Terminate */
 		ret = CC_REFRESH;
@@ -899,7 +907,7 @@ e_inc_search(dir)
 		patbuf[patlen] = '\0';
 		if (Cursor < InputBuf || Cursor > LastChar ||
 		    (ret = c_search_line(&patbuf[1], newdir)) == CC_ERROR) {
-		    LastCmd = newdir; /* avoid c_hsetpat */
+		    LastCmd = (KEYCMD) newdir; /* avoid c_hsetpat */
 		    ret = newdir == F_UP_SEARCH_HIST ?
 			e_up_search_hist(0) : e_down_search_hist(0);
 		    if (ret != CC_ERROR) {
@@ -958,8 +966,13 @@ v_search(dir)
 {
     Char ch;
     Char tmpbuf[INBUFSIZE];
+    Char oldbuf[INBUFSIZE];
+    Char *oldlc, *oldc;
     int tmplen;
 
+    copyn(oldbuf, InputBuf, INBUFSIZE);
+    oldlc = LastChar;
+    oldc = Cursor;
     tmplen = 0;
     tmpbuf[tmplen++] = '*';
 
@@ -984,9 +997,9 @@ v_search(dir)
 		tmpbuf[tmplen--] = '\0';
 	    }
 	    else {
-		InputBuf[0] = '\0';
-		LastChar = InputBuf;
-		Cursor = InputBuf;
+		copyn(InputBuf, oldbuf, INBUFSIZE);
+		LastChar = oldlc;
+		Cursor = oldc;
 		return(CC_REFRESH);
 	    }
 	    Refresh();
@@ -1038,7 +1051,7 @@ v_search(dir)
 	(void) Strcpy(patbuf, tmpbuf);
 	patlen = tmplen;
     }
-    LastCmd = dir; /* avoid c_hsetpat */
+    LastCmd = (KEYCMD) dir; /* avoid c_hsetpat */
     Cursor = LastChar = InputBuf;
     if ((dir == F_UP_SEARCH_HIST ? e_up_search_hist(0) : 
 				   e_down_search_hist(0)) == CC_ERROR) {
@@ -2256,7 +2269,7 @@ v_repeat_srch(c)
 	    c, patlen, short2str(patbuf));
 #endif
 
-    LastCmd = c;  /* Hack to stop c_hsetpat */
+    LastCmd = (KEYCMD) c;  /* Hack to stop c_hsetpat */
     LastChar = InputBuf;
     switch (c) {
     case F_DOWN_SEARCH_HIST:
@@ -2595,7 +2608,7 @@ v_substline(c)
 {				/* vi mode replace whole line */
     (void) e_killall(0);
     c_alternativ_key_map(0);
-    return(CC_NORM);
+    return(CC_REFRESH);
 }
 
 /*ARGSUSED*/
@@ -2688,7 +2701,8 @@ e_expand(c)
     register Char *p;
     extern bool justpr;
 
-    for (p = InputBuf; Isspace(*p); p++);
+    for (p = InputBuf; Isspace(*p); p++)
+	continue;
     if (p == LastChar)
 	return(CC_ERROR);
 

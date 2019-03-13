@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tc.vers.c,v 3.12 1991/12/19 22:34:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.vers.c,v 3.18 1992/05/15 21:54:34 christos Exp $ */
 /*
  * tc.vers.c: Version dependent stuff
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.vers.c,v 3.12 1991/12/19 22:34:14 christos Exp $")
+RCSID("$Id: tc.vers.c,v 3.18 1992/05/15 21:54:34 christos Exp $")
 
 #include "patchlevel.h"
 
@@ -49,6 +49,12 @@ gethosttype()
 #ifdef HOSTTYPE	/* Override any system determined hosttypes */
     hosttype = str2short(HOSTTYPE);
 #else
+
+# ifdef AMIX /* Amiga UNIX */
+#  define _havehosttype_
+    hosttype = str2short("amiga");
+# endif /* AMIX */
+
 # if defined(vax) || defined(__vax)
 #  define _havehosttype_
     hosttype = str2short("vax");
@@ -97,6 +103,11 @@ gethosttype()
     hosttype = str2short("pyramid");
 # endif /* pyr */
 
+# ifdef tahoe /* tahoe */
+#  define _havehosttype_
+    hosttype = str2short("tahoe");
+# endif /* tahoe */
+
 # ifdef ibm032 /* from Jak Kirman */
 #  define _havehosttype_
     hosttype = str2short("rt");
@@ -137,14 +148,14 @@ gethosttype()
 #   define _havehosttype_
    hosttype = str2short("hp9000s700");
 #  endif /* __hp9000s700 */
-#  if defined(hp9000s800) && !defined(_havehosttype_)
+#  if (defined(__hp9000s800) || defined(hp9000s800)) && !defined(_havehosttype_)
 #   define _havehosttype_
    hosttype = str2short("hp9000s800");	/* maybe "spectrum" */
-#  endif /* hp9000s800 */
-#  if defined(hp9000s300) && !defined(_havehosttype_)
+#  endif /* __hp9000s800 || hp9000s800 */
+#  if (defined(__hp9000s300) || defined(hp9000s300)) && !defined(_havehosttype_)
 #   define _havehosttype_
    hosttype = str2short("hp9000s300");
-#  endif /* hp9000s300 */
+#  endif /* __hp9000s800 || hp9000s300 */
 # if defined(hp9000s500) && !defined(_havehosttype_)
 #  define _havehosttype_
    hosttype = str2short("hp9000s500");
@@ -189,7 +200,7 @@ gethosttype()
 # endif /* i386 */
 #endif /* _MINIX */
 
-# if defined(i386) && SVID > 0
+# if defined(i386) && SYSVREL > 0
 
 #  if !defined(_havehosttype_) && (defined(ISC) || defined(ISC202))
 #   define _havehosttype_
@@ -313,7 +324,7 @@ gethosttype()
 #  endif /* MIPSEB || __MIPSEB */
 # endif /* mips || __mips */
 
-# ifdef m88k
+# if defined(m88k) || defined(__m88k__)
 #  define _havehosttype_
     hosttype = str2short("m88k");	/* Motorola 88100 system */
 # endif 
@@ -388,6 +399,19 @@ gethosttype()
    /* B|rje Josefsson <bj@dc.luth.se> */
    hosttype = str2short("nd500");
 # endif /* NDIX */
+
+# if defined(i860) && !defined(_havehosttype_)
+#  define _havehosttype_
+   /* Tasos Kotsikonas <tasos@avs.com> */
+   hosttype = str2short("vistra800"); /* Stardent Vistra */
+# endif /* i860  && !_havehosttype_ */
+
+# ifndef _havehosttype_
+#  if defined(mc68000) || defined(__mc68000__) || defined(mc68k32)
+#   define _havehosttype_
+     hosttype = str2short("m68k");	/* Motorola 68000 system */
+#  endif 
+# endif
 
 # ifndef _havehosttype_
 #  define _havehosttype_

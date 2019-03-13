@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tc.sig.c,v 3.6 1991/11/11 01:56:34 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.sig.c,v 3.9 1992/05/09 04:03:53 christos Exp $ */
 /*
  * sh.sig.c: Signal routine emulations
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.sig.c,v 3.6 1991/11/11 01:56:34 christos Exp $")
+RCSID("$Id: tc.sig.c,v 3.9 1992/05/09 04:03:53 christos Exp $")
 
 #include "tc.wait.h"
 
@@ -89,7 +89,7 @@ sig_ch_rel()
 #endif /* SIGVOID */
 }
 
-/* libc.a contains these functions in SVID >= 3. */
+/* libc.a contains these functions in SYSVREL >= 3. */
 sigret_t
 (*sigset(a, b)) ()
     int     a;
@@ -109,7 +109,7 @@ sigrelse(what)
     if (what == SIGCHLD)
 	sig_ch_rel();
 
-#ifdef notdef	/* XXX: Should not need that when compiled with SVID=1 */
+#ifdef notdef	/* XXX: Should not need that when compiled with SYSVREL=1 */
 # ifdef UNIXPC	
     if (what == SIGINT)
     	(void)signal(SIGINT, pintr);
@@ -127,7 +127,7 @@ sighold(what)
     if (what == SIGCHLD)
 	(void) signal(SIGCHLD, sig_ch_queue);
 
-#ifdef notdef	/* XXX: Should not need that when compiled with SVID=1 */
+#ifdef notdef	/* XXX: Should not need that when compiled with SYSVREL=1 */
 # ifdef UNIXPC	
     if (what == SIGINT)
     	(void)signal(SIGINT, SIG_IGN);
@@ -170,8 +170,8 @@ sigpause(what)
 
 #ifdef SXA
 /*
- * SX/A is SVID3 but does not have sys5-sigpause().
- * I've heard that sigpause() is not defined in SVID3.
+ * SX/A is SYSVREL3 but does not have sys5-sigpause().
+ * I've heard that sigpause() is not defined in SYSVREL3.
  */
 /* This is not need if you make tcsh by BSD option's cc. */
 void
@@ -250,7 +250,7 @@ sigret_t(*
 
 #endif /* NEEDsignal */
 
-#ifdef _SEQUENT_
+#if defined(_SEQUENT_) || defined(linux)
 /*
  * Support for signals.
  */
@@ -292,12 +292,16 @@ sigsetmask(mask)
 	if (ISSET(mask, i))
 	    sigaddset(&set, i);
 
+#ifdef linux	/* sigprocmask returns old mask! */
+    (void) sigprocmask(SIG_SETMASK, &set, &oset);
+#else /* !linux */
     if (sigprocmask(SIG_SETMASK, &set, &oset))
 	xprintf("sigsetmask(0x%x) - sigprocmask failed, errno %d",
 		mask, errno);
 
+#endif /* linux */
     m = 0;
-    for (i = 1; i < MAXSIG; i++)
+    for (i = 1; i <= MAXSIG; i++)
 	if (sigismember(&oset, i))
 	    SETBIT(m, i);
 
@@ -335,7 +339,7 @@ sigblock(mask)
 
     /* Return old mask to user. */
     m = 0;
-    for (i = 1; i < MAXSIG; i++)
+    for (i = 1; i <= MAXSIG; i++)
 	if (sigismember(&oset, i))
 	    SETBIT(m, i);
 
@@ -362,6 +366,40 @@ bsd_sigpause(mask)
 	if (ISSET(mask, i))
 	    sigaddset(&set, i);
     sigsuspend(&set);
+}
+
+/*
+ * bsd_signal(sig, func)
+ *
+ * Emulate bsd style signal()
+ */
+void (*bsd_signal(sig, func))()
+        int sig;
+        sigret_t (*func)();
+{
+        struct sigaction act, oact;
+        sigset_t set;
+        sigret_t (*r_func)();
+
+        if (sig < 0 || sig > MAXSIG) {
+                printf("error: bsd_signal(%d) signal out of range\n", sig);
+                return;
+        }
+
+        sigemptyset(&set);
+
+        act.sa_handler = (sigret_t(*)()) func;      /* user function */
+        act.sa_mask = set;                      /* signal mask */
+        act.sa_flags = 0;                       /* no special actions */
+
+        if (sigaction(sig, &act, &oact)) {
+                printf("error: bsd_signal(%d) - sigaction failed, errno %d\n",
+                    sig, errno);
+                return((sigret_t(*)()) SIG_IGN);
+        }
+
+        r_func = (sigret_t(*)()) oact.sa_handler;
+        return(r_func);
 }
 #endif /* _SEQUENT_ */
 

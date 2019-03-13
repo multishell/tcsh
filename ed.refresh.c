@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/ed.refresh.c,v 3.3 1991/10/12 04:23:51 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/ed.refresh.c,v 3.10 1992/05/11 14:23:58 christos Exp $ */
 /*
  * ed.refresh.c: Lower level screen refreshing functions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.refresh.c,v 3.3 1991/10/12 04:23:51 christos Exp $")
+RCSID("$Id: ed.refresh.c,v 3.10 1992/05/11 14:23:58 christos Exp $")
 
 #include "ed.h"
 /* #define DEBUG_UPDATE */
@@ -50,19 +50,17 @@ static int vcursor_h, vcursor_v;
 
 static	void	Draw 			__P((int));
 static	void	Vdraw 			__P((int));
-static	void	Vnewline 		__P((void));
 static	void	update_line 		__P((Char *, Char *, int));
 static	void	str_insert		__P((Char *, int, int, Char *, int));
 static	void	str_delete		__P((Char *, int, int, int));
 static	void	str_cp			__P((Char *, Char *, int));
 static	void	PutPlusOne		__P((int));
 static	void	cpy_pad_spaces		__P((Char *, Char *, int));
+#if defined(DEBUG_UPDATE) || defined(DEBUG_REFRESH) || defined(DEBUG_LITERAL)
+static	void	dprintf			__P((char *, ...));
 #ifdef DEBUG_UPDATE
 static	void	dprintstr		__P((char *, Char *, Char *));
-static	void	dprintf			__P((char *, ...));
-#endif  /* DEBUG_UPDATE */
 
-#ifdef DEBUG_UPDATE
 static void
 dprintstr(str, f, t)
 char *str;
@@ -73,6 +71,7 @@ Char *f, *t;
 	dprintf("%c", *f++ & ASCII);
     dprintf("\"\r\n");
 } 
+#endif /* DEBUG_UPDATE */
 
 /* dprintf():
  *	Print to $DEBUGTTY, so that we can test editing on one pty, and 
@@ -106,13 +105,13 @@ dprintf(va_list)
 	o = SHOUT;
 	flush();
 	SHOUT = fd;
-	vprintf(fmt, va);
+	xvprintf(fmt, va);
 	va_end(va);
 	flush();
 	SHOUT = o;
     }
 }
-#endif  /* DEBUG_UPDATE */
+#endif  /* DEBUG_UPDATE || DEBUG_REFRESH || DEBUG_LITERAL */
 
 static void
 Draw(c)				/* draw c, expand tabs, ctl chars */
@@ -126,9 +125,17 @@ Draw(c)				/* draw c, expand tabs, ctl chars */
     }
     /* from wolman%crltrx.DEC@decwrl.dec.com (Alec Wolman) */
     if (ch == '\n') {		/* expand the newline	 */
-	Vdraw('\0');	/* assure end of line	 */
-	vcursor_h = 0;		/* reset cursor pos	 */
-	vcursor_v++;
+	/*
+	 * Don't force a newline if Vdraw does it (i.e. we're at end of line)
+	 * - or we will get two newlines and possibly garbage in between
+	 */
+	int oldv = vcursor_v;
+
+	Vdraw('\0');		/* assure end of line	 */
+	if (oldv == vcursor_v) {
+	    vcursor_h = 0;	/* reset cursor pos	 */
+	    vcursor_v++;
+	}
 	return;
     }
     if (ch == '\t') {		/* expand the tab 	 */
@@ -174,21 +181,16 @@ Vdraw(c)			/* draw char c onto V lines */
 	Vdisplay[vcursor_v][TermH] = '\0';	/* assure end of line */
 	vcursor_h = 0;		/* reset it. */
 	vcursor_v++;
-	if (vcursor_v >= TermV) {	/* should NEVER happen. */
 #ifdef DEBUG_REFRESH
+	if (vcursor_v >= TermV) {	/* should NEVER happen. */
 	    dprintf("\r\nVdraw: vcursor_v overflow! Vcursor_v == %d > %d\r\n",
 		    vcursor_v, TermV);
 	    abort();
-#endif /* DEBUG_REFRESH */
 	}
+#endif /* DEBUG_REFRESH */
     }
 }
 
-static void
-Vnewline()
-{
-    /* needs work. */
-}
 
 /*
  *  Refresh()
@@ -231,7 +233,7 @@ Refresh()
 	    while (*cp & LITERAL)
 		cp++;
 	    if (*cp)
-		Vdraw(litnum++ | LITERAL);
+		Vdraw((int) (litnum++ | LITERAL));
 	    else {
 		/*
 		 * XXX: This is a bug, we lose the last literal, if it is not
@@ -252,20 +254,6 @@ Refresh()
 	    cur_v = vcursor_v;
 	}
 	Draw(*cp);
-    }
-
-    /* to next line and draw the current search prompt if searching */
-    if (DoingSearch) {
-	Vnewline();
-	for (cp = SearchPrompt; *cp; cp++)
-	    Draw(*cp);
-	for (cp = InputBuf; (cp < LastChar); cp++) {
-	    if (cp == Cursor) {
-		cur_h = vcursor_h;	/* save for later */
-		cur_v = vcursor_v;
-	    }
-	    Draw(*cp);
-	}
     }
 
     if (cur_h == -1) {		/* if I havn't been set yet, I'm at the end */
@@ -474,7 +462,8 @@ update_line(old, new, cur_line)
     /*
      * find first diff
      */
-    for (o = old, n = new; *o && (*o == *n); o++, n++);
+    for (o = old, n = new; *o && (*o == *n); o++, n++)
+	continue;
     ofd = o;
     nfd = n;
 
@@ -520,7 +509,8 @@ update_line(old, new, cur_line)
     /*
      * find last same pointer
      */
-    while ((o > ofd) && (n > nfd) && (*--o == *--n));
+    while ((o > ofd) && (n > nfd) && (*--o == *--n))
+	continue;
     ols = ++o;
     nls = ++n;
 
@@ -538,7 +528,8 @@ update_line(old, new, cur_line)
     if (*ofd) {
 	for (c = *ofd, n = nfd; n < nls; n++) {
 	    if (c == *n) {
-		for (o = ofd, p = n; p < nls && o < ols && *o == *p; o++, p++);
+		for (o = ofd, p = n; p < nls && o < ols && *o == *p; o++, p++)
+		    continue;
 		/*
 		 * if the new match is longer and it's worth keeping, then we
 		 * take it
@@ -559,7 +550,8 @@ update_line(old, new, cur_line)
     if (*nfd) {
 	for (c = *nfd, o = ofd; o < ols; o++) {
 	    if (c == *o) {
-		for (n = nfd, p = o; p < ols && n < nls && *p == *n; p++, n++);
+		for (n = nfd, p = o; p < ols && n < nls && *p == *n; p++, n++)
+		    continue;
 		/*
 		 * if the new match is longer and it's worth keeping, then we
 		 * take it
@@ -711,8 +703,8 @@ update_line(old, new, cur_line)
      * if we have a net insert on the first difference, AND inserting the net
      * amount ((nsb-nfd) - (osb-ofd)) won't push the last useful character
      * (which is ne if nls != ne, otherwise is nse) off the edge of the screen
-     * (TermH) else we do the deletes first so that we keep everything we need
-     * to.
+     * (TermH - 1) else we do the deletes first so that we keep everything we
+     * need to.
      */
 
     /*
@@ -728,7 +720,7 @@ update_line(old, new, cur_line)
      * width) We need to do an insert! else if (we need to delete characters)
      * We need to delete characters! else No insert or delete
      */
-    if ((nsb != nfd) && fx > 0 && ((p - old) + fx <= TermH)) {
+    if ((nsb != nfd) && fx > 0 && ((p - old) + fx < TermH)) {
 #ifdef DEBUG_UPDATE
 	dprintf("first diff insert at %d...\r\n", nfd - new);
 #endif  /* DEBUG_UPDATE */
@@ -994,11 +986,6 @@ RefCursor()
     register Char *cp, c;
     register int h, th, v;
 
-    if (DoingSearch) {
-	Refresh();
-	return;
-    }
-
     /* first we must find where the cursor is... */
     h = 0;
     v = 0;
@@ -1097,8 +1084,16 @@ PutPlusOne(c)
 	CursorH = 0;
 	CursorV++;
 	OldvcV++;
-	(void) putraw('\r');
-	(void) putraw('\n');
+	if (T_Margin & MARGIN_AUTO) {
+	    if (T_Margin & MARGIN_MAGIC) {
+		(void) putraw(' ');
+		(void) putraw('\b');
+	    }
+	}
+	else {
+	    (void) putraw('\r');
+	    (void) putraw('\n');
+	}
     }
 }
 
@@ -1114,11 +1109,6 @@ RefPlusOne()
 	Refresh();		/* too hard to handle */
 	return;
     }				/* else (only do at end of line, no TAB) */
-
-    if (DoingSearch) {
-	Refresh();
-	return;
-    }
 
     if (Iscntrl(c)) {		/* if control char, do caret */
 	mc = (c == '\177') ? '?' : (c | 0100);
@@ -1157,12 +1147,17 @@ ClearLines()
     register int i;
 
     if (T_CanCEOL) {
-	MoveToChar(0);
-	for (i = 0; i <= OldvcV; i++) {	/* for each line on the screen */
+	/*
+	 * Clear the lines from the bottom up so that if we try moving
+	 * the cursor down by writing the character that is at the end
+	 * of the screen line, we won't rewrite a character that shouldn't
+	 * be there.
+	 */
+	for (i = OldvcV; i >= 0; i--) {	/* for each line on the screen */
 	    MoveToLine(i);
+	    MoveToChar(0);
 	    ClearEOL(TermH);
 	}
-	MoveToLine(0);
     }
     else {
 	MoveToLine(OldvcV);	/* go to last line */

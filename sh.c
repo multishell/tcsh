@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.c,v 3.20 1991/12/19 22:34:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.c,v 3.29 1992/05/09 04:03:53 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -43,7 +43,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif				/* not lint */
 
-RCSID("$Id: sh.c,v 3.20 1991/12/19 22:34:14 christos Exp $")
+RCSID("$Id: sh.c,v 3.29 1992/05/09 04:03:53 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -88,37 +88,39 @@ jmp_buf reslab;
 int do_logout;
 #endif				/* TESLA */
 
-Char   *dumphist[] = {STRhistory, STRmh, 0, 0};
-Char   *loadhist[] = {STRsource, STRmh, STRtildothist, 0};
+static Char   *dumphist[] = {STRhistory, STRmh, 0, 0};
+static Char   *loadhist[] = {STRsource, STRmh, STRtildothist, 0};
 
 #ifdef CSHDIRS
-Char   *loaddirs[] = {STRsource, STRdirfile, 0};
-bool    dflag = 0;
+static Char   *loaddirs[] = {STRsource, STRdirfile, 0};
+static bool    dflag = 0;
 #endif
 
 #if defined(convex) || defined(__convex__)
 bool    use_fork = 0;		/* use fork() instead of vfork()? */
 #endif
 
-int     nofile = 0;
-bool    reenter = 0;
-bool    nverbose = 0;
-bool    nexececho = 0;
-bool    quitit = 0;
+static int     nofile = 0;
+static bool    reenter = 0;
+static bool    nverbose = 0;
+static bool    nexececho = 0;
+static bool    quitit = 0;
 bool    fast = 0;
-bool    batch = 0;
-bool    mflag = 0;
-bool    prompt = 1;
-bool    enterhist = 0;
+static bool    batch = 0;
+static bool    mflag = 0;
+static bool    prompt = 1;
+static bool    enterhist = 0;
 bool    tellwhat = 0;
 time_t  t_period;
+static time_t  chktim;		/* Time mail last checked */
+static int     gid;		/* Invokers gid */
 
 extern char **environ;
 
 static	int		  srccat	__P((Char *, Char *));
-static	int		  srcfile	__P((char *, bool, bool));
+static	int		  srcfile	__P((char *, bool, bool, Char **));
 static	sigret_t	  phup		__P((int));
-static	void		  srcunit	__P((int, bool, bool));
+static	void		  srcunit	__P((int, bool, bool, Char **));
 static	void		  mailchk	__P((void));
 static	Char	 	**defaultpath	__P((void));
 
@@ -137,12 +139,37 @@ main(argc, argv)
 
 #ifdef BSDSIGS
     sigvec_t osv;
-#endif				/* BSDSIGS */
+#endif /* BSDSIGS */
+
+#if !(defined(BSDTIMES) || defined(_SEQUENT_)) && defined(POSIX)
+# ifdef _SC_CLK_TCK
+    clk_tck = (clock_t) sysconf(_SC_CLK_TCK);
+# else /* ! _SC_CLK_TCK */
+#  ifdef CLK_TCK
+    clk_tck = CLK_TCK;
+#  else /* !CLK_TCK */
+    clk_tck = HZ;
+#  endif /* CLK_TCK */
+# endif /* _SC_CLK_TCK */
+#endif /* !BSDTIMES && POSIX */
 
     settimes();			/* Immed. estab. timing base */
 #ifdef TESLA
     do_logout = 0;
-#endif				/* TESLA */
+#endif /* TESLA */
+
+    /*
+     * Make sure we have 0, 1, 2 open
+     * Otherwise `` jobs will not work... (From knaff@poly.polytechnique.fr)
+     */
+    {
+	do 
+	    if ((f = open(_PATH_DEVNULL, O_RDONLY)) == -1 &&
+		(f = open("/", O_RDONLY)) == -1) 
+		exit(1);
+	while (f < 3);
+	(void) close(f);
+    }
 
     osinit();			/* Os dependent initialization */
 
@@ -172,6 +199,15 @@ main(argc, argv)
 	quitit = 1;
     uid = getuid();
     gid = getgid();
+#ifdef OREO
+    /*
+     * We are a login shell if: 1. we were invoked as -<something> with
+     * optional arguments 2. or we were invoked only with the -l flag
+     */
+    loginsh = (**tempv == '-') || (argc == 2 &&
+				   tempv[1][0] == '-' && tempv[1][1] == 'l' &&
+						tempv[1][2] == '\0');
+#else
     /*
      * We are a login shell if: 1. we were invoked as -<something> and we had
      * no arguments 2. or we were invoked only with the -l flag
@@ -179,6 +215,7 @@ main(argc, argv)
     loginsh = (**tempv == '-' && argc == 1) || (argc == 2 &&
 				   tempv[1][0] == '-' && tempv[1][1] == 'l' &&
 						tempv[1][2] == '\0');
+#endif
     if (loginsh && **tempv != '-') {
 	/*
 	 * Mangle the argv space
@@ -186,7 +223,8 @@ main(argc, argv)
 	tempv[1][0] = '\0';
 	tempv[1][1] = '\0';
 	tempv[1] = NULL;
-	for (tcp = *tempv; *tcp++;);
+	for (tcp = *tempv; *tcp++;)
+	     continue;
 	for (tcp--; tcp >= *tempv; tcp--)
 	    tcp[1] = tcp[0];
 	*++tcp = '-';
@@ -199,10 +237,14 @@ main(argc, argv)
     NoNLSRebind = getenv("NOREBIND") != NULL;
 #ifdef NLS
     (void) setlocale(LC_ALL, "");
+# ifdef LC_COLLATE
+    (void) setlocale(LC_COLLATE, "");
+# endif
     {
 	int     k;
 
-	for (k = 0200; k <= 0377 && !Isprint(k); k++);
+	for (k = 0200; k <= 0377 && !Isprint(k); k++)
+	    continue;
 	AsciiOnly = k > 0377;
     }
 #else
@@ -218,6 +260,33 @@ main(argc, argv)
     (void) time(&t_period);
     initwatch();
 
+#if defined(alliant)
+    /*
+     * From:  Jim Pace <jdp@research.att.com>
+     * tcsh does not work properly on the alliants through an rlogin session.
+     * The shell generally hangs.  Also, reference to the controlling terminal
+     * does not work ( ie: echo foo > /dev/tty ).
+     *
+     * A security feature was added to rlogind affecting FX/80's Concentrix
+     * from revision 5.5.xx upwards (through 5.7 where this fix was implemented)
+     * This security change also affects the FX/2800 series.
+     * The security change to rlogind requires the process group of an rlogin
+     * session become disassociated with the tty in rlogind.
+     *
+     * The changes needed are:
+     * 1. set the process group
+     * 2. reenable the control terminal
+     */
+     if (loginsh && isatty(SHIN)) {
+	 ttyn = (char *) ttyname(SHIN);
+	 (void) close(SHIN);
+	 SHIN = open(ttyn, O_RDWR);
+	 shpgrp = getpid();
+	 (void) ioctl (SHIN, TIOCSPGRP, (ptr_t) &shpgrp);
+	 (void) setpgid(0, shpgrp);
+     }
+#endif /* alliant */
+
     /*
      * Move the descriptors to safe places. The variable didfds is 0 while we
      * have only FSH* to work with. When didfds is true, we have 0,1,2 and
@@ -228,7 +297,7 @@ main(argc, argv)
     /*
      * Get and set the tty now
      */
-    if (ttyn = ttyname(SHIN)) {
+    if ((ttyn = ttyname(SHIN)) != NULL) {
 	/*
 	 * Could use rindex to get rid of other possible path components, but
 	 * hpux preserves the subdirectory /pty/ when storing the tty name in
@@ -294,6 +363,22 @@ main(argc, argv)
 
     set(STRstatus, Strsave(STR0));
     fix_version();		/* publish the shell version */
+
+    /*
+     * Publish the selected echo style
+     */
+#if ECHO_STYLE == NONE_ECHO
+    set(STRecho_style, Strsave(STRnone));
+#endif /* ECHO_STYLE == NONE_ECHO */
+#if ECHO_STYLE == BSD_ECHO
+    set(STRecho_style, Strsave(STRbsd));
+#endif /* ECHO_STYLE == BSD_ECHO */
+#if ECHO_STYLE == SYSV_ECHO
+    set(STRecho_style, Strsave(STRsysv));
+#endif /* ECHO_STYLE == SYSV_ECHO */
+#if ECHO_STYLE == BOTH_ECHO
+    set(STRecho_style, Strsave(STRboth));
+#endif /* ECHO_STYLE == BOTH_ECHO */
 
     /*
      * increment the shell level.
@@ -486,6 +571,18 @@ main(argc, argv)
 		if (argc == 1)
 		    xexit(0);
 		argc--, tempv++;
+#ifdef M_XENIX
+		/* Xenix Vi bug:
+		   it relies on a 7 bit environment (/bin/sh), so it
+		   pass ascii arguments with the 8th bit set */
+		if (!strcmp(argv[0], "sh"))
+		  {
+		    char *p;
+
+		    for (p = tempv[0]; *p; ++p)
+		      *p &= ASCII;
+		  }
+#endif
 		arginp = SAVE(tempv[0]);
 		/*
 		 * * Give an error on -c arguments that end in * backslash to
@@ -827,7 +924,7 @@ main(argc, argv)
  * David Dawes (dawes@physics.su.oz.au) Sept 1991
  */
 
-#if SVID > 3
+#if SYSVREL > 3
     {
 	struct sigaction act;
         act.sa_handler=pchild;
@@ -839,9 +936,9 @@ main(argc, argv)
 				    */
         sigaction(SIGCHLD,&act,(struct sigaction *)NULL);
     }
-#else /* SVID <= 3 */
+#else /* SYSVREL <= 3 */
     (void) sigset(SIGCHLD, pchild);	/* while signals not ready */
-#endif /* SVID <= 3 */
+#endif /* SYSVREL <= 3 */
 
 
     if (intty && !arginp) 	
@@ -868,13 +965,13 @@ main(argc, argv)
 	    setintr = 0;
 	    parintr = SIG_IGN;	/* onintr in /etc/ files has no effect */
 #ifdef _PATH_DOTCSHRC
-	    (void) srcfile(_PATH_DOTCSHRC, 0, 0);
+	    (void) srcfile(_PATH_DOTCSHRC, 0, 0, NULL);
 #endif
 	    if (!arginp && !onelflg && !havhash)
 		dohash(NULL,NULL);
 #ifdef _PATH_DOTLOGIN
 	    if (loginsh)
-		(void) srcfile(_PATH_DOTLOGIN, 0, 0);
+		(void) srcfile(_PATH_DOTLOGIN, 0, 0, NULL);
 #endif
 #ifdef BSDSIGS
 	    (void) sigsetmask(omask);
@@ -941,6 +1038,7 @@ main(argc, argv)
 	setNS(STRverbose);
     if (nexececho)
 	setNS(STRecho);
+    
     /*
      * All the rest of the world is inside this call. The argument to process
      * indicates whether it should catch "error unwinds".  Thus if we are a
@@ -1034,13 +1132,13 @@ srccat(cp, dp)
     Char   *cp, *dp;
 {
     if (cp[0] == '/' && cp[1] == '\0') 
-	return srcfile(short2str(dp), mflag ? 0 : 1, 0);
+	return srcfile(short2str(dp), (mflag ? 0 : 1), 0, NULL);
     else {
 	register Char *ep = Strspl(cp, dp);
 	char   *ptr = short2str(ep);
 
 	xfree((ptr_t) ep);
-	return srcfile(ptr, mflag ? 0 : 1, 0);
+	return srcfile(ptr, (mflag ? 0 : 1), 0, NULL);
     }
 }
 
@@ -1048,9 +1146,10 @@ srccat(cp, dp)
  * Source to a file putting the file descriptor in a safe place (> 2).
  */
 static int
-srcfile(f, onlyown, flag)
+srcfile(f, onlyown, flag, av)
     char   *f;
     bool    onlyown, flag;
+    Char **av;
 {
     register int unit;
 
@@ -1061,7 +1160,7 @@ srcfile(f, onlyown, flag)
 #ifdef FIOCLEX
     (void) ioctl(unit, FIOCLEX, NULL);
 #endif
-    srcunit(unit, onlyown, flag);
+    srcunit(unit, onlyown, flag, av);
     return 1;
 }
 
@@ -1070,10 +1169,12 @@ srcfile(f, onlyown, flag)
  * we don't chance it.	This occurs on ".cshrc"s and the like.
  */
 int     insource;
+static  Char **goargv = NULL;
 static void
-srcunit(unit, onlyown, hflg)
+srcunit(unit, onlyown, hflg, av)
     register int unit;
     bool    onlyown, hflg;
+    Char **av;
 {
     /*
      * PWP: this is arranged like this so that an optimizing compiler won't go
@@ -1098,6 +1199,7 @@ srcunit(unit, onlyown, hflg)
     bool    oenterhist = enterhist;
     char    OHIST = HIST;
     bool    otell = cantell;
+    Char **oargv;
     struct Bin saveB;
 #ifdef BSDSIGS
     volatile sigmask_t omask = (sigmask_t) 0;
@@ -1106,6 +1208,7 @@ srcunit(unit, onlyown, hflg)
 
     /* The (few) real local variables */
     int     my_reenter;
+
 
     if (unit < 0)
 	return;
@@ -1159,6 +1262,20 @@ srcunit(unit, onlyown, hflg)
     enterhist = hflg;
     if (enterhist)
 	HIST = '\0';
+    /*
+     * we can now pass arguments to source. 
+     * For compatibility we do that only if arguments were really
+     * passed, otherwise we keep the old, global $argv like before.
+     */
+
+    oargv = goargv;
+    goargv = NULL;
+    if (av != NULL && *av != NULL && **av != '\0') {
+	struct varent *vp;
+	if ((vp = adrof(STRargv)) != NULL)
+	    goargv = saveblk(vp->vec);
+	setq(STRargv, saveblk(av), &shvhed);
+    }
 
     /*
      * Now if we are allowing commands to be interrupted, we let ourselves be
@@ -1208,11 +1325,18 @@ srcunit(unit, onlyown, hflg)
 	intty = oldintty, whyles = oldwhyl, gointr = ogointr;
 	if (enterhist)
 	    HIST = OHIST;
+	if (av != NULL && *av != NULL && **av != '\0') {
+	    if (goargv)
+		setq(STRargv, goargv, &shvhed);
+	    else
+		unsetv(STRargv);
+	}
 	enterhist = oenterhist;
 	cantell = otell;
     }
 
     resexit(oldexit);
+    goargv = oargv;
     /*
      * If process reset() (effectively an unwind) then we must also unwind.
      */
@@ -1224,16 +1348,32 @@ srcunit(unit, onlyown, hflg)
 void
 rechist()
 {
-    Char    buf[BUFSIZE], *hfile;
+    Char    buf[BUFSIZE], hbuf[BUFSIZE], *hfile;
     int     fp, ftmp, oldidfds;
+    struct  varent *shist;
 
     if (!fast) {
-	if (value(STRsavehist)[0] == '\0')
+	/*
+	 * If $savehist is just set, we use the value of $history
+	 * else we use the value in $savehist
+	 */
+	if ((shist = adrof(STRsavehist)) != NULL) {
+	    if (shist->vec[0][0] != '\0')
+		(void) Strcpy(hbuf, shist->vec[0]);
+	    else if ((shist = adrof(STRhistory)) != 0 && 
+		     shist->vec[0][0] != '\0')
+		(void) Strcpy(hbuf, shist->vec[0]);
+	    else
+		return;
+	}
+	else
 	    return;
+
 	if ((hfile = value(STRhistfile)) == STRNULL) {
 	    hfile = Strcpy(buf, value(STRhome));
 	    (void) Strcat(buf, STRsldthist);
 	}
+
 	fp = creat(short2str(hfile), 0600);
 	if (fp == -1) 
 	    return;
@@ -1241,8 +1381,7 @@ rechist()
 	didfds = 0;
 	ftmp = SHOUT;
 	SHOUT = fp;
-	(void) Strcpy(buf, value(STRsavehist));
-	dumphist[2] = buf;
+	dumphist[2] = hbuf;
 	dohist(dumphist, NULL);
 	(void) close(fp);
 	SHOUT = ftmp;
@@ -1270,7 +1409,7 @@ goodbye(v, c)
 	if (!(adrof(STRlogout)))
 	    set(STRlogout, STRnormal);
 #ifdef _PATH_DOTLOGOUT
-	(void) srcfile(_PATH_DOTLOGOUT, 0, 0);
+	(void) srcfile(_PATH_DOTLOGOUT, 0, 0, NULL);
 #endif
 	if (adrof(STRhome))
 	    (void) srccat(value(STRhome), STRsldtlogout);
@@ -1334,7 +1473,7 @@ int snum;
 #endif
 }
 
-Char   *jobargv[2] = {STRjobs, 0};
+static Char   *jobargv[2] = {STRjobs, 0};
 
 /*
  * Catch an interrupt, e.g. during lexical input.
@@ -1383,10 +1522,17 @@ pintr1(wantnl)
 #endif
 	if (pjobs) {
 	    pjobs = 0;
-	    xprintf("\n");
+	    xputchar('\n');
 	    dojobs(jobargv, NULL);
 	    stderror(ERR_NAME | ERR_INTR);
 	}
+    }
+    /* MH - handle interrupted completions specially */
+    {
+	extern int InsideCompletion;
+
+	if (InsideCompletion)
+	    stderror(ERR_SILENT);
     }
     /* JV - Make sure we shut off inputl */
     {
@@ -1413,14 +1559,14 @@ pintr1(wantnl)
     if (gointr) {
 	gotolab(gointr);
 	timflg = 0;
-	if (v = pargv)
+	if ((v = pargv) != 0)
 	    pargv = 0, blkfree(v);
-	if (v = gargv)
+	if ((v = gargv) != 0)
 	    gargv = 0, blkfree(v);
 	reset();
     }
     else if (intty && wantnl) {
-	/* xprintf("\n"); *//* Some like this, others don't */
+	/* xputchar('\n'); *//* Some like this, others don't */
 	(void) putraw('\r');
 	(void) putraw('\n');
     }
@@ -1441,7 +1587,7 @@ pintr1(wantnl)
  * Note that if catch is not set then we will unwind on any error.
  * If an end-of-file occurs, we return.
  */
-struct command *savet = NULL;
+static struct command *savet = NULL;
 void
 process(catch)
     bool    catch;
@@ -1646,10 +1792,10 @@ dosource(t, c)
 	    stderror(ERR_NAME | ERR_HFLAG);
 	hflg++;
     }
-    f = globone(*t, G_ERROR);
+    f = globone(*t++, G_ERROR);
     (void) strcpy(buf, short2str(f));
     xfree((ptr_t) f);
-    if ((!srcfile(buf, 0, hflg)) && (!hflg))
+    if ((!srcfile(buf, 0, hflg, t)) && (!hflg))
 	stderror(ERR_SYSTEM, buf, strerror(errno));
 }
 
@@ -1720,7 +1866,7 @@ gethdir(home)
      * Is it us?
      */
     if (*home == '\0') {
-	if (h = value(STRhome)) {
+	if ((h = value(STRhome)) != NULL) {
 	    (void) Strcpy(home, h);
 	    return 0;
 	}

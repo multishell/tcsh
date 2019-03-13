@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.decls.h,v 3.7 1991/12/14 20:45:46 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.decls.h,v 3.11 1992/05/02 23:39:58 christos Exp $ */
 /*
  * sh.decls.h	 External declarations from sh*.c
  */
@@ -66,12 +66,11 @@ extern	Char		 *dcanon	__P((Char *, Char *));
 extern	void		  dtildepr	__P((Char *, Char *));
 extern	void		  dtilde	__P((void));
 extern	void		  dochngd	__P((Char **, struct command *));
-extern	Char		 *dnormalize	__P((Char *));
+extern	Char		 *dnormalize	__P((Char *, int));
 extern	void		  dopushd	__P((Char **, struct command *));
 extern	void		  dopopd	__P((Char **, struct command *));
 extern	void		  dfree		__P((struct directory *));
 extern	int		  getstakd	__P((Char *, int));
-extern	void		  dextract	__P((struct directory *));
 #ifdef	CSHDIRS
 extern	void		  recdirs	__P((void));
 #endif
@@ -100,10 +99,10 @@ extern	void		  execash	__P((Char **, struct command *));
 extern	void		  hashstat	__P((Char **, struct command *));
 #endif
 extern	void		  xechoit	__P((Char **));
-extern	int		  iscommand	__P((Char *));
 extern	int		  executable	__P((Char *, Char *, bool));
 extern	void		  tellmewhat	__P((struct wordent *));
 extern	void		  dowhere	__P((Char **, struct command *));
+extern	int		  find_cmd	__P((Char *, int));
 
 /*
  * sh.exp.c
@@ -165,10 +164,12 @@ extern	void		  wfree		__P((void));
 /*
  * sh.glob.c
  */
+extern	Char	 	 *globequal	__P((Char *, Char *));
 extern	Char		**dobackp	__P((Char *, bool));
 extern	void		  Gcat		__P((Char *, Char *));
 extern	Char		 *globone	__P((Char *, int));
 extern	int		  Gmatch	__P((Char *, Char *));
+extern	int		  Gnmatch	__P((Char *, Char *, Char **));
 extern	void		  ginit		__P((void));
 extern	Char		**globall	__P((Char **));
 extern	void		  rscan		__P((Char **, void (*)()));
@@ -208,9 +209,7 @@ extern	void		  unreadc	__P((int));
  * sh.misc.c
  */
 extern	int		  any		__P((char *, int));
-extern	Char		**blkcat	__P((Char **, Char **));
 extern	Char		**blkcpy	__P((Char **, Char **));
-extern	Char		**blkend	__P((Char **));
 extern	void		  blkfree	__P((Char **));
 extern	int		  blklen	__P((Char **));
 extern	void		  blkpr		__P((Char **));
@@ -289,7 +288,6 @@ extern	void		  palloc	__P((int, struct command *));
 extern	void		  panystop	__P((bool));
 extern	sigret_t	  pchild	__P((int));
 extern	void		  pendjob	__P((void));
-extern	struct process 	 *pfind		__P((Char *));
 extern	int		  pfork		__P((struct command *, int));
 extern	void		  pgetty	__P((int, int));
 extern	void		  pjwait	__P((struct process *));
@@ -351,8 +349,6 @@ extern	void		  prusage	__P((struct tms *, struct tms *,
 extern	void		  settimes	__P((void));
 #if defined(BSDTIMES) || defined(_SEQUENT_)
 extern	void		  ruadd		__P((struct rusage *, struct rusage *));
-extern	void		  tvadd		__P((struct timeval *, 
-					     struct timeval *));
 extern	void		  tvsub		__P((struct timeval *, 
 					     struct timeval *, 
 					     struct timeval *));

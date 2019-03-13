@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tc.os.c,v 3.13 1991/12/19 22:34:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.os.c,v 3.19 1992/05/15 23:49:22 christos Exp $ */
 /*
  * tc.os.c: OS Dependent builtin functions
  */
@@ -36,15 +36,12 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.os.c,v 3.13 1991/12/19 22:34:14 christos Exp $")
+RCSID("$Id: tc.os.c,v 3.19 1992/05/15 23:49:22 christos Exp $")
 
 #include "tw.h"
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
-
-#ifdef titan
-int     end;
-#endif				/* titan */
+#include "sh.decls.h"
 
 /***
  *** MACH
@@ -66,11 +63,17 @@ int     end;
 static Char STRCPATH[] = {'C', 'P', 'A', 'T', 'H', '\0'};
 static Char STRLPATH[] = {'L', 'P', 'A', 'T', 'H', '\0'};
 static Char STRMPATH[] = {'M', 'P', 'A', 'T', 'H', '\0'};
+# if EPATH
 static Char STREPATH[] = {'E', 'P', 'A', 'T', 'H', '\0'};
-#endif				/* MACH */
+# endif
+#endif /* MACH */
 
-static Char *syspaths[] = {STRPATH, STRCPATH, STRLPATH, STRMPATH, STREPATH, 0};
-#define LOCALSYSPATH	"/usr/cs"
+static Char *syspaths[] = {STRPATH, STRCPATH, STRLPATH, STRMPATH, 
+#if EPATH
+	STREPATH,
+#endif
+	 0};
+#define LOCALSYSPATH	"/usr/local"
 
 /*ARGSUSED*/
 void
@@ -81,7 +84,6 @@ dosetpath(arglist, c)
     extern char *getenv();
     sigmask_t omask;
     Char  **pathvars, **cmdargs;
-    Char  **paths;
     char  **spaths, **cpaths, **cmds;
     char   *tcp;
     unsigned int npaths, ncmds;
@@ -120,8 +122,6 @@ dosetpath(arglist, c)
 
     spaths = (char **) xmalloc(npaths * sizeof *spaths);
     setzero((char *) spaths, npaths * sizeof *spaths);
-    paths = (Char **) xmalloc((npaths + 1) * sizeof *paths);
-    setzero((char *) paths, (npaths + 1) * sizeof *paths);
     cpaths = (char **) xmalloc((npaths + 1) * sizeof *cpaths);
     setzero((char *) cpaths, (npaths + 1) * sizeof *cpaths);
     cmds = (char **) xmalloc((ncmds + 1) * sizeof *cmds);
@@ -158,12 +158,6 @@ abortpath:
 		    xfree((ptr_t) spaths[i]);
 	    xfree((ptr_t) spaths);
 	}
-	if (paths) {
-	    for (i = 0; i < npaths; i++)
-		if (paths[i])
-		    xfree((ptr_t) paths[i]);
-	    xfree((ptr_t) paths);
-	}
 	if (cpaths)
 	    xfree((ptr_t) cpaths);
 	if (cmds) {
@@ -173,23 +167,20 @@ abortpath:
 	    xfree((ptr_t) cmds);
 	}
 
-	for (i = 0; i < npaths; i++) {
-	    paths[i] = SAVE(cpaths[i]);
-	    xfree((ptr_t) cpaths[i]);
-	}
 	(void) sigsetmask(omask);
 	donefds();
 	return;
     }
 
     for (i = 0; i < npaths; i++) {
-	Char   *val;
+	Char	*val, *name;
 
-	for (val = paths[i]; val && *val && *val != '='; val++);
+	name = str2short(cpaths[i]);
+	for (val = str2short(cpaths[i]); val && *val && *val != '='; val++);
 	if (val && *val == '=') {
 	    *val++ = '\0';
-	    setenv(paths[i], val);
-	    if (Strcmp(paths[i], STRPATH) == 0) {
+	    Setenv(name, val);
+	    if (Strcmp(name, STRPATH) == 0) {
 		importpath(val);
 		if (havhash)
 		    dohash(NULL, NULL);
@@ -343,7 +334,7 @@ dogetspath(v, c)
 		xprintf("*site %d* ", (int) (p[i] & SPATH_MASK));
 	}
     }
-    xprintf("\n");
+    xputchar('\n');
     flush();
 }
 
@@ -715,10 +706,6 @@ fix_yp_bugs()
 void
 osinit()
 {
-    extern ptr_t membot;
-
-    membot = (ptr_t) sbrk(0);
-
 #ifdef OREO
     set42sig();
     sigignore(SIGIO);		/* ignore SIGIO */
@@ -732,10 +719,6 @@ osinit()
 	sigstack(&inst, NULL);
     }
 #endif /* aiws */
-
-#ifdef titan
-    end = sbrk(0);
-#endif	/* titan */
 
 #ifdef apollo
     (void) isapad();
@@ -759,33 +742,60 @@ xstrerror(i)
 #endif /* strerror */
     
 #ifdef gethostname
-#include <sys/utsname.h>
+# ifndef _MINIX
+#  include <sys/utsname.h>
+# endif
 
 int
 xgethostname(name, namlen)
     char   *name;
     int     namlen;
 {
+#ifndef _MINIX
     int     i, retval;
     struct utsname uts;
 
     retval = uname(&uts);
 
-#ifdef DEBUG
+# ifdef DEBUG
     xprintf("sysname:  %s\n", uts.sysname);
     xprintf("nodename: %s\n", uts.nodename);
     xprintf("release:  %s\n", uts.release);
     xprintf("version:  %s\n", uts.version);
     xprintf("machine:  %s\n", uts.machine);
-#endif				/* DEBUG */
+# endif	/* DEBUG */
     i = strlen(uts.nodename) + 1;
     (void) strncpy(name, uts.nodename, i < namlen ? i : namlen);
 
     return retval;
-}				/* end gethostname */
+#else /* _MINIX */
+    if (namlen > 0) {
+	(void) strncpy(name, "minix", namlen);
+	name[namlen-1] = '\0';
+    }
+    return(0);
+#endif /* _MINIX */
+} /* end xgethostname */
+#endif /* gethostname */
 
-#endif				/* gethostname */
-
+#ifdef nice
+# if defined(_MINIX) && defined(NICE)
+#  undef _POSIX_SOURCE	/* redefined in <lib.h> */
+#  undef _MINIX		/* redefined in <lib.h> */
+#  undef HZ		/* redefined in <minix/const.h> */
+#  include <lib.h>
+# endif /* _MINIX */
+int 
+xnice(incr)
+    int incr;
+{
+#if defined(_MINIX) && defined(NICE)
+    return callm1(MM, NICE, incr, 0, 0, NIL_PTR, NIL_PTR, NIL_PTR);
+#else
+    return /* incr ? 0 : */ 0;
+#endif /* _MINIX && NICE */
+} /* end xnice */
+#endif /* nice */
 
 #ifdef getwd
 static char *strrcpy __P((char *, char *));

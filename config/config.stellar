@@ -61,20 +61,20 @@
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
- * 		This is usually the case for SVID systems, where
+ * 		This is usually the case for SYSV systems, where
  *		BSD uses sgttyb. POSIX systems should define this
  *		anyway, even though they use struct termios.
  */
 #define TERMIO
 
 /*
- * SVID		Your machine is SVID complient (Sys V, HPUX, A/UX)
+ * SYSVREL	Your machine is SYSV based (HPUX, A/UX)
  *		NOTE: don't do this if you are on a Pyramid -- tcsh is
  *		built in a BSD universe.
- *		Set SVID to 1, 2, or 3, depending the version of System V
- *		you are running. Or set it to 0 if you are not SVID based
+ *		Set SYSVREL to 1, 2, or 3, depending the version of System V
+ *		you are running. Or set it to 0 if you are not SYSV based
  */
-#define SVID	3
+#define SYSVREL	3
 
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username

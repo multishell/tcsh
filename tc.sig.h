@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tc.sig.h,v 3.5 1991/11/26 04:41:23 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.sig.h,v 3.9 1992/05/15 23:49:22 christos Exp $ */
 /*
  * tc.sig.h: Signal handling
  *
@@ -38,25 +38,25 @@
 #ifndef _h_tc_sig
 #define _h_tc_sig
 
-#if (SVID > 0) || defined(BSD4_4)
+#if (SYSVREL > 0) || defined(BSD4_4) || defined(_MINIX)
 # include <signal.h>
 # ifndef SIGCHLD
 #  define SIGCHLD SIGCLD
 # endif				/* SIGCHLD */
-#else				/* SVID == 0 */
+#else				/* SYSVREL == 0 */
 # include <sys/signal.h>
-#endif				/* SVID > 0 */
+#endif				/* SYSVREL > 0 */
 
-#ifdef sun
+#if defined(sun) || defined(DGUX)
 # define SAVESIGVEC
-#endif
+#endif /* sun || DGUX */
 
-#if SVID > 0 && SVID < 3 && !defined(BSDSIGS)
+#if (SYSVREL > 0 && SYSVREL < 3 && !defined(BSDSIGS)) || defined(_MINIX)
 /*
  * If we have unreliable signals...
  */
-# define UNRELSIG
-#endif /* SVID > 0 && SVID < 3 && !BSDSIGS */
+# define UNRELSIGS
+#endif /* SYSVREL > 0 && SYSVREL < 3 && !BSDSIGS */
 
 #ifdef BSDSIGS
 /*
@@ -85,7 +85,7 @@ typedef struct sigvec sigvec_t;
 # undef HAVE_SIGVEC
 #endif /* BSDSIGS */
 
-#if SVID > 0
+#if SYSVREL > 0
 # ifdef BSDJOBS
 /* here I assume that systems that have bsdjobs implement the
  * the setpgrp call correctly. Otherwise defining this would
@@ -102,12 +102,19 @@ typedef struct sigvec sigvec_t;
  */
 #  define killpg(a, b) kill((a), (b))
 # endif	/* BSDJOBS */
-#endif /* SVID > 0 */
+#endif /* SYSVREL > 0 */
 
 #ifdef _MINIX
 #include <signal.h>
 #  define killpg(a, b) kill((a), (b))
 #endif /* _MINIX */
+
+#if !defined(NSIG) && defined(SIGMAX)
+# define NSIG (SIGMAX+1)
+#endif /* !NSIG && SIGMAX */
+#if !defined(NSIG) && defined(_NSIG)
+# define NSIG _NSIG
+#endif /* !NSIG && _NSIG */
 
 #ifdef BSDSIGS
 /*
@@ -119,7 +126,7 @@ typedef struct sigvec sigvec_t;
 # define	sigmask(s)	(1 << ((s)-1))
 # ifdef _SEQUENT_
 #  define 	sigpause(a)	bsd_sigpause(a)
-#  define 	signal(a, b)	sigset(a, b)
+#  define 	signal(a, b)	bsd_signal(a, b)
 # else /* _SEQUENT_ */
 #  define	sighold(s)	sigblock(sigmask(s))
 #  define	sigignore(s)	signal(s, SIG_IGN)
@@ -131,6 +138,9 @@ typedef struct sigvec sigvec_t;
 #  define 	killpg(a, b)	kill(-getpgrp(a), b)
 #  define	NEEDsignal
 # endif	/* aiws */
+# ifdef linux
+#  define	sigpause(a)	bsd_sigpause(a)
+# endif /* linux */
 #endif /* BSDSIGS */
 
 

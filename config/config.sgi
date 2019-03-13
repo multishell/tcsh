@@ -10,7 +10,11 @@
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
  */
-#undef POSIX
+#ifdef mips
+# define POSIX
+#else
+# undef POSIX
+#endif
 
 /*
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
@@ -73,30 +77,30 @@
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
- * 		This is usually the case for SVID systems, where
+ * 		This is usually the case for SYSV systems, where
  *		BSD uses sgttyb. POSIX systems should define this
  *		anyway, even though they use struct termios.
  */
 #define TERMIO
 
 /*
- * SVID		Your machine is SVID complient (Sys V, HPUX, A/UX)
+ * SYSVREL	Your machine is SYSV based (HPUX, A/UX)
  *		NOTE: don't do this if you are on a Pyramid -- tcsh is
  *		built in a BSD universe.
- *		Set SVID to 1, 2, 3, or 4, depending the version of System V
- *		you are running. Or set it to 0 if you are not SVID based
+ *		Set SYSVREL to 1, 2, 3, or 4, depending the version of System V
+ *		you are running. Or set it to 0 if you are not SYSV based
  */
 #ifdef mips
-# define SVID	3
+# define SYSVREL	3
 #else
 /* 
  * For the 3000:
  * We may not technically be compliant, and I don't know whether we are
  * SVR1 or SVR2.  We're pretty System V-ish, though, so we won't say 0.
- * We'll guess 1.  There are no checks for SVID <= 1 vs. SVID >= 2 at
+ * We'll guess 1.  There are no checks for SYSVREL <= 1 vs. SYSVREL >= 2 at
  * current writing anyway. 
  */
-# define SVID	1
+# define SYSVREL	1
 #endif
 
 /*
@@ -133,6 +137,16 @@
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
  */
 #define DIRENT
+
+/*
+ * ECHO_STYLE	Optionally change the behavior of the builtin echo
+ *		BOTH_ECHO: Support both bsd options (-n) and sysv escapes (\nnn)
+ *		BSD_ECHO:  Support only -n
+ *		SYSV_ECHO: Support only sysv escapes (\nnn)
+ *		NONE_ECHO: Pure echo.
+ */
+#define ECHO_STYLE BOTH_ECHO	/* Both BSD and SYSV options */
+
 /****************** local defines *********************/
 #ifdef mips
 /*
