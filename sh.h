@@ -1079,7 +1079,7 @@ extern int errno, sys_nerr;
 
 #ifdef NLS_CATALOGS
 # ifdef linux
-#  include <localeinfo.h>
+//#  include <localeinfo.h>
 #  include <features.h>
 # endif
 # ifdef SUNOS4
