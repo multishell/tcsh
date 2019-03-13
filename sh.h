@@ -266,6 +266,7 @@ extern pid_t setpgrp();
 #  endif /* _MINIX */
 # endif /* !pyr && !stellar */
 #endif /* SYSVREL > 0 ||  _IBMR2 */
+#include <time.h>
 
 /* In the following ifdef the DECOSF1 has been commented so that later
  * versions of DECOSF1 will get TIOCGWINSZ. This might break older versions...
