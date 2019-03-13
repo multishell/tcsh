@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.exec.c,v 3.16 1992/05/09 04:03:53 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.exec.c,v 3.21 1992/10/27 16:18:15 christos Exp $ */
 /*
  * sh.exec.c: Search, find, and execute a command!
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.exec.c,v 3.16 1992/05/09 04:03:53 christos Exp $")
+RCSID("$Id: sh.exec.c,v 3.21 1992/10/27 16:18:15 christos Exp $")
 
 #include "tc.h"
 #include "tw.h"
@@ -132,7 +132,7 @@ static char xhash[HSHSIZ / BITS_PER_BYTE];
 
 #ifdef VFORK
 static int hits, misses;
-#endif
+#endif /* VFORK */
 
 /* Dummy search path for just absolute search when no path */
 static Char *justabs[] = {STRNULL, 0};
@@ -177,7 +177,7 @@ doexec(t)
     expath = Strsave(pv[0]);
 #ifdef VFORK
     Vexpath = expath;
-#endif
+#endif /* VFORK */
 
     v = adrof(STRpath);
     if (v == 0 && expath[0] != '/') {
@@ -215,7 +215,7 @@ doexec(t)
 	pexerr();
 
     xechoit(av);		/* Echo command if -x */
-#ifdef FIOCLEX
+#ifdef CLOSE_ON_EXEC
     /*
      * Since all internal file descriptors are set to close on exec, we don't
      * need to close them explicitly here.  Just reorient ourselves for error
@@ -236,10 +236,10 @@ doexec(t)
      */
 #ifdef BSDSIGS
     (void) sigsetmask((sigmask_t) 0);
-#else				/* BSDSIGS */
+#else /* BSDSIGS */
     (void) sigrelse(SIGINT);
     (void) sigrelse(SIGCHLD);
-#endif				/* BSDSIGS */
+#endif /* BSDSIGS */
 
     /*
      * If no path, no words in path, or a / in the filename then restrict the
@@ -252,13 +252,13 @@ doexec(t)
     sav = Strspl(STRslash, *av);/* / command name for postpending */
 #ifdef VFORK
     Vsav = sav;
-#endif
+#endif /* VFORK */
     hashval = havhash ? hashname(*av) : 0;
 
     i = 0;
 #ifdef VFORK
     hits++;
-#endif
+#endif /* VFORK */
     do {
 	/*
 	 * Try to save time by looking at the hash table for where this command
@@ -277,31 +277,75 @@ doexec(t)
 #endif /* FASTHASH */
 	}
 	if (pv[0][0] == 0 || eq(pv[0], STRdot))	/* don't make ./xxx */
+	{
+
+#ifdef COHERENT
+	    if (t->t_dflg & F_AMPERSAND) {
+# ifdef JOBDEBUG
+    	        xprintf("set SIGINT to SIG_IGN\n");
+    	        xprintf("set SIGQUIT to SIG_DFL\n");
+# endif /* JOBDEBUG */
+    	        (void) signal(SIGINT,SIG_IGN); /* may not be necessary */
+	        (void) signal(SIGQUIT,SIG_DFL);
+	    }
+
+	    if (gointr && eq(gointr, STRminus)) {
+# ifdef JOBDEBUG
+    	        xprintf("set SIGINT to SIG_IGN\n");
+    	        xprintf("set SIGQUIT to SIG_IGN\n");
+# endif /* JOBDEBUG */
+    	        (void) signal(SIGINT,SIG_IGN); /* may not be necessary */
+	        (void) signal(SIGQUIT,SIG_IGN);
+	    }
+#endif /* COHERENT */
+
 	    texec(*av, av);
+}
 	else {
 	    dp = Strspl(*pv, sav);
 #ifdef VFORK
 	    Vdp = dp;
-#endif
+#endif /* VFORK */
+
+#ifdef COHERENT
+	    if ((t->t_dflg & F_AMPERSAND)) {
+# ifdef JOBDEBUG
+    	        xprintf("set SIGINT to SIG_IGN\n");
+# endif /* JOBDEBUG */
+		/* 
+		 * this is necessary on Coherent or all background 
+		 * jobs are killed by CTRL-C 
+		 * (there must be a better fix for this) 
+		 */
+    	        (void) signal(SIGINT,SIG_IGN); 
+	    }
+	    if (gointr && eq(gointr,STRminus)) {
+# ifdef JOBDEBUG
+    	        xprintf("set SIGINT to SIG_IGN\n");
+    	        xprintf("set SIGQUIT to SIG_IGN\n");
+# endif /* JOBDEBUG */
+    	        (void) signal(SIGINT,SIG_IGN); /* may not be necessary */
+	        (void) signal(SIGQUIT,SIG_IGN);
+	    }
+#endif /* COHERENT */
+
 	    texec(dp, av);
 #ifdef VFORK
 	    Vdp = 0;
-#endif
+#endif /* VFORK */
 	    xfree((ptr_t) dp);
 	}
 #ifdef VFORK
 	misses++;
-#endif
+#endif /* VFORK */
 cont:
 	pv++;
 	i++;
     } while (*pv);
 #ifdef VFORK
     hits--;
-#endif
-#ifdef VFORK
     Vsav = 0;
-#endif
+#endif /* VFORK */
     xfree((ptr_t) sav);
     pexerr();
 }
@@ -314,7 +358,7 @@ pexerr()
 	setname(short2str(expath));
 #ifdef VFORK
 	Vexpath = 0;
-#endif
+#endif /* VFORK */
 	xfree((ptr_t) expath);
 	expath = 0;
     }
@@ -338,10 +382,10 @@ texec(sf, st)
     register char **t;
     register char *f;
     register struct varent *v;
-    register Char **vp;
+    Char  **vp;
     Char   *lastsh[2];
+    char    pref[2];
     int     fd;
-    unsigned char c;
     Char   *st0, **ost;
 
     /* The order for the conversions is significant */
@@ -349,7 +393,7 @@ texec(sf, st)
     f = short2str(sf);
 #ifdef VFORK
     Vt = t;
-#endif
+#endif /* VFORK */
     errno = 0;			/* don't use a previous error */
 #ifdef apollo
     /*
@@ -362,11 +406,11 @@ texec(sf, st)
 	    errno = EISDIR;
     }
     if (errno == 0)
-#endif
+#endif /* apollo */
     (void) execv(f, t);
 #ifdef VFORK
     Vt = 0;
-#endif
+#endif /* VFORK */
     blkfree((Char **) t);
     switch (errno) {
 
@@ -376,8 +420,8 @@ texec(sf, st)
 	 * it, don't feed it to the shell if it looks like a binary!
 	 */
 	if ((fd = open(f, O_RDONLY)) != -1) {
-	    if (read(fd, (char *) &c, 1) == 1) {
-		if (!Isprint(c) && (c != '\n' && c != '\t')) {
+	    if (read(fd, (char *) pref, 2) == 2) {
+		if (!Isprint(pref[0]) && (pref[0] != '\n' && pref[0] != '\t')) {
 		    (void) close(fd);
 		    /*
 		     * We *know* what ENOEXEC means.
@@ -386,32 +430,44 @@ texec(sf, st)
 		}
 	    }
 #ifdef _PATH_BSHELL
-	    else
-		c = '#';
+	    else {
+		pref[0] = '#';
+		pref[1] = '\0';
+	    }
 #endif
-	    (void) close(fd);
 	}
+#ifdef HASHBANG
+	if (fd == -1 ||
+	    pref[0] != '#' || pref[1] != '!' || hashbang(fd, &vp) == -1) {
+#endif /* HASHBANG */
 	/*
 	 * If there is an alias for shell, then put the words of the alias in
 	 * front of the argument list replacing the command name. Note no
 	 * interpretation of the words at this point.
 	 */
-	v = adrof1(STRshell, &aliases);
-	if (v == 0) {
-	    vp = lastsh;
-	    vp[0] = adrof(STRshell) ? value(STRshell) : STR_SHELLPATH;
-	    vp[1] = NULL;
+	    v = adrof1(STRshell, &aliases);
+	    if (v == 0) {
+		vp = lastsh;
+		vp[0] = adrof(STRshell) ? value(STRshell) : STR_SHELLPATH;
+		vp[1] = NULL;
 #ifdef _PATH_BSHELL
-	    if (fd != -1 
+		if (fd != -1 
 # ifndef ISC	/* Compatible with ISC's /bin/csh */
-		&& c != '#'
+		    && pref[0] != '#'
 # endif /* ISC */
-		)
-		vp[0] = STR_BSHELL;
+		    )
+		    vp[0] = STR_BSHELL;
 #endif
+		vp = saveblk(vp);
+	    }
+	    else
+		vp = saveblk(v->vec);
+#ifdef HASHBANG
 	}
-	else
-	    vp = v->vec;
+#endif /* HASHBANG */
+	if (fd != -1)
+	    (void) close(fd);
+
 	st0 = st[0];
 	st[0] = sf;
 	ost = st;
@@ -422,13 +478,14 @@ texec(sf, st)
 	t = short2blk(st);
 	f = short2str(sf);
 	xfree((ptr_t) st);
+	blkfree((Char **) vp);
 #ifdef VFORK
 	Vt = t;
-#endif
+#endif /* VFORK */
 	(void) execv(f, t);
 #ifdef VFORK
 	Vt = 0;
-#endif
+#endif /* VFORK */
 	blkfree((Char **) t);
 	/* The sky is falling, the sky is falling! */
 	stderror(ERR_SYSTEM, f, strerror(errno));
@@ -440,7 +497,7 @@ texec(sf, st)
 
 #ifdef _IBMR2
     case 0:			/* execv fails and returns 0! */
-#endif				/* _IBMR2 */
+#endif /* _IBMR2 */
     case ENOENT:
 	break;
 
@@ -452,7 +509,7 @@ texec(sf, st)
 	    expath = Strsave(sf);
 #ifdef VFORK
 	    Vexpath = expath;
-#endif
+#endif /* VFORK */
 	}
 	break;
     }
@@ -469,12 +526,12 @@ execash(t, kp)
     int     oSHOUT;
     int     oSHDIAG;
     int     oOLDSTD;
-    jmp_buf osetexit;
+    jmp_buf_t osetexit;
     int	    my_reenter;
     int     odidfds;
-#ifndef FIOCLEX
+#ifndef CLOSE_ON_EXEC
     int	    odidcch;
-#endif /* FIOCLEX */
+#endif /* CLOSE_ON_EXEC */
     sigret_t (*osigint)(), (*osigquit)(), (*osigterm)();
 
     if (chkstop == 0 && setintr)
@@ -483,7 +540,7 @@ execash(t, kp)
      * Hmm, we don't really want to do that now because we might
      * fail, but what is the choice
      */
-    rechist();
+    rechist(NULL);
 
 
     osigint  = signal(SIGINT, parintr);
@@ -491,9 +548,9 @@ execash(t, kp)
     osigterm = signal(SIGTERM, parterm);
 
     odidfds = didfds;
-#ifndef FIOCLEX
+#ifndef CLOSE_ON_EXEC
     odidcch = didcch;
-#endif /* FIOCLEX */
+#endif /* CLOSE_ON_EXEC */
     oSHIN = SHIN;
     oSHOUT = SHOUT;
     oSHDIAG = SHDIAG;
@@ -519,9 +576,9 @@ execash(t, kp)
 	SHIN = dcopy(0, -1);
 	SHOUT = dcopy(1, -1);
 	SHDIAG = dcopy(2, -1);
-#ifndef FIOCLEX
+#ifndef CLOSE_ON_EXEC
 	didcch = 0;
-#endif /* FIOCLEX */
+#endif /* CLOSE_ON_EXEC */
 	didfds = 0;
 	/*
 	 * Decrement the shell level
@@ -535,9 +592,9 @@ execash(t, kp)
     (void) sigset(SIGTERM, osigterm);
 
     doneinp = 0;
-#ifndef FIOCLEX
+#ifndef CLOSE_ON_EXEC
     didcch = odidcch;
-#endif /* FIOCLEX */
+#endif /* CLOSE_ON_EXEC */
     didfds = odidfds;
     (void) close(SHIN);
     (void) close(SHOUT);
@@ -689,7 +746,7 @@ hashstat(v, c)
 	      hits, misses, 100 * hits / (hits + misses));
 }
 
-#endif
+#endif /* VFORK */
 
 /*
  * Hash a command name.
@@ -843,7 +900,7 @@ tellmewhat(lex)
 	if (eq(sp->word, str2short(bptr->bname))) {
 	    if (aliased)
 		prlex(lex);
-	    xprintf("%s: shell built-in command.\n", short2str(sp->word));
+	    xprintf("%S: shell built-in command.\n", sp->word);
 	    flush();
 	    sp->word = s0;	/* we save and then restore this */
 	    return;
@@ -883,7 +940,7 @@ tellmewhat(lex)
     else {
 	if (aliased)
 	    prlex(lex);
-	xprintf("%s: Command not found.\n", short2str(sp->word));
+	xprintf("%S: Command not found.\n", sp->word);
 	flush();
     }
     sp->word = s0;		/* we save and then restore this */
@@ -927,7 +984,7 @@ find_cmd(cmd, prt)
 
     if (prt && adrof1(cmd, &aliases)) {
 	if ((var = adrof1(cmd, &aliases)) != NULL) {
-	    xprintf("%s is aliased to ", short2str(cmd));
+	    xprintf("%S is aliased to ", cmd);
 	    blkpr(var->vec);
 	    xputchar('\n');
 	    rval = 1;
@@ -940,7 +997,7 @@ find_cmd(cmd, prt)
 	if (eq(cmd, str2short(bptr->bname))) {
 	    rval = 1;
 	    if (prt)
-		xprintf("%s is a shell built-in\n", short2str(cmd));
+		xprintf("%S is a shell built-in\n", cmd);
 	    else
 		return 1;
 	}
@@ -975,8 +1032,8 @@ find_cmd(cmd, prt)
 	if (ex) {
 	    rval = 1;
 	    if (prt) {
-		xprintf("%s/",short2str(*pv));
-		xprintf("%s\n",short2str(cmd));
+		xprintf("%S/", *pv);
+		xprintf("%S\n", cmd);
 	    }
 	    else
 		return 1;

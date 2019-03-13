@@ -144,6 +144,15 @@ static	void	 qprintf	__P((Char *));
  *            POSIX specifies that they should be ignored in directories.
  */
 
+/*
+ * For operating systems with single case filenames (OS/2)
+ */
+#ifdef CASE_INSENSITIVE
+# define samecase(x) (isupper(x) ? tolower(x) : (x))
+#else
+# define samecase(x) (x)
+#endif /* CASE_INSENSITIVE */
+
 static DIR *
 Opendir(str)
     register Char *str;
@@ -200,7 +209,7 @@ Stat(fn, sb)
     {
 	int     st;
 
-	st = lstat(buf, sb);
+	st = stat(buf, sb);
 	if (*buf)
 	    dc--;
 	return (*--dc == '/' && !S_ISDIR(sb->st_mode) ? -1 : st);
@@ -355,7 +364,11 @@ glob(pattern, flags, errfunc, pglob)
 	    break;
 	case STAR:
 	    pglob->gl_flags |= GLOB_MAGCHAR;
-	    *bufnext++ = M_ALL;
+	    /* collapse adjacent stars to one, to avoid
+	     * exponential behavior
+	     */
+	    if (bufnext == patbuf || bufnext[-1] != M_ALL)
+		*bufnext++ = M_ALL;
 	    break;
 	default:
 	    *bufnext++ = CHAR(c);
@@ -581,7 +594,7 @@ globextend(path, pglob)
 
     for (p = path; *p++;)
 	continue;
-    if ((copy = (char *) malloc((size_t) (p - path))) != NULL) {
+    if ((copy = (char *) xmalloc((size_t) (p - path))) != NULL) {
 	register char *dc = copy;
 	register Char *sc = path;
 
@@ -612,10 +625,10 @@ match(name, pat, patend, m_not)
 	case M_ALL:
 	    if (pat == patend)
 		return (1);
-	    for (; *name != EOS; ++name) {
+	    do 
 		if (match(name, pat, patend, m_not))
 		    return (1);
-	    }
+	    while (*name++ != EOS);
 	    return (0);
 	case M_ONE:
 	    if (*name++ == EOS)
@@ -640,7 +653,8 @@ match(name, pat, patend, m_not)
 		return (0);
 	    break;
 	default:
-	    if (*name++ != c)
+	    k = *name++;
+	    if (samecase(k) != samecase(c))
 		return (0);
 	    break;
 	}

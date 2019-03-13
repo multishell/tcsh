@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.os.h,v 3.29 1992/05/09 04:03:53 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.os.h,v 3.40 1992/11/14 20:40:02 christos Exp $ */
 /*
  * tc.os.h: Shell os dependent defines
  */
@@ -39,21 +39,43 @@
 
 #define NEEDstrerror		/* Too hard to find which systems have it */
 
-#if SYSVREL > 3
+
+#ifdef notdef 
 /*
- * for SVR4 we fork pipelines backwards. 
+ * for SVR4 and linux we used to fork pipelines backwards. 
+ * This should not be needed any more.
  * more info in sh.sem.c
  */
 # define BACKPIPE
-#endif /* SYSVREL > 3 */
+#endif /* notdef */
+
+#ifdef   _VMS_POSIX
+# ifndef  NOFILE 
+#  define  NOFILE 64
+# endif
+# define  nice(a)       setprio((getpid()),a)
+# undef   NEEDstrerror    /* won't get sensible error messages otherwise */
+# define  NEEDgethostname 
+# include <sys/time.h>    /* for time stuff in tc.prompt.c */
+# include <limits.h>
+#endif /*atp vmsposix*/
+
+#ifndef NOFILE
+# ifdef OPEN_MAX
+#  define NOFILE OPEN_MAX
+# else
+#  define NOFILE 256
+# endif
+#endif /* NOFILE */
+
+#ifdef linux
+# undef NEEDstrerror
+#endif /* linux */
 
 #ifdef OREO
 # include <sys/time.h>
 # include <sys/resource.h>
 # ifdef POSIX
-#  ifdef T_BREAK
-#   undef T_BREAK
-#  endif /* T_BREAK */
 #  include <sys/tty.h>
 #  include <termios.h>
 # endif /* POSIX */
@@ -124,23 +146,28 @@ struct ucred {
  * XXX: This will be changed soon to 
  * #if (SYSVREL > 0) && defined(TIOCGWINSZ)
  * If that breaks on your machine, let me know.
+ *
+ * It would break on linux, where all this is
+ * defined in <termios.h>. Wrapper added.
  */
-#if defined(INTEL) || defined(u3b2) || defined (u3b5) || defined(ub15) || defined(u3b20d) || defined(ISC) || defined(SCO) 
-#ifdef TIOCGWINSZ
+#if !defined(linux) && !defined(_VMS_POSIX)
+# if defined(INTEL) || defined(u3b2) || defined (u3b5) || defined(ub15) || defined(u3b20d) || defined(ISC) || defined(SCO) 
+#  ifdef TIOCGWINSZ
 /*
  * for struct winsiz
  */
-# include <sys/stream.h>
-# include <sys/ptem.h>
-#endif /* TIOCGWINSZ */
-# ifndef ODT
-#  define NEEDgethostname
-# endif /* ODT */
-#endif /* INTEL || att || isc || sco */
+#   include <sys/stream.h>
+#   include <sys/ptem.h>
+#  endif /* TIOCGWINSZ */
+#  ifndef ODT
+#   define NEEDgethostname
+#  endif /* ODT */
+# endif /* INTEL || att || isc || sco */
+#endif /* !linux && !_VMS_POSIX */
 
-#ifdef UNIXPC
+#if defined(UNIXPC) || defined(COHERENT)
 # define NEEDgethostname
-#endif /* UNIXPC */
+#endif /* UNIXPC || COHERENT */
 
 #ifdef IRIS4D
 # include <sys/time.h>
@@ -153,6 +180,27 @@ struct ucred {
 #  define getpgrp BSDgetpgrp
 # endif
 #endif /* IRIS4D */
+
+/*
+ * For some versions of system V software, specially ones that use the 
+ * Wollongong Software TCP/IP, the FIOCLEX, FIONCLEX, FIONBIO calls
+ * might not work correctly for file descriptors [they work only for
+ * sockets]. So we try to use first the fcntl() and we only use the
+ * ioctl() form, only if we don't have the fcntl() one.
+ *
+ * From: scott@craycos.com (Scott Bolte)
+ */
+#ifdef F_SETFD
+# define close_on_exec(fd, v)	\
+    ((v) ? fcntl((fd), F_SETFD, 1) : fcntl((fd), F_SETFD, 0))
+#else /* !F_SETFD */
+# ifdef FIOCLEX
+# define close_on_exec(fd, v)	\
+    ((v) ? ioctl((fd), FIOCLEX, NULL) : ioctl((fd), FIONCLEX, NULL))
+# else /* Nothing */
+# define close_on_exec(fd, v)	/* Nothing */
+# endif /* FIOCLEX */
+#endif /* F_SETFD */
 
 /*
  * Stat
@@ -170,12 +218,18 @@ struct ucred {
 # endif /* S_IFMT */
 #endif /* ISC */
 
-#ifdef uts
+#if defined(uts) || defined(UTekV) || defined(sysV88)
 /*
  * The uts 2.1.2 macros (Amdahl) are busted!
  * You should fix <sys/stat.h>, cause other programs will break too!
  *
  * From: creiman@ncsa.uiuc.edu (Charlie Reiman)
+ */
+
+/*
+ * The same applies to Motorola MPC (System V/88 R32V2, UTekV 3.2e) 
+ * workstations, the stat macros are broken.
+ * Kaveh Ghazi (ghazi@caip.rutgers.edu)
  */
 # undef S_ISDIR
 # undef S_ISCHR
@@ -185,7 +239,7 @@ struct ucred {
 # undef S_ISNAM
 # undef S_ISLNK
 # undef S_ISSOCK
-#endif /* uts */
+#endif /* uts || UTekV */
 
 #ifdef S_IFMT
 # if !defined(S_ISDIR) && defined(S_IFDIR)
@@ -214,6 +268,33 @@ struct ucred {
 # endif	/* ! S_ISSOCK && S_IFSOCK */
 #endif /* S_IFMT */
 
+
+#ifndef S_IREAD
+# define S_IREAD 0000400
+#endif /* S_IREAD */
+#ifndef S_IROTH
+# define S_IROTH (S_IREAD >> 6)
+#endif /* S_IROTH */
+#ifndef S_IRGRP
+# define S_IRGRP (S_IREAD >> 3)
+#endif /* S_IRGRP */
+#ifndef S_IRUSR
+# define S_IRUSR S_IREAD
+#endif /* S_IRUSR */
+
+#ifndef S_IWRITE
+# define S_IWRITE 0000200
+#endif /* S_IWRITE */
+#ifndef S_IWOTH
+# define S_IWOTH (S_IWRITE >> 6)
+#endif /* S_IWOTH */
+#ifndef S_IWGRP
+# define S_IWGRP (S_IWRITE >> 3)
+#endif /* S_IWGRP */
+#ifndef S_IWUSR
+# define S_IWUSR S_IWRITE
+#endif /* S_IWUSR */
+
 #ifndef S_IEXEC
 # define S_IEXEC 0000100
 #endif /* S_IEXEC */
@@ -226,6 +307,16 @@ struct ucred {
 #ifndef S_IXUSR
 # define S_IXUSR S_IEXEC
 #endif /* S_IXUSR */
+
+#ifndef S_ISUID
+# define S_ISUID 0004000 	/* setuid */
+#endif /* S_ISUID */
+#ifndef S_ISGID	
+# define S_ISGID 0002000	/* setgid */
+#endif /* S_ISGID */
+#ifndef S_ISVTX
+# define S_ISVTX 0001000	/* sticky */
+#endif /* S_ISVTX */
 
 /*
  * Access()
@@ -316,38 +407,37 @@ struct ucred {
 #  define setrlimit 	bsd_setrlimit
 #  define getrlimit	bsd_getrlimit
 # endif	/* _BSDX_ */
-# ifndef NOFILE
-#  define	NOFILE	64
-# endif	/* NOFILE */
 #endif /* SXA */
 
-#ifdef _MINIX
-# ifndef NOFILE
-#  define NOFILE 64
-# endif /* NOFILE */
+#if defined(_MINIX) || defined(__EMX__)
 # define NEEDgethostname
 # define NEEDnice
+# define HAVENOLIMIT
 /*
  * Minix does not have these, so...
  */
-# define ulimit(a, b)		(0x003fffff)
-# define getpgrp()		getpid()
-#endif /* _MINIX */
+# define getpgrp		getpid
+#endif /* _MINIX || __EMX__ */
+
+#ifdef __EMX__
+/* XXX: How can we get the tty name in emx? */
+# define ttyname(fd) (isatty(fd) ? "/dev/tty" : NULL)
+#endif /* __EMX__ */
 
 #ifndef POSIX
 # define mygetpgrp()    getpgrp(0)
 #else /* POSIX */
-# if defined(BSD) || defined(sun) || defined(IRIS4D)
+# if defined(BSD) || defined(SUNOS4) || defined(IRIS4D)
 #  define mygetpgrp()    getpgrp(0)
-# else /* BSD || sun || IRIS4D */
+# else /* BSD || SUNOS4 || IRIS4D */
 #  define mygetpgrp()    getpgrp()
-# endif	/* BSD || sun */
+# endif	/* BSD || SUNOS4 */
 #endif /* POSIX */
 
 
-#if SYSVREL > 0 && !defined(OREO) && !defined(sgi)
+#if SYSVREL > 0 && !defined(OREO) && !defined(sgi) && !defined(linux)
 # define NEEDgetwd
-#endif /* SYSVREL > 0 && !OREO && !sgi */
+#endif /* SYSVREL > 0 && !OREO && !sgi && !linux */
 
 #ifndef S_IFLNK
 # define lstat stat
@@ -369,12 +459,26 @@ typedef struct timeval timeval_t;
 #endif /* NeXT */
 
 
-#if !defined(POSIX) || defined(sun)
+#if !defined(POSIX) || defined(SUNOS4) || defined(UTekV) || defined(sysV88)
 extern time_t time();
 extern char *getenv();
 extern int atoi();
+#ifndef __EMX__
 extern char *ttyname();
+#endif
 
+#if defined(SUNOS4)
+# ifndef toupper
+extern int toupper __P((int));
+# endif
+# ifndef tolower
+extern int tolower __P((int));
+# endif
+extern caddr_t sbrk __P((int));
+# if SYSVREL == 0
+extern int qsort();
+# endif
+#else
 # ifndef hpux
 #  if __GNUC__ != 2
 extern int abort();
@@ -386,6 +490,7 @@ extern int qsort();
 extern void abort();
 extern void qsort();
 # endif
+#endif	/* SUNOS4 */
 extern void perror();
 
 #ifndef NEEDgethostname
@@ -463,7 +568,7 @@ extern int setpriority();
 extern int nice();
 # endif	/* !BSDNICE */
 
-# ifndef fps500
+# if (!defined(fps500) && !defined(apollo))
 extern void setpwent();
 extern void endpwent();
 # endif /* fps500 */
@@ -483,30 +588,31 @@ extern char *getwd();
 # endif	/* getwd */
 #else /* POSIX */
 
-# if (defined(sun) && !defined(__GNUC__)) || defined(_IBMR2) || defined(_IBMESA)
+# if (defined(SUNOS4) && !defined(__GNUC__)) || defined(_IBMR2) || defined(_IBMESA)
 extern char *getwd();
-# endif	/* (sun && ! __GNUC__) || _IBMR2 || _IBMESA */
+# endif	/* (SUNOS4 && ! __GNUC__) || _IBMR2 || _IBMESA */
 
 # ifdef SCO
 extern char *ttyname();   
 # endif /* SCO */
 
-
 #endif /* POSIX */
 
-# if defined(sun) && __GNUC__ == 2
+# if defined(SUNOS4) && __GNUC__ == 2
 /*
  * Somehow these are missing
  */
 extern int ioctl __P((int, int, ...));
 extern int readlink __P((const char *, char *, size_t));
-# endif /* sun && __GNUC__ == 2 */
+# endif /* SUNOS4 && __GNUC__ == 2 */
 
-#ifdef linux
-extern int		tcgetpgrp	__P((int));
-extern int		tcsetpgrp	__P((int, int));
-extern int		gethostname	__P((char *, int));
-extern int		readlink	__P(());
-#endif /* linux */
+#if (defined(BSD) && !defined(__386BSD__))  || defined(SUNOS4) 
+extern void bcopy	__P((const void *, void *, size_t));
+# define memmove(a, b, c) (bcopy((char *) (b), (char *) (a), (int) (c)), a)
+#endif
+
+#if !defined(hpux) && !defined(COHERENT) && ((SYSVREL < 4) || defined(_SEQUENT_)) && !defined(__386BSD__) && !defined(memmove)
+# define NEEDmemmove
+#endif
 
 #endif /* _h_tc_os */

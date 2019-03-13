@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.misc.c,v 3.12 1992/03/27 01:59:46 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.misc.c,v 3.17 1992/10/18 00:43:08 christos Exp $ */
 /*
  * sh.misc.c: Miscelaneous functions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.misc.c,v 3.12 1992/03/27 01:59:46 christos Exp $")
+RCSID("$Id: sh.misc.c,v 3.17 1992/10/18 00:43:08 christos Exp $")
 
 static	int	renum	__P((int, int));
 static  Char  **blkend	__P((Char **));
@@ -104,7 +104,7 @@ blkpr(av)
 {
 
     for (; *av; av++) {
-	xprintf("%s", short2str(*av));
+	xprintf("%S", *av);
 	if (av[1])
 	    xprintf(" ");
     }
@@ -250,11 +250,15 @@ closem()
 #endif
     for (f = 0; f < NOFILE; f++)
 	if (f != SHIN && f != SHOUT && f != SHDIAG && f != OLDSTD &&
-	    f != FSHTTY)
+	    f != FSHTTY 
+#ifdef MALLOC_TRACE
+	    && f != 25
+#endif /* MALLOC_TRACE */
+	    )
 	    (void) close(f);
 }
 
-#ifndef FIOCLEX
+#ifndef CLOSE_ON_EXEC
 /*
  * Close files before executing a file.
  * We could be MUCH more intelligent, since (on a version 7 system)
@@ -279,7 +283,7 @@ closech()
 	(void) close(f);
 }
 
-#endif
+#endif /* CLOSE_ON_EXEC */
 
 void
 donefds()
@@ -324,13 +328,14 @@ dcopy(i, j)
 
     if (i == j || i < 0 || (j < 0 && i > 2))
 	return (i);
-#ifdef HAVEDUP2
     if (j >= 0) {
+#ifdef HAVEDUP2
 	(void) dup2(i, j);
 	return (j);
-    }
+#else
+	(void) close(j);
 #endif
-    (void) close(j);
+    }
     return (renum(i, j));
 }
 
@@ -350,18 +355,6 @@ renum(i, j)
 	return (j);
     }
     return (k);
-}
-
-void
-copy(to, from, size)
-    register char *to, *from;
-    register int size;
-{
-    if (size && from && to)
-	do
-	    /*SUPPRESS 112*/
-	    *to++ = *from++;
-	while (--size != 0);
 }
 
 /*
@@ -420,7 +413,7 @@ strend(cp)
     return (cp);
 }
 
-#endif				/* SHORT_STRINGS */
+#endif /* SHORT_STRINGS */
 
 Char   *
 strip(cp)
@@ -432,6 +425,19 @@ strip(cp)
 	return (cp);
     while (*dp++ &= TRIM)
 	continue;
+    return (cp);
+}
+
+Char   *
+quote(cp)
+    Char   *cp;
+{
+    register Char *dp = cp;
+
+    if (!cp)
+	return (cp);
+    while (*dp != '\0')
+	*dp++ |= QUOTE;
     return (cp);
 }
 

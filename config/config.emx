@@ -4,36 +4,26 @@
  * All source files should #include this FIRST.
  *
  * Edit this to match your system type.
+ *
+ * configuration file for emx: OS/2 unix emulation
  */
 
 /****************** System dependant compilation flags ****************/
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
  */
-#ifdef __hpux
-# define POSIX
-#else
-# undef POSIX
-#endif
-
-#if defined(__hpux) && !defined(hpux)
-# define hpux
-#endif /* __hpux && !hpux */
-
-#if __STDC__ && !defined(__GNUC__)
-# define _POSIX_SOURCE
-# define _HPUX_SOURCE
-#endif
+#undef POSIX
 
 /*
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
  *		job control facilities.
  */
-#ifdef __hpux
-# define POSIXJOBS
-#else
-# undef POSIXJOBS
-#endif
+#undef POSIXJOBS
+
+/*
+ * POSIXSIGS	Use the POSIX signal facilities to emulate BSD signals.
+ */
+#undef POSIXSIGS
 
 /*
  * VFORK	This machine has a vfork().  
@@ -54,14 +44,14 @@
  * BSDJOBS	You have BSD-style job control (both process groups and
  *		a tty that deals correctly
  */
-#define BSDJOBS
+#undef BSDJOBS
 
 /*
  * BSDSIGS	You have 4.2-style signals, rather than USG style.
  *		Note: POSIX systems should not define this unless they
  *		have sigvec() and friends (ie: 4.3BSD-RENO, HP-UX).
  */
-#define BSDSIGS
+#undef BSDSIGS
 
 /*
  * BSDTIMES	You have BSD-style process time stuff (like rusage)
@@ -69,6 +59,11 @@
  *		(OREO) has BSDJOBS and BSDSIGS but not BSDTIMES.
  */
 #undef BSDTIMES
+
+/*
+ * BSDLIMIT	You have BSD-style resource limit stuff (getrlimit/setrlimit)
+ */
+#undef BSDLIMIT
 
 /*
  * BSDNICE	Your system uses setpriority() instead of nice, to
@@ -91,7 +86,13 @@
  *		Set SYSVREL to 1, 2, 3, or 4, depending the version of System V
  *		you are running. Or set it to 0 if you are not SYSV based
  */
-#define SYSVREL	3
+#define SYSVREL	2
+
+/*
+ * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
+ *		to send command output to /dev/null
+ */
+#undef YPBUGS
 
 /*
  * SIGVOID	Define this if your signal handlers return void.  On older
@@ -102,29 +103,23 @@
 /*
  * HAVEDUP2	Define this if your system supports dup2().
  */
-#undef HAVEDUP2
+#define HAVEDUP2
 
 /*
  * UTHOST	Does the utmp file have a host field?
  */
-#ifdef __hpux
-# define UTHOST
-#else
-# undef UTHOST
-#endif /* __hpux */
+#undef UTHOST
 
 /*
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
  */
 #define DIRENT
 /****************** local defines *********************/
-#ifdef __hpux
-# define NAMEI_BUG	/* Great! you broke that one too */
-#endif
-#ifdef __hpux
-# define BACKPIPE	/* with the new semantics we cannot have a zombie */
-			/* as a process group leader :-( */
-#endif
+#define HAVENOUTMP
+#define NO_CRYPT
+#define BACKPIPE
+#define CASE_INSENSITIVE
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
+#undef NLS

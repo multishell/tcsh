@@ -15,12 +15,18 @@
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
  */
 #define POSIX
+#define _POSIX_SOURCE
 
 /*
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
  *		job control facilities.
  */
 #define POSIXJOBS
+
+/*
+ * POSIXSIGS	Use the POSIX signal facilities to emulate BSD signals.
+ */
+#undef POSIXSIGS
 
 /*
  * VFORK	This machine has a vfork().  
@@ -58,6 +64,11 @@
 #undef BSDTIMES
 
 /*
+ * BSDLIMIT	You have BSD-style resource limit stuff (getrlimit/setrlimit)
+ */
+#undef BSDLIMIT
+
+/*
  * BSDNICE	Your system uses setpriority() instead of nice, to
  *		change a processes scheduling priority
  */
@@ -90,7 +101,7 @@
  * SIGVOID	Define this if your signal handlers return void.  On older
  *		systems, signal returns int, but on newer ones, it returns void.
  */
-#undef SIGVOID 
+#define SIGVOID 
 
 /*
  * HAVEDUP2	Define this if your system supports dup2().
@@ -124,3 +135,5 @@
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
+
+#undef NLS

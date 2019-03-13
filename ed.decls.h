@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/ed.decls.h,v 3.11 1991/11/26 04:28:26 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/ed.decls.h,v 3.15 1992/10/05 02:41:30 christos Exp $ */
 /*
  * ed.decls.h: Editor external definitions
  */
@@ -58,7 +58,7 @@ extern	void	ed_set_tty_eight_bit	__P((void));
 
 extern	void	QuoteModeOn		__P((void));
 extern	void	QuoteModeOff		__P((void));
-extern	void	ResetInLine		__P((void));
+extern	void	ResetInLine		__P((int));
 extern	int	Load_input_line		__P((void));
 
 /*
@@ -91,6 +91,11 @@ extern	void	DeleteChars		__P((int));
 extern	void	TellTC			__P((char *));
 extern	void	SetTC			__P((char *, char *));
 extern	void	EchoTC			__P((Char **));
+extern	int 	SetArrowKeys		__P((Char *, XmapVal *, int));
+extern	void	ResetArrowKeys		__P((void));
+extern	void	DefaultArrowKeys	__P((void));
+extern	int 	ClearArrowKeys		__P((Char *));
+extern	void 	PrintArrowKeys		__P((Char *));
 extern	void	BindArrowKeys		__P((void));
 extern	void	Beep			__P((void));
 extern	int	CanWeTab		__P((void));
@@ -115,6 +120,8 @@ extern	CCRETVAL	e_insert		__P((int));
 extern	CCRETVAL	e_newline		__P((int));
 extern	CCRETVAL	e_delprev		__P((int));
 extern	CCRETVAL	e_delnext		__P((int));
+/* added by mtk@ari.ncl.omron.co.jp (920818) */
+extern	CCRETVAL	e_delnext_eof		__P((int));	
 extern	CCRETVAL	e_list_delnext		__P((int));	/* for ^D */
 extern	CCRETVAL	e_toend			__P((int));
 extern	CCRETVAL	e_tobeg			__P((int));
@@ -214,6 +221,9 @@ extern	CCRETVAL	v_rchar_back		__P((int));
 extern  CCRETVAL        v_charto_fwd		__P((int));
 extern  CCRETVAL        v_charto_back		__P((int));
 extern  CCRETVAL        e_normalize_path	__P((int));
+extern  CCRETVAL        e_stuff_char		__P((int));
+extern  CCRETVAL        e_list_all		__P((int));
+extern  CCRETVAL        e_complete_all		__P((int));
 
 /*
  * ed.inputl.c
@@ -240,8 +250,9 @@ extern  XmapVal *XmapCmd		__P((int));
 extern	void	 AddXkey		__P((Char *, XmapVal *, int));
 extern	void	 ClearXkey		__P((KEYCMD *, Char *));
 extern	int	 GetXkey		__P((Char *, XmapVal *));
-extern	void	 ResetXmap		__P((int));
+extern	void	 ResetXmap		__P((void));
 extern	int	 DeleteXkey		__P((Char *));
 extern	void	 PrintXkey		__P((Char *));
+extern	int	 printOne		__P((Char *, XmapVal *, int));
 
 #endif /* _h_ed_decls */

@@ -3,7 +3,7 @@
  *
  * All source files should #include this FIRST.
  *
- * This is the config file for minix-386 systems
+ * This is the config file for Linux systems
  */
 
 /****************** System dependant compilation flags ****************/
@@ -19,6 +19,11 @@
 #define POSIXJOBS
 
 /*
+ * POSIXSIGS	Use the POSIX signal facilities to emulate BSD signals.
+ */
+#undef POSIXSIGS
+
+/*
  * VFORK	This machine has a vfork().  
  *		It used to be that for job control to work, this define
  *		was mandatory. This is not the case any more.
@@ -31,7 +36,7 @@
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
  */
-#undef VFORK
+#define VFORK
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and
@@ -54,10 +59,15 @@
 #undef BSDTIMES
 
 /*
+ * BSDLIMIT	You have BSD-style resource limit stuff (getrlimit/setrlimit)
+ */
+#define BSDLIMIT
+
+/*
  * BSDNICE	Your system uses setpriority() instead of nice, to
  *		change a processes scheduling priority
  */
-#undef BSDNICE
+#define BSDNICE
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
@@ -68,13 +78,15 @@
 #define TERMIO
 
 /*
- * SVID		Your machine is SVID compliant (Sys V, HPUX, A/UX)
+ * SYSVREL	Your machine is SYSV based (HPUX, A/UX)
  *		NOTE: don't do this if you are on a Pyramid -- tcsh is
  *		built in a BSD universe.
- *		Set SVID to 1, 2, or 3, depending the version of System V
- *		you are running. Or set it to 0 if you are not SVID based
+ *		Set SYSVREL to 1, 2, 3, or 4, depending the version of System V
+ *		you are running. Or set it to 0 if you are not SYSV based
+ *
+ *		Note: Linux should work with any SYSVREL < 3.
  */
-#define SVID	1
+#define SYSVREL	0
 
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
@@ -104,14 +116,20 @@
 #define DIRENT
 /****************** local defines *********************/
 
-#define _PATH_TCSHELL "/usr/bin/tcsh"
-#define BACKPIPE
-#define UNRELSIGS
-#define NOFILE OPEN_MAX
-#define MAXSIG NSIG
+/* Since people like shared libs so much, we'll make this a default. :-) */
+#define _PATH_TCSHELL "/bin/tcsh"
+#define ECHO_STYLE      BOTH_ECHO
+#ifdef BSDSIGS
+# define __USE_BSD_SIGNAL
+#endif
 
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
 
+/* GNU libc 1.03 has a dummy implementation of setlocale() that
+   does more harm than good. Hopefully we can remove this #undef
+   in the future. Meanwhile, the builtin ISO8859-1 support should
+   satisfy most people.
+ */
 #undef NLS

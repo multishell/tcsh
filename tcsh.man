@@ -1,5 +1,36 @@
-.\" $Id: tcsh.man,v 3.43 1992/05/15 21:54:34 christos Exp $
-.TH TCSH 1 "19 December 1991" "Cornell"
+.\" Copyright (c) 1980, 1990 The Regents of the University of California.
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. All advertising materials mentioning features or use of this software
+.\"    must display the following acknowledgement:
+.\"     This product includes software developed by the University of
+.\"     California, Berkeley and its contributors.
+.\" 4. Neither the name of the University nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\" $Id: tcsh.man,v 3.53 1992/11/20 08:56:38 christos Exp $
+.TH TCSH 1 "20 November 1992" "Cornell 6.03.00"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
@@ -142,7 +173,10 @@ directory is changed.
 32) Enhanced history/variable modifier expansion
 .sp
 .ti -4
-33) Programmable file/user/variable/alias completion.
+33) Programmable completion.
+.sp
+.ti -4
+34) Enhanced file inquiry operator.
 .RE
 .sp
 For a description of standard C-shell features, see the
@@ -162,7 +196,7 @@ There is a new shell command,
 that allows the user to redefine what any key does, or find out what
 any or all of the keys do.
 .PP
-Syntax: bindkey [ -a ] [ -c ] [ -s ] [ -v ] [ -e ] [ -d ] [ -l ] [ -r ] [ -- ] [ in-string [ out-string | command ]]
+Syntax: bindkey [ -a ] [ -c ] [ -s ] [ -v ] [ -e ] [ -d ] [ -k ] [ -l ] [ -r ] [ -- ] [ [ in-string | key-name ] [ out-string | command ]]
 .PP
 If no values are given all bindings are listed. If only in-string is given,
 bindings for the in-string is listed.
@@ -178,7 +212,7 @@ is used by VI command mode. For multi-character input the basic key maps
 contains a sequence-lead-in for the first character in the input.
 .PP
 Options:
-    -a    bind in-string in alternative key map.
+    -a    bind in-string in alternative key map
 .br
     -s    bind an out-string instead of a command
 .br
@@ -187,6 +221,8 @@ Options:
     -v    bind for default VI-mode
 .br
     -e    bind for default emacs-mode
+.br
+    -k    interpret in-string as a symbolic arrow key name
 .br
     -d    bind to compiled in default
 .br
@@ -1300,6 +1336,10 @@ The available sequences are:
 .DT
 .fi
 .sp
+On %C, %c and %., if the optional digit is 0, then then next digit is
+interpreted as the number of directory components to be skipped, and
+the number of components skipped are reported as: /<num-skipped>path/path.
+.sp
 The sequences for standout are often used to indicate that this is an
 enabled (running as root) shell.
 An example:
@@ -1348,6 +1388,19 @@ available in \fIcsh\fR); thus, on logging back in, all the saved history
 events will be recorded with the login time as their time stamp.
 The time stamp printouts can be omitted from the history list by adding the
 -t switch to the \fIhistory\fR command.
+.pp
+.I Tcsh 
+provides a way to save, restore and clear the history list in a file.
+.sp
+.I history -S [<filename>] 
+.br
+.I history -L [<filename>]
+.br
+.I history -c
+.sp
+The 'S' flag saves the current history, the 'L' flags loads
+the history, and the 'c' flag clears the history.
+If a filename is not specified, then $HOME/.history is used.
 .PP
 .SH "14. DIRECTORY ACCESS"
 .I Tcsh 
@@ -1433,6 +1486,19 @@ pushed onto the top of the stack.  Example:
 /usr/spool/uucp /sys/src /usr/net/bin ~
 .RE
 .fi
+.PP
+.I Tcsh 
+provides a way to save, restore and clear the directory stack in a file.
+.sp
+.I dirs -S [<filename>] 
+.br
+.I dirs -L [<filename>]
+.br
+.I dirs -c
+.sp
+The 'S' flag saves the current directory stack, the 'L' flags loads
+the directory stack, and the 'c' flag clears the directory stack.
+If a filename is not specified, then $HOME/.cshdirs is used.
 .PP 
 In addition, if the shell variable 
 .I dunique 
@@ -1614,7 +1680,8 @@ since it allows the user to see who is on when he first logs in.
 .PP
 The format of the printouts can be tailored via setting of the variable
 .I who.
-The following sequences are available for the format specification:
+In addition to the standard prompt % escapes, the
+following sequences are available for the format specification:
 .sp
 .RS +.6i
 .ta 1.2i 1.7i
@@ -1623,25 +1690,12 @@ The following sequences are available for the format specification:
 %a	The observed action, i.e. "logged on", 
 	"logged off", or "replaced <olduser> on".
 %l	The line (tty) the user is logged on.
-%S (%s)	Start (stop) standout mode.
-%B (%b)	Start (stop) boldfacing mode. (Only if 
-	tcsh was compiled to be eight bit clean)
-%U (%u)	Start (stop) underline mode. (Only if 
-	tcsh was compiled to be eight bit clean)
 %M	The full hostname of the remote host ("local" 
 	if non-remote).
 %m	The hostname up to the first ".". If only 
 	the ip address is available or the utmp 
 	field contains the name of an x-windows 
 	display, the whole name is printed.
-%t or %@	The time, in 12-hour, am/pm format (logout 
-	time is approximated if unavailable).
-%T	The time, in 24-hour format. (but see 
-	the "ampm" shell variable below).
-%D	The day in dd format.
-%w	The month in <Mon> format.
-%W	The month in mm format.
-%Y	The year in yy format.
 .RE
 .DT
 .fi
@@ -1901,9 +1955,13 @@ The current possible values are:
 .sp
 .ta 1.5i
 .nf
+\fI386BSD\fR		an Intel 386, running 386BSD
 \fIaix370\fR		an IBM 370, running aix
 \fIaixESA\fR		an IBM ESA, running aix
 \fIalliant\fR		an Alliant FX series
+\fIalliant-fx80\fR	an Alliant FX80 (mc68000 based)
+\fIalliant-fx2800\fR	an Alliant FX2800 (i860 based)
+\fIalpha\fR		an DEC Alpha running OSF/1
 \fIamdahl\fR		an Amdahl running uts 2.1
 \fIamiga\fR		an amiga running amix 2.02
 \fIapollo\fR		an Apollo running DomainOS
@@ -1912,7 +1970,10 @@ The current possible values are:
 \fIatt3b20\fR		an AT&T 3b20
 \fIatt3b5\fR		an AT&T 3b5
 \fIbalance\fR		a Sequent Balance (32000 based)
+\fIbsd386\fR		an Intel 386, running BSDI's bsd386
 \fIbutterfly\fR		a BBN Computer Butterfly 1000
+\fIcoh386\fR		a 386 running Coherent 4.0
+\fIcoherent\fR		an unknown machine running Coherent
 \fIconvex\fR		a Convex
 \fIcray\fR		a Cray running Unicos
 \fIdecstation\fR	a DecStation XXXX
@@ -1928,6 +1989,8 @@ The current possible values are:
 \fIhp\fR			an HP, running hpux
 \fIi386\fR		an Intel 386, generic
 \fIi386-mach\fR		an Intel 386, running mach
+\fIi386-linux\fR	an Intel 386, running Linux
+\fIi386-emx\fR		an Intel 386, running emx [unix emulation under OS/2]
 \fIintel386\fR		an Intel 386, running INTEL's SVR3
 \fIiris3d\fR		a Silicon Graphics Iris 3000
 \fIiris4d\fR		a Silicon Graphics Iris 4D
@@ -1959,11 +2022,15 @@ The current possible values are:
 \fIsun386i\fR		a Sun Microsystems 386i workstation (386 based)
 \fIsun4\fR			a Sun Microsystems series 4 workstation (SPARC based)
 \fIsymmetry\fR		a Sequent Symmetry running DYNIX 3 (386/486 based)
+\fIsysV88\fR		a Motorola MPC running System V/88 R32V2 (SVR3/88100 based)
 \fItahoe\fR		a tahoe running 4BSD
+\fItek4300\fR		a Tektronix 4300 running UTek (BSD 4.2 / 68020 based)
+\fItekXD88\fR		a Tektronix XD88/10 running UTekV 3.2e (SVR3/88100 based)
 \fItitan\fR		an Stardent Titan
 \fIunixpc\fR		an UNIX/PC running SVR1 att7300 aka att3b1
 \fIvax\fR			a Digital Equipment Corp. Vax (of any flavor)
 \fIvistra800\fR		a Stardent Vistra 800 running SVR4
+\fIVMS-POSIX\fR		a vax? running VMS/POSIX
 .DT
 .fi
 .sp
@@ -2543,9 +2610,7 @@ or present only in
 .sp
 .TP 4
 .I \-d
-Load ~/.cshdirs (If 
-.I tcsh 
-was compiled with CSHDIRS enabled)(+)
+Force load of directory stack. (+)
 .TP 4
 .I \-Dname[=value]
 Set environment variable name to value. (Domain/OS only) (+)
@@ -2814,7 +2879,9 @@ f	Complete file or path component
 j	Complete jobs
 l	Complete limits
 n	Complete nothing
+p	Complete files using the supplied pathname prefix
 s	Complete shell variable
+t	Complete non directory `text' filename
 v	Complete any variable
 u	Complete username
 x	Explain what argument when listing is requested.
@@ -3016,6 +3083,60 @@ return from some command in raw, CBREAK, or noecho mode. This behavior
 can be changed using 
 .I setty.
 .PP
+.SH ENHANCED FILE INQUIRIES
+.I Csh
+allows the following file inquiries that can appear as primitive
+operands in expressions. They are for the form 
+.I -l 
+.I <filename>.
+.sp
+.RS +.6i
+.ta 1.2i 1.7i
+.nf
+r	read access
+w	write access
+x	execute access
+e	existence
+o	ownership
+z	zero size
+f	plain file
+d	directory
+l	symbolic link *
+.fi
+.RE
+.DT
+.sp
+.PP
+.I Tcsh
+defines also the following:
+.sp
+.RS +.6i
+.ta 1.2i 1.7i
+.nf
+c	character special file
+b	block special file		
+p	named pipe (fifo) *
+u	set-user-ID bit is set	
+g	set-group-ID bit is set	
+k	sticky bit is set
+s	socket special file *
+t	open file descriptor for terminal device [a number]
+X	executable in the path or shell builtin
+.fi
+.RE
+.DT
+.sp
+.PP
+Notes: On systems without the file types indicated by
+.I *
+the file inquiry operands return false. In the version of 
+.I csh 
+appearing on the Silicon Graphics IRIX, -s is true when the file is not
+zero size.
+.I Tcsh
+is *not* compatible with that. 
+
+.PP
 .SH ENVIRONMENT
 HPATH -- path to look for command documentation
 .br
@@ -3081,6 +3202,18 @@ or correct=all, the whole line will be corrected.
 .B dextract 
 extract a directory on pushd rather than rotating.
 .TP 10
+.B dirsfile 
+If set, it contains the full path-name where a directory stack file is 
+read/written.
+It defaults to $home/.cshdirs. This file is executed last after .cshrc
+and .login to restore the directory stack.
+.TP 10
+.B dirstack
+If set, it contains an array of all the directories on the directory
+stack. $dirstack[1] is the current working directory, $dirstack[2]
+the first directory on the stack etc. Setting $dirstack resets all
+the stack entries, but the current working directory which is preserved.
+.TP 10
 .B dunique 
 Push only directories that are not already in the directory stack.
 .TP 10
@@ -3124,6 +3257,11 @@ directory in different machines, or if one wants to save all the histories
 in the tty sessions. It is usually set in .cshrc for interactive shells,
 because history is sourced between .cshrc and .login so that it is available
 from .login.
+.TP 10
+.B history
+The first word of the history variable indicates the number of history
+events to be saved. The optional second word indicates the format
+history is printed (Defaults to "%h\et%T\et%R\en").
 .TP 10
 .B inputmode
 Can be set to either
@@ -3209,7 +3347,7 @@ If it is just set, the number of items is taken from $history.
 .TP 10
 .B shlvl
 Integer value indicating the number
-of nested shells. 
+of nested shells. On login shells the level is reset to 1.
 .TP 10
 .B showdots 
 show hidden files in list and complete operations. If it is set to -A,
@@ -3273,11 +3411,11 @@ bye	Set if tcsh should accept bye in addition
 	Default is unset.
 al	Set if tcsh should determine if autologout 
 	should be enabled. The default is set.
-dir	Set if tcsh should save and restore the directory
-	stack.
 kan	Set if tcsh is compiled for Kanji. 
 	(ignore the iso character set.) Default is unset.
 sm	Set if tcsh was compiled to use the system's malloc.
+hb	Set if tcsh is emulating #!<program> <args> in
+	shell script execution
 .RE
 .DT
 .fi
@@ -3326,7 +3464,7 @@ I am certain that there are bugs.  Bugs (preferably with fixes)
 should be sent to Christos Zoulas (christos@ee.cornell.edu).
 .PP
 .SH VERSION
-This man page documents tcsh 6.02.00 (Cornell) 05/15/92.
+This man page documents tcsh 6.03.00 (Cornell) 92/11/20.
 .PP
 .SH AUTHORS
 Ken Greer, HP Labs, 1981
@@ -3368,7 +3506,7 @@ Chris Grevstad, TRW, 1987
 .br
 Ported the 4.3 csh sources to tcsh.
 .sp
-Christos S. Zoulas, Cornell U. EE dept., 1987-91
+Christos S. Zoulas, Cornell U. EE dept., 1987-92
 .br
 ported tcsh to HPUX, and System V rel. 2 and 3 and wrote a SysV version of
 getwd.c. Added SHORT_STRINGS support. New version of sh.glob.c.
@@ -3379,7 +3517,32 @@ Re-ported tcsh to A/UX.
 .sp
 .SH "BUGFIXES AND ENHANCEMENTS"
 .sp
-Mika Liljeberg, liljeber@kruuna.Helsinki.FI
+Harry C. Pulley, 1992
+.br
+Coherent port
+.sp
+Andy Phillips, Mullard Space Science Lab U.K., 1992
+.br
+VMS-POSIX port.
+.sp
+Beto Appleton, IBM Corp., 1992
+.br
+Walking process group fixes, lots of misc csh bug fixes, POSIX file tests,
+POSIX SIGHUP.
+.sp
+Scott Bolte, Cray Computer Corp., 1992
+.br
+CSOS port.
+.sp
+Kaveh R. Ghazi, Rutgers University, 1992
+.br
+Fixes and Ports for Tek, m88k, Titan, Masscomp.
+.sp
+Mark Linderman, Cornell University, 1992
+.br
+OS/2 Port
+.sp
+Mika Liljeberg, liljeber@kruuna.Helsinki.FI, 1992
 .br
 Linux port.
 .sp

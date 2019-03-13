@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.printf.c,v 3.6 1992/04/03 22:15:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.printf.c,v 3.10 1992/10/14 20:19:19 christos Exp $ */
 /*
  * tc.printf.c: A public-domain, minimal printf/sprintf routine that prints
  *	       through the putchar() routine.  Feel free to use for
@@ -38,7 +38,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.printf.c,v 3.6 1992/04/03 22:15:14 christos Exp $")
+RCSID("$Id: tc.printf.c,v 3.10 1992/10/14 20:19:19 christos Exp $")
 
 #ifdef lint
 #undef va_arg
@@ -50,15 +50,17 @@ RCSID("$Id: tc.printf.c,v 3.6 1992/04/03 22:15:14 christos Exp $")
 static char buf[128];
 
 static	void	xaddchar	__P((int));
-static	void	doprnt		__P((void (*) __P((int)), char *, va_list));
+static	void	doprnt		__P((void (*) __P((int)), const char *, va_list));
 
 static void
 doprnt(addchar, sfmt, ap)
     void    (*addchar)();
-    char   *sfmt;
+    const char   *sfmt;
     va_list ap;
 {
-    register char *f, *bp;
+    register char *bp;
+    register const char *f;
+    register Char *Bp;
     register long l;
     register unsigned long u;
     register int i;
@@ -121,7 +123,7 @@ doprnt(addchar, sfmt, ap)
 	    }
 
 	    fmt = (unsigned char) *f;
-	    if (Isupper(fmt)) {
+	    if (fmt != 'S' && Isupper(fmt)) {
 		do_long = 1;
 		fmt = Tolower(fmt);
 	    }
@@ -143,9 +145,9 @@ doprnt(addchar, sfmt, ap)
 		    *bp++ = '-';
 		f_width = f_width - (bp - buf);
 		if (!flush_left)
-		    while (f_width-- > 0)
+		    while (f_width-- > 0) 
 			(*addchar) ((int) (pad | attributes));
-		for (bp--; bp >= buf; bp--)
+		for (bp--; bp >= buf; bp--) 
 		    (*addchar) ((int) (((unsigned char) *bp) | attributes));
 		if (flush_left)
 		    while (f_width-- > 0)
@@ -201,8 +203,35 @@ doprnt(addchar, sfmt, ap)
 		(*addchar) ((int) (i | attributes));
 		break;
 
+	    case 'S':
+#ifdef SHORT_STRINGS
+		Bp = va_arg(ap, Char *);
+		if (!Bp) {
+		    bp = NULL;
+		    goto lcase_s;
+	        }
+		f_width = f_width - Strlen(Bp);
+		if (!flush_left)
+		    while (f_width-- > 0)
+			(*addchar) ((int) (pad | attributes));
+		for (i = 0; *Bp && i < prec; i++) {
+		    (*addchar) ((int) ((unsigned char)*Bp | attributes));
+		    Bp++;
+		}
+		if (flush_left)
+		    while (f_width-- > 0)
+			(*addchar) ((int) (' ' | attributes));
+		break;
+#else
+		bp = va_arg(ap, Char *);
+		if (bp)
+		    (void) strip((Char *) bp);
+		goto lcase_s;
+#endif /* SHORT_STRINGS */
+
 	    case 's':
 		bp = va_arg(ap, char *);
+lcase_s:
 		if (!bp)
 		    bp = "(nil)";
 		f_width = f_width - strlen((char *) bp);
@@ -315,3 +344,50 @@ xvsprintf(str, fmt, va)
     doprnt(xaddchar, fmt, va);
     *xstring++ = '\0';
 }
+
+
+
+#ifdef PURIFY
+/* Purify uses (some of..) the following functions to output memory-use
+ * debugging info.  Given all the messing with file descriptors that
+ * tcsh does, the easiest way I could think of to get it (Purify) to
+ * print anything was by replacing some standard functions with
+ * ones that do tcsh output directly - see dumb hook in doreaddirs()
+ * (sh.dir.c) -sg
+ */
+#define FILE int
+int 
+#if __STDC__
+fprintf(FILE *fp, const char* fmt, ...)
+#else
+fprintf(va_alist)
+    va_dcl
+#endif
+{
+    va_list va;
+#if __STDC__
+    va_start(va, fmt);
+#else
+    FILE *fp;
+    const char   *fmt;
+
+    va_start(va);
+    fp = va_arg(va, FILE *);
+    fmt = va_arg(va, const char *);
+#endif
+    doprnt(xputchar, fmt, va);
+    va_end(va);
+    return 1;
+}
+
+int 
+vfprintf(fp, fmt, va)
+    FILE *fp;
+    const char   *fmt;
+    va_list va;
+{
+    doprnt(xputchar, fmt, va);
+    return 1;
+}
+
+#endif	/* PURIFY */

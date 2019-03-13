@@ -1,11 +1,12 @@
 
-Last Updated: Mon Jan  6 17:34:17 EST 1992
+Last Updated: 
+Thu Nov 12 22:43:19 EST 1992
 
 This is for people that do not read the manual!
 
-So far people who don't read manuals don't read this either...
-I may call it README.*PLEASE* in the future, but then people won't
-be able to get it... :-)
+So far people who don't read manuals don't read this either... I may
+call it README.*PLEASE* in the future, but then the same people won't
+be able to get ftp it... :-)
 
 1.  Why is the meta key broken in tcsh-5.20 and up? 
 
@@ -16,10 +17,10 @@ be able to get it... :-)
     logged in through a modem line with 7 bits and parity and your terminal 
     has a meta key. Then tcsh 5.19 would set wrongly set pass8.
 
-    If you did like the prevous behavior you can add in /etc/Login, or
+    If you did like the previous behavior you can add in /etc/csh.login, or
     in .login:
 
-    if ( $?prompt ) then
+    if ( $?tcsh && $?prompt ) then
 	if ( "`echotc meta`" == "yes" ) then
 	     stty pass8
 	endif
@@ -43,6 +44,8 @@ be able to get it... :-)
     the tty. A work-around is:
 
     dbxtool < /dev/null >& /dev/null &
+    or
+    /usr/etc/setsid dbxtool &
 
 3.  I tried to compile tcsh and it cannot find <locale.h>?
 
@@ -102,5 +105,44 @@ be able to get it... :-)
     get echo'ed twice. 
 
     It is a bug in the unbundled optimizer. Lower the optimization level.
+
+11. How can I use the arrow keys with hpterm?
+    Hp terminals use the arrow keys internally. You can tell hpterm not
+    to do that, by sending it the termcap sequence smkx. Since this
+    has to be done all the time, the easiest thing is to put it as an
+    alias for precmd, or inside the prompt:
+
+    if ($term == "hp") then
+	set prompt="%{`echotc smkx`%}$prompt"
+    endif
+
+    Note that by doing that you cannot use pgup and pgdn to scroll...
+
+12. On POSIX machines ^C and ^Z will do not work when tcsh is a login
+    shell?
+    Make sure that the interrupt character is set to ^C and suspend
+    is set to ^Z; 'stty -a' will show you the current stty settings;
+    'stty intr ^C susp ^Z' will set them to ^C and ^Z respectively.
+
+13. I am trying to compile tcsh and I am getting compile errors that
+    look like:
+
+    >sh.c:???: `STR???' undeclared, outside of functions [gcc]
+    or
+    >"sh.c", line ???: STR??? undefined [cc]
+
+    You interrupted make, while it was making the automatically
+    generated headers. Type 'make clean; make'
+
+14. On the cray, sometimes the CR/LF mapping gets screwed up.
+
+    You are probably logged in to the cray via telnet. Cray's
+    telnetd implements line mode selection, but many telnet 
+    clients do not do that correctly, and the tty settings 
+    do not get propagated correctly. You can either compile
+    a new telnet client (from the BSD net2 tape), or at least
+    on the suns use: 'mode character'.
+
+christos
 
 Everything else is a bug :-(

@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/mi.varargs.h,v 1.1 1992/05/15 23:49:22 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/mi.varargs.h,v 1.1 1992/05/15 23:49:22 christos Exp $ */
 /*
  * mi.varargs.h: Correct varargs for minix
  */

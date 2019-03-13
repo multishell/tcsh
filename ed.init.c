@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/ed.init.c,v 3.27 1992/04/03 22:15:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/ed.init.c,v 3.33 1992/10/05 02:41:30 christos Exp $ */
 /*
  * ed.init.c: Editor initializations
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.init.c,v 3.27 1992/04/03 22:15:14 christos Exp $")
+RCSID("$Id: ed.init.c,v 3.33 1992/10/05 02:41:30 christos Exp $")
 
 #include "ed.h"
 #include "ed.term.h"
@@ -232,9 +232,9 @@ ed_Setup(rst)
     extty.d_t.c_lflag &= ~ttylist[EX_IO][M_LINED].t_clrmask;
     extty.d_t.c_lflag |=  ttylist[EX_IO][M_LINED].t_setmask;
 
-# ifdef IRIX3_3
+# if defined(IRIX3_3) && SYSVREL < 4
     extty.d_t.c_line = NTTYDISC;
-# endif /* IRIX3_3 */
+# endif /* IRIX3_3 && SYSVREL < 4 */
 
 #else	/* GSTTY */		/* V7, Berkeley style tty */
 
@@ -291,7 +291,7 @@ ed_Setup(rst)
 void
 ed_Init()
 {
-    ResetInLine();		/* reset the input pointers */
+    ResetInLine(1);		/* reset the input pointers */
     GettingInput = 0;		/* just in case */
     LastKill = KillBuf;		/* no kill buffer */
 
@@ -325,9 +325,9 @@ ed_Init()
     edtty.d_t.c_lflag |=  ttylist[ED_IO][M_LINED].t_setmask;
 
 
-# ifdef IRIX3_3
+# if defined(IRIX3_3) && SYSVREL < 4
     edtty.d_t.c_line = NTTYDISC;
-# endif /* IRIX3_3 */
+# endif /* IRIX3_3 && SYSVREL < 4 */
 
 #else /* GSTTY */
 
@@ -545,7 +545,7 @@ Rawmode()
 #ifdef DEBUG_TTY
 	xprintf("Rawmode: tty_setty: %s\n", strerror(errno));
 #endif /* DEBUG_TTY */
-	return -1;
+	return(-1);
     }
     Tty_raw_mode = 1;
     flush();			/* flush any buffered output */
@@ -586,7 +586,8 @@ Cookedmode()
 }
 
 void
-ResetInLine()
+ResetInLine(macro)
+    int macro;
 {
     Cursor = InputBuf;		/* reset cursor */
     LastChar = InputBuf;
@@ -602,7 +603,8 @@ ResetInLine()
     LastKill = KillBuf;		/* no kill buffer */
 #endif 
     LastCmd = F_UNASSIGNED;	/* previous command executed */
-    MacroLvl = -1;		/* no currently active macros */
+    if (macro)
+	MacroLvl = -1;		/* no currently active macros */
 }
 
 static Char *Input_Line = NULL;
@@ -618,7 +620,7 @@ Load_input_line()
     if (Tty_raw_mode)
 	return 0;
 
-#ifdef FIONREAD
+#if defined(FIONREAD) && !defined(OREO)
     (void) ioctl(SHIN, FIONREAD, &chrs);
     if (chrs > 0) {
 	char    buf[BUFSIZE];
@@ -630,7 +632,7 @@ Load_input_line()
 	    PushMacro(Input_Line);
 	}
     }
-#endif  /* FIONREAD */
+#endif  /* FIONREAD && !OREO */
     return chrs > 0;
 }
 

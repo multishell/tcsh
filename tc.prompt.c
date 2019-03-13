@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.prompt.c,v 3.12 1992/03/21 02:46:07 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.prompt.c,v 3.16 1992/10/14 20:19:19 christos Exp $ */
 /*
  * tc.prompt.c: Prompt printing stuff
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.prompt.c,v 3.12 1992/03/21 02:46:07 christos Exp $")
+RCSID("$Id: tc.prompt.c,v 3.16 1992/10/14 20:19:19 christos Exp $")
 
 #include "ed.h"
 
@@ -56,22 +56,11 @@ printprompt(promptno, str)
     int     promptno;
     char   *str;
 {
-    Char   *p, *z, *q, *ep, *cp;
-    register Char attributes = 0;
-    static int print_prompt_did_ding = 0;
-    register char *cz;
-    struct tm *t;
-    time_t  lclock;
-    Char    buff[BUFSIZE];
     static  Char *ocp = NULL;
     static  char *ostr = NULL;
+    time_t  lclock = time(NULL);
+    Char   *cp;
 
-    (void) time(&lclock);
-    t = localtime(&lclock);
-
-    PromptBuf[0] = '\0';
-    p = PromptBuf;
-    ep = &PromptBuf[2*INBUFSIZE - 2];
     switch (promptno) {
     default:
     case 0:
@@ -98,6 +87,38 @@ printprompt(promptno, str)
 	ostr = str;
     }
 
+    PromptBuf[0] = '\0';
+    tprintf(FMT_PROMPT, PromptBuf, cp, 2 * INBUFSIZE - 2, str, lclock, NULL);
+
+    if (!editing) {
+	for (cp = PromptBuf; *cp ; )
+	    (void) putraw(*cp++);
+	SetAttributes(0);
+	flush();
+    }
+}
+
+void
+tprintf(what, buf, fmt, siz, str, tim, info)
+    int what;
+    Char *buf, *fmt;
+    size_t siz;
+    char *str;
+    time_t tim;
+    ptr_t info;
+{
+    Char   *z, *q;
+    Char    attributes = 0;
+    static int print_prompt_did_ding = 0;
+    char   *cz;
+    Char    buff[BUFSIZE];
+    char    cbuff[BUFSIZE];
+
+    Char *p  = buf;
+    Char *ep = &p[siz];
+    Char *cp = fmt;
+    struct tm *t = localtime(&tim);
+
     for (; *cp; cp++) {
 	if (p >= ep)
 	    break;
@@ -105,6 +126,8 @@ printprompt(promptno, str)
 	    cp++;
 	    switch (*cp) {
 	    case 'R':
+		if (what == FMT_HISTORY)
+		    fmthist('R', info, str = cbuff);
 		if (str != NULL)
 		    while (*str) {
 			*p++ = attributes | *str++;
@@ -116,9 +139,12 @@ printprompt(promptno, str)
 		break;
 	    case '!':
 	    case 'h':
-		Itoa(eventno + 1, buff);
-		for (z = buff; *z; z++) {
-		    *p++ = attributes | *z;
+		if (what == FMT_HISTORY)  
+		    fmthist('h', info, cbuff);
+		else 
+		    xsprintf(cbuff, "%d", eventno + 1);
+		for (cz = cbuff; *cz; cz++) {
+		    *p++ = attributes | *cz;
 		    if (p >= ep) break;
 		}
 		break;
@@ -144,8 +170,8 @@ printprompt(promptno, str)
 		    }		/* else do a 24 hour clock */
 
 		    /* "DING!" stuff by Hans also */
-		    if (t->tm_min || print_prompt_did_ding
-			 /* || !adrof(STRprompt_ding) */ ) {
+		    if (t->tm_min || print_prompt_did_ding || 
+			what != FMT_PROMPT) {
 			if (t->tm_min)
 			    print_prompt_did_ding = 0;
 			Itoa(hr, buff);
@@ -180,11 +206,17 @@ printprompt(promptno, str)
 		break;
 
 	    case 'M':
+#ifndef HAVENOUTMP
+		if (what == FMT_WHO)
+		    cz = who_info(info, 'M', cbuff);
+		else 
+#endif /* HAVENOUTMP */
+		    cz = getenv("HOST");
 		/*
 		 * Bug pointed out by Laurent Dami <dami@cui.unige.ch>: don't
 		 * derefrence that NULL (if HOST is not set)...
 		 */
-		if ((cz = getenv("HOST")) != NULL)
+		if (cz != NULL)
 		    while (*cz) {
 			if (p >= ep) break;
 			*p++ = attributes | *cz++;
@@ -192,8 +224,15 @@ printprompt(promptno, str)
 		break;
 
 	    case 'm':
-		if ((cz = getenv("HOST")) != NULL)
-		    while (*cz && *cz != '.') {
+#ifndef HAVENOUTMP
+		if (what == FMT_WHO)
+		    cz = who_info(info, 'm', cbuff);
+		else 
+#endif /* HAVENOUTMP */
+		    cz = getenv("HOST");
+
+		if (cz != NULL)
+		    while (*cz && (what == FMT_WHO || *cz != '.')) {
 			if (p >= ep) break;
 			*p++ = attributes | *cz++;
 		    }
@@ -204,7 +243,7 @@ printprompt(promptno, str)
 		    static Char *olddir = 0, *olduser = 0, *oldpath = 0;
 		    extern int tlength;	/* cache cleared */
 
-		    if (!(z = value(STRcwd)))
+		    if ((z = value(STRcwd)) == STRNULL)
 			break;	/* no cwd, so don't do anything */
 		    /*
 		     * Have we changed directory?
@@ -225,7 +264,7 @@ printprompt(promptno, str)
 		}
 		/*FALLTHROUGH*/
 	    case '/':
-		if ((z = value(STRcwd)) != NULL) {
+		if ((z = value(STRcwd)) != STRNULL) {
 		    while (*z) {
 			*p++ = attributes | *z++;
 			if (p >= ep) break;
@@ -239,8 +278,16 @@ printprompt(promptno, str)
 		    register int j, k;
 		    Char    scp;
 
+		    /* modified RWM 8/6/92 - indicate dirs ignored */
+		    register int updirs;
+		    int pdirs = 0;
+		    
 		    scp = *cp;
 		    /* option to determine fix number of dirs from path */
+		    if (*(cp + 1) == '0') {
+			pdirs = 1;
+			cp++;
+		    }
 		    if (*(cp + 1) >= '1' && *(cp + 1) <= '9') {
 			j = *(cp + 1) - '0';
 			cp++;
@@ -248,23 +295,33 @@ printprompt(promptno, str)
 		    else {
 			j = 1;
 		    }
-		    if (!(z = value(STRcwd)))
+		    if ((z = value(STRcwd)) == STRNULL)
 			break;
 		    (void) Strcpy(buff, z);
-		    if (!buff[1]) {	/* if CWD == / */
+		    if (!buff[1]) /* if CWD == / */
 			*p++ = attributes | buff[0];
-		    }
 		    else {
-			if ((scp != 'C') && (q = value(STRhome)) &&
+			if ((scp != 'C') && (q = value(STRhome)) != STRNULL &&
 			    Strncmp(buff, q, (k = Strlen(q))) == 0 &&
 			    (buff[k] == '/' || buff[k] == '\0')) {
 			    buff[--k] = '~';
 			    q = &buff[k];
+			    /* RWM - reset the path length */
+			    updirs = 0;
 			}
-			else
+			else {
 			    q = buff;
-			for (z = q; *z; z++)
+			    /* RWM - in case first char is not '/' */
+			    if (*q == '/') updirs = 0; else updirs = 1;
+			}
+			/* RWM - calculate elements in the path */
+			for (z = q; *z; z++) {
+			    if (*z == '/') updirs++;
 			    continue;	/* find the end */
+			}
+			/* RWM - the ones we will skip can be found here */
+			updirs -= j;
+			
 			while (j-- > 0) {
 			    while ((z > q) && (*z != '/'))
 				z--;	/* back up */
@@ -273,6 +330,26 @@ printprompt(promptno, str)
 			}
 			if (*z == '/' && z != q)
 			    z++;
+
+			/* RWM - if *q == '~' and *z != '~' then print */
+			/*       out the '~' ahead of the partial path */
+			if (pdirs && (*q == '~') && (*z != '~'))
+			    *p++ = attributes | '~';
+			
+			/* RWM - tell you how many dirs we've ignored */
+			/*       and add '/' at front of this         */
+			if (updirs > 0 && pdirs) {
+			    *p++ = attributes | '/';
+			    *p++ = attributes | '<';
+			    if (updirs > 9) {
+				*p++ = attributes | '9';
+				*p++ = attributes | '+';
+			    } else
+				*p++ = attributes | ('0' + updirs);
+			    *p++ = attributes | '>';
+			}
+			/* RWM - end of added code */
+
 			while (*z) {
 			    *p++ = attributes | *z++;
 			    if (p >= ep) break;
@@ -281,18 +358,42 @@ printprompt(promptno, str)
 		}
 		break;
 	    case 'n':
-		if ((z = value(STRuser)) != NULL)
-		    while (*z) {
-			*p++ = attributes | *z++;
-			if (p >= ep) break;
-		    }
+#ifndef HAVENOUTMP
+		if (what == FMT_WHO) {
+		    if ((cz = who_info(info, 'n', cbuff)) != NULL)
+			while (*cz) {
+			    *p++ = attributes | *cz++;
+			    if (p >= ep) break;
+			}
+		}
+		else  
+#endif /* HAVENOUTMP */
+		{
+		    if ((z = value(STRuser)) != STRNULL)
+			while (*z) {
+			    *p++ = attributes | *z++;
+			    if (p >= ep) break;
+			}
+		}
 		break;
 	    case 'l':
-		if ((z = value(STRtty)) != NULL)
-		    while (*z) {
-			*p++ = attributes | *z++;
-			if (p >= ep) break;
-		    }
+#ifndef HAVENOUTMP
+		if (what == FMT_WHO) {
+		    if ((cz = who_info(info, 'l', cbuff)) != NULL)
+			while (*cz) {
+			    *p++ = attributes | *cz++;
+			    if (p >= ep) break;
+			}
+		}
+		else  
+#endif /* HAVENOUTMP */
+		{
+		    if ((z = value(STRtty)) != STRNULL)
+			while (*z) {
+			    *p++ = attributes | *z++;
+			    if (p >= ep) break;
+			}
+		}
 		break;
 	    case 'd':
 		for (cz = day_list[t->tm_wday]; *cz;) {
@@ -371,7 +472,7 @@ printprompt(promptno, str)
 		ClearToBottom();
 		break;
 	    case '?':
-		if ((z = value(STRstatus)) != NULL)
+		if ((z = value(STRstatus)) != STRNULL)
 		    while (*z) {
 			*p++ = attributes | *z++;
 			if (p >= ep) break;
@@ -395,31 +496,38 @@ printprompt(promptno, str)
 		attributes &= ~LITERAL;
 		break;
 	    default:
-		if (p >= ep - 3) break;
-		*p++ = attributes | '%';
-		*p++ = attributes | *cp;
+#ifndef HAVENOUTMP
+		if (*cp == 'a' && what == FMT_WHO) {
+		    cz = who_info(info, 'a', cbuff);
+		    while (*cz) {
+			*p++ = attributes | *cz++;
+			if (p >= ep) break;
+		    }
+		}
+		else 
+#endif /* HAVENOUTMP */
+		{
+		    if (p >= ep - 3) break;
+		    *p++ = attributes | '%';
+		    *p++ = attributes | *cp;
+		}
 		break;
 	    }
 	}
-	else if (*cp == '\\' || *cp == '^') {
+	else if (*cp == '\\' || *cp == '^') 
 	    *p++ = attributes | parseescape(&cp);
-	}
 	else if (*cp == '!') {	/* EGS: handle '!'s in prompts */
-	    Itoa(eventno + 1, buff);
-	    for (z = buff; *z; z++) {
-		*p++ = attributes | *z;
+	    if (what == FMT_HISTORY) 
+		fmthist('h', info, cbuff);
+	    else
+		xsprintf(cbuff, "%d", eventno + 1);
+	    for (cz = cbuff; *cz; cz++) {
+		*p++ = attributes | *cz;
 		if (p >= ep) break;
 	    }
 	}
-	else {
+	else 
 	    *p++ = attributes | *cp;	/* normal character */
-	}
     }
     *p = '\0';
-    if (!editing) {
-	for (z = PromptBuf; z < p; z++)
-	    (void) putraw(*z);
-	SetAttributes(0);
-	flush();
-    }
 }

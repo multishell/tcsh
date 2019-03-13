@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.glob.c,v 3.22 1992/05/02 23:39:58 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.glob.c,v 3.28 1992/10/27 16:18:15 christos Exp $ */
 /*
  * sh.glob.c: Regular expression expansion
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.glob.c,v 3.22 1992/05/02 23:39:58 christos Exp $")
+RCSID("$Id: sh.glob.c,v 3.28 1992/10/27 16:18:15 christos Exp $")
 
 #include "tc.h"
 
@@ -88,7 +88,7 @@ static Char *
 globtilde(nv, s)
     Char  **nv, *s;
 {
-    Char    gbuf[MAXPATHLEN], *gstart, *b, *u, *e;
+    Char    gbuf[BUFSIZE], *gstart, *b, *u, *e;
 #ifdef apollo
     int slash;
 #endif
@@ -96,7 +96,7 @@ globtilde(nv, s)
     gstart = gbuf;
     *gstart++ = *s++;
     u = s;
-    for (b = gstart, e = &gbuf[MAXPATHLEN - 1]; 
+    for (b = gstart, e = &gbuf[BUFSIZE - 1]; 
 	 *s && *s != '/' && *s != ':' && b < e;
 	 *b++ = *s++)
 	continue;
@@ -129,7 +129,7 @@ globequal(new, old)
     Char *new, *old;
 {
     int     dig;
-    Char    *b = NULL, *d;
+    Char    *b, *d;
 
     /*
      * kfk - 17 Jan 1984 - stack hack allows user to get at arbitrary dir names
@@ -158,7 +158,7 @@ globequal(new, old)
 
     /* Copy the rest of the string */
     for (d = &new[Strlen(new)]; 
-	 d < &new[MAXPATHLEN - 1] && (*d++ = *b++) != '\0';)
+	 d < &new[BUFSIZE - 1] && (*d++ = *b++) != '\0';)
 	continue;
     *d = '\0';
 
@@ -172,7 +172,7 @@ globbrace(s, p, bl)
     int     i, len;
     Char   *pm, *pe, *lm, *pl;
     Char  **nv, **vl;
-    Char    gbuf[MAXPATHLEN];
+    Char    gbuf[BUFSIZE];
     int     size = GLOBSPACE;
 
     nv = vl = (Char **) xmalloc((size_t) (sizeof(Char *) * size));
@@ -292,10 +292,8 @@ expbrace(nvp, elp, size)
 		xfree((ptr_t) bl);
 		continue;
 	    }
-	    len = blklen(bl);
 	    if (&el[len] >= &nv[size]) {
 		int     l, e;
-
 		l = &el[len] - &nv[size];
 		size += GLOBSPACE > l ? GLOBSPACE : l;
 		l = vl - nv;
@@ -305,12 +303,24 @@ expbrace(nvp, elp, size)
 		vl = nv + l;
 		el = nv + e;
 	    }
+	    /* nv vl   el     bl
+	     * |  |    |      |
+	     * -.--..--	      x--
+	     *   |            len
+	     *   vp
+	     */
 	    vp = vl--;
 	    *vp = *bl;
 	    len--;
 	    for (bp = el; bp != vp; bp--)
 		bp[len] = *bp;
 	    el += len;
+	    /* nv vl    el bl
+	     * |  |     |  |
+	     * -.-x  ---    --
+	     *   |len
+	     *   vp
+	     */
 	    vp++;
 	    for (bp = bl + 1; *bp; *vp++ = *bp++)
 		continue;
@@ -374,8 +384,7 @@ globexpand(v)
      * Step 2: expand braces
      */
     el = vl;
-    vl = nv;
-    expbrace(&vl, &el, size);
+    expbrace(&nv, &el, size);
 
 
     /*
@@ -384,7 +393,7 @@ globexpand(v)
     vl = nv;
     for (s = *vl; s; s = *++vl)
 	switch (*s) {
-	    Char gp[MAXPATHLEN], *ns;
+	    Char gp[BUFSIZE], *ns;
 	case '~':
 	    *vl = globtilde(nv, s);
 	    break;
@@ -588,7 +597,7 @@ globall(v)
 
     if (!noglob && (gflg & G_GLOB)) {
 	vl = libglob(vo);
-	if ((gflg & G_CSH) && vl != vo)
+	if (vl != vo)
 	    blkfree(vo);
     }
     else
@@ -682,7 +691,7 @@ dobackp(cp, literal)
     bool    literal;
 {
     register Char *lp, *rp;
-    Char   *ep, word[MAXPATHLEN];
+    Char   *ep, word[BUFSIZE];
 
     if (pargv) {
 #ifdef notdef
@@ -695,7 +704,7 @@ dobackp(cp, literal)
     pargv[0] = NULL;
     pargcp = pargs = word;
     pargc = 0;
-    pnleft = MAXPATHLEN - 4;
+    pnleft = BUFSIZE - 4;
     for (;;) {
 	for (lp = cp; *lp != '`'; lp++) {
 	    if (*lp == 0) {
@@ -746,17 +755,6 @@ backeval(cp, literal)
     faket.t_dcom = fakecom;
     fakecom[0] = STRfakecom1;
     fakecom[1] = 0;
-
-    if (didfds == 0) {
-	/*
-	 * Make sure that we have some file descriptors to
-	 * play with, so that the processes have at least 0, 1, 2
-	 * open
-	 */
-	(void) dcopy(SHIN, 0);
-	(void) dcopy(SHOUT, 1);
-	(void) dcopy(SHDIAG, 2);
-    }
 
     /*
      * We do the psave job to temporarily change the current job so that the
@@ -898,7 +896,7 @@ pword()
     pargv[pargc++] = Strsave(pargs);
     pargv[pargc] = NULL;
     pargcp = pargs;
-    pnleft = MAXPATHLEN - 4;
+    pnleft = BUFSIZE - 4;
 }
 
 int
@@ -985,7 +983,7 @@ pmatch(string, pattern, estr)
 	    oestr = *estr;
 	    pestr = NULL;
 
-	    while (*string) {
+	    do {
 		switch(pmatch(string, pattern, estr)) {
 		case 0:
 		    break;
@@ -997,9 +995,9 @@ pmatch(string, pattern, estr)
 		default:
 		    abort();	/* Cannot happen */
 		}
-		string++;
 		*estr = string;
 	    }
+	    while (*string++);
 
 	    if (pestr) {
 		*estr = pestr;
@@ -1072,11 +1070,6 @@ int
 sortscmp(a, b)
     register Char **a, **b;
 {
-#if defined(NLS) && !defined(NOSTRCOLL)
-    char    buf[2048];
-
-#endif
-
     if (!a)			/* check for NULL */
 	return (b ? 1 : 0);
     if (!b)
@@ -1087,12 +1080,7 @@ sortscmp(a, b)
     if (!*b)
 	return (-1);
 
-#if defined(NLS) && !defined(NOSTRCOLL)
-    (void) strcpy(buf, short2str(*a));
-    return ((int) strcoll(buf, short2str(*b)));
-#else
-    return ((int) Strcmp(*a, *b));
-#endif
+    return (int) collate(a, b);
 }
 
 #endif

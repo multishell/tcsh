@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.proc.c,v 3.28 1992/05/15 23:49:22 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.proc.c,v 3.39 1992/11/13 04:19:10 christos Exp $ */
 /*
  * sh.proc.c: Job manipulations
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.proc.c,v 3.28 1992/05/15 23:49:22 christos Exp $")
+RCSID("$Id: sh.proc.c,v 3.39 1992/11/13 04:19:10 christos Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -78,11 +78,11 @@ RCSID("$Id: sh.proc.c,v 3.28 1992/05/15 23:49:22 christos Exp $")
 #define BIGINDEX	9	/* largest desirable job index */
 
 #ifdef BSDTIMES
-# if defined(sun) || defined(hp9000)
+# if defined(SUNOS4) || defined(hp9000)
 static struct rusage zru = {{0L, 0L}, {0L, 0L}, 0L, 0L, 0L, 0L,
 			    0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L};
 
-# else /* !sun && !hp9000 */
+# else /* !SUNOS4 && !hp9000 */
 #  ifdef masscomp
 /*
  * Initialization of this structure under RTU 4.1A & RTU 5.0 is problematic
@@ -94,7 +94,7 @@ static struct rusage zru;
 static struct rusage zru = {{0L, 0L}, {0L, 0L}, 0, 0, 0, 0, 0, 0, 0, 
 			    0, 0, 0, 0, 0, 0};
 #  endif /* masscomp */
-# endif	/* !sun && !hp9000 */
+# endif	/* !SUNOS4 && !hp9000 */
 #else /* ! BSDTIMES */
 # ifdef _SEQUENT_
 static struct process_stats zru = {{0L, 0L}, {0L, 0L}, 0, 0, 0, 0, 0, 0, 0,
@@ -118,7 +118,6 @@ static	void		 pads		__P((Char *));
 static	void		 pkill		__P((Char **, int));
 static	struct process	*pgetcurr	__P((struct process *));
 static	void		 okpcntl	__P((void));
-static  struct process  *pfind		__P((Char *));
 
 /*
  * pchild - called at interrupt level by the SIGCHLD signal
@@ -190,7 +189,7 @@ loop:
 #ifdef BSDJOBS
 # ifdef BSDTIMES
     /* both a wait3 and rusage */
-#  if !defined(BSDWAIT) || defined(NeXT) || defined(MACH) || (defined(IRIS4D) && __STDC__)
+#  if !defined(BSDWAIT) || defined(NeXT) || defined(MACH) || (defined(IRIS4D) && __STDC__ && SYSVREL <= 3)
     pid = wait3(&w,
        (setintr && (intty || insource) ? WNOHANG | WUNTRACED : WNOHANG), &ru);
 #  else /* BSDWAIT */
@@ -277,11 +276,6 @@ loop:
 	    goto loop;
 	}
 	pnoprocesses = pid == -1;
-#ifdef linux
-# ifdef UNRELSIGS
-	(void) sigset(SIGCHLD, pchild);
-# endif /* UNRELSIGS */
-#endif /* linux */
 #ifndef SIGVOID
 	return (0);
 #else /* !SIGVOID */
@@ -312,7 +306,12 @@ found:
 # ifdef _SEQUENT_
 	    (void) get_process_stats(&pp->p_etime, PS_SELF, NULL, NULL);
 # else	/* !_SEQUENT_ */
+#  ifndef COHERENT
 	    pp->p_etime = times(&proctimes);
+#  else /* !COHERENT */
+	    pp->p_etime = HZ * time(NULL);
+	    times(&proctimes);
+#  endif /* !COHERENT */
 # endif	/* !_SEQUENT_ */
 #else /* BSDTIMES */
 	    (void) gettimeofday(&pp->p_etime, NULL);
@@ -834,7 +833,12 @@ palloc(pid, t)
     {
 	struct tms tmptimes;
 
+#  ifndef COHERENT
 	pp->p_btime = times(&tmptimes);
+#  else /* !COHERENT */
+	pp->p_btime = HZ * time(NULL);
+	times(&tmptimes);
+#  endif /* !COHERENT */
     }
 # endif /* !_SEQUENT_ */
 #endif /* !BSDTIMES */
@@ -1137,7 +1141,7 @@ pprint(pp, flag)
 	}
 prcomd:
 	if (flag & NAME) {
-	    xprintf("%s", short2str(pp->p_command));
+	    xprintf("%S", pp->p_command);
 	    if (pp->p_flags & PPOU)
 		xprintf(" |");
 	    if (pp->p_flags & PDIAG)
@@ -1221,6 +1225,17 @@ prcomd:
     return (jobflags);
 }
 
+/*
+ * All 4.3 BSD derived implementations are buggy and I've had enough.
+ * The following implementation produces similar code and works in all
+ * cases. The 4.3BSD one works only for <, >, !=
+ */
+# undef timercmp
+#  define timercmp(tvp, uvp, cmp) \
+      (((tvp)->tv_sec == (uvp)->tv_sec) ? \
+	   ((tvp)->tv_usec cmp (uvp)->tv_usec) : \
+	   ((tvp)->tv_sec  cmp (uvp)->tv_sec))
+
 static void
 ptprint(tp)
     register struct process *tp;
@@ -1243,9 +1258,6 @@ ptprint(tp)
     prusage(&zru, &ru, &tetime, &ztime);
 #else /* !BSDTIMES */
 # ifdef _SEQUENT_
-#  define timercmp(tvp, uvp, cmp) \
-      ((tvp)->tv_sec cmp (uvp)->tv_sec || \
-       (tvp)->tv_sec == (uvp)->tv_sec && (tvp)->tv_usec cmp (uvp)->tv_usec)
     timeval_t tetime, diff;
     static timeval_t ztime;
     struct process_stats ru;
@@ -1529,11 +1541,9 @@ pkill(v, signum)
 	    case SIGTTOU:
 		if ((jobflags & PRUNNING) == 0) {
 # ifdef SUSPENDED
-		    xprintf("%s: Already suspended\n",
-			    short2str(cp));
+		    xprintf("%S: Already suspended\n", cp);
 # else /* !SUSPENDED */
-		    xprintf("%s: Already stopped\n",
-			    short2str(cp));
+		    xprintf("%S: Already stopped\n", cp);
 # endif /* !SUSPENDED */
 		    err1++;
 		    goto cont;
@@ -1551,7 +1561,7 @@ pkill(v, signum)
 	    }
 #endif /* BSDJOBS */
 	    if (killpg(pp->p_jobid, signum) < 0) {
-		xprintf("%s: %s\n", short2str(cp), strerror(errno));
+		xprintf("%S: %s\n", cp, strerror(errno));
 		err1++;
 	    }
 #ifdef BSDJOBS
@@ -1624,9 +1634,24 @@ pstart(pp, foregnd)
 	pclrcurr(pp);
     (void) pprint(pp, foregnd ? NAME | JOBDIR : NUMBER | NAME | AMPERSAND);
 #ifdef BSDJOBS
-    if (foregnd)
+    if (foregnd) {
 	(void) tcsetpgrp(FSHTTY, pp->p_jobid);
-    if (jobflags & PSTOPPED)
+    }
+    /*
+     * 1. child process of csh (shell script) receives SIGTTIN/SIGTTOU
+     * 2. parent process (csh) receives SIGCHLD
+     * 3. The "csh" signal handling function pchild() is invoked
+     *    with a SIGCHLD signal.
+     * 4. pchild() calls wait3(WNOHANG) which returns 0.
+     *    The child process is NOT ready to be waited for at this time.
+     *    pchild() returns without picking-up the correct status
+     *    for the child process which generated the SIGCHILD.
+     * 5. CONSEQUENCE : csh is UNaware that the process is stopped
+     * 6. THIS LINE HAS BEEN COMMENTED OUT : if (jobflags&PSTOPPED)
+     * 	  (beto@aixwiz.austin.ibm.com - aug/03/91)
+     */
+
+    /* if (jobflags & PSTOPPED) */
 	(void) killpg(pp->p_jobid, SIGCONT);
 #endif /* BSDJOBS */
 #ifdef BSDSIGS
@@ -1648,7 +1673,7 @@ panystop(neednl)
 	    stderror(ERR_STOPPED, neednl ? "\n" : "");
 }
 
-static struct process *
+struct process *
 pfind(cp)
     Char   *cp;
 {
@@ -1775,6 +1800,11 @@ pfork(t, wanttty)
     if (setintr)
 	ignint = (tpgrp == -1 && (t->t_dflg & F_NOINTERRUPT))
 	    || (gointr && eq(gointr, STRminus));
+
+#ifdef COHERENT
+    ignint |= gointr && eq(gointr, STRminus);
+#endif /* COHERENT */
+
     /*
      * Check for maximum nesting of 16 processes to avoid Forking loops
      */
@@ -1858,7 +1888,7 @@ pfork(t, wanttty)
 #endif /* !BSDNICE */
 #ifdef F_VER
         if (t->t_dflg & F_VER) {
-	    Setenv(STRSYSTYPE, t->t_systype ? STRbsd43 : STRsys53);
+	    tsetenv(STRSYSTYPE, t->t_systype ? STRbsd43 : STRsys53);
 	    dohash(NULL, NULL);
 	}
 #endif /* F_VER */
@@ -1871,8 +1901,25 @@ pfork(t, wanttty)
     }
     else {
 #ifdef POSIXJOBS
-	if (wanttty >= 0)
-	    (void) setpgid(pid, pcurrjob ? pcurrjob->p_jobid : pid);
+        if (wanttty >= 0) {
+	    /*
+	     * `Walking' process group fix from Beto Appleton.
+	     * (beto@aixwiz.austin.ibm.com)
+	     * If setpgid fails at this point that means that
+	     * our process leader has died. We flush the current
+	     * job and become the process leader ourselves.
+	     * The parent will figure that out later.
+	     */
+	    pgrp = pcurrjob ? pcurrjob->p_jobid : pid;
+	    if (setpgid(pid, pgrp) == -1 && errno == EPERM) {
+		pflush(pcurrjob);
+		pcurrjob = NULL;
+		if (setpgid(pid, pgrp = pid) == -1) {
+		    stderror(ERR_SYSTEM, "setpgid parent:", strerror(errno));
+		    xexit(0);
+		}
+	    }
+	}
 #endif /* POSIXJOBS */
 	palloc(pid, t);
 #ifdef SIGSYNCH
@@ -1936,12 +1983,11 @@ pgetty(wanttty, pgrp)
      */
     if (wanttty > 0)
 #  ifdef BSDSIGS
-	omask = sigblock(sigmask(SIGTSTP)|sigmask(SIGTTIN)|sigmask(SIGTTOU));
+	omask = sigblock(sigmask(SIGTSTP)|sigmask(SIGTTIN));
 #  else /* !BSDSIGS */
     {
 	(void) sighold(SIGTSTP);
 	(void) sighold(SIGTTIN);
-	(void) sighold(SIGTTOU);
     }
 #  endif /* !BSDSIGS */
 # endif /* POSIXJOBS */
@@ -1959,35 +2005,44 @@ pgetty(wanttty, pgrp)
      */
     if (wanttty >= 0)
 	if (setpgid(0, pgrp) == -1) {
-# ifdef BACKPIPE
-	    /*
-     	     * This usually happens in svr4 when the last command in a pipe
-	     * either couldn't be started, or exits without waiting for input.
-	     * Putting in the xexit() hangs the shell, so leave it out.
-	     * (DHD)
-     	     */
-#  ifdef JOBDEBUG
-	    xprintf("tcsh: setpgid error (%s).\n", strerror(errno));
-	    xprintf("pgrp = %d, shell pid = %d\n",pgrp,getpid());
-#  endif /* JOBDEBUG */
-# else /* !BACKPIPE */
-#  if !defined(ISC) && !defined(SCO) && !defined(cray)
-	    /* XXX: Wrong but why? */
-	    xprintf("tcsh: setpgid error (%s).\n", strerror(errno));
-#  endif /* !ISC && !SCO && !cray */
-	    xexit(0);
-# endif /* BACKPIPE */
+# ifdef POSIXJOBS
+	    /* Walking process group fix; see above */
+	    if (setpgid(0, pgrp = getpid()) == -1) {
+# endif /* POSIXJOBS */
+		stderror(ERR_SYSTEM, "setpgid child:\n", strerror(errno));
+		xexit(0);
+# ifdef POSIXJOBS
+	    }
+	    wanttty = 1;  /* Now we really want the tty, since we became the
+			   * the process group leader
+			   */
+# endif /* POSIXJOBS */
 	}
 
 # ifdef POSIXJOBS
+#  ifdef _SEQUENT_
+    /* The controlling terminal is lost if all processes in the
+     * terminal process group are zombies. In this case tcgetpgrp()
+     * returns 0. If this happens we must set the terminal process
+     * group again.
+     */
+    if (wanttty == 0 && tcgetpgrp(FSHTTY) == 0)
+    	wanttty = 1;
+#  endif /* _SEQUENT_ */
     if (wanttty > 0) {
+        /*
+	 * tcsetpgrp will set SIGTTOU to all the the processes in 
+	 * the background according to POSIX... We ignore this here.
+	 */
+	sigret_t (*old)() = sigset(SIGTTOU, SIG_IGN);
 	(void) tcsetpgrp(FSHTTY, pgrp);
+	(void) sigset(SIGTTOU, old);
+
 #  ifdef BSDSIGS
 	(void) sigsetmask(omask);
 #  else /* BSDSIGS */
 	(void) sigrelse(SIGTSTP);
 	(void) sigrelse(SIGTTIN);
-	(void) sigrelse(SIGTTOU);
 #  endif /* !BSDSIGS */
     }
 # endif /* POSIXJOBS */

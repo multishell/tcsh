@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/config_f.h,v 3.3 1992/02/13 05:31:36 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/config_f.h,v 3.6 1992/10/18 00:43:08 christos Exp $ */
 /*
  * config_f.h -- configure various defines for tcsh
  *
@@ -74,11 +74,6 @@
 #undef KAI
 
 /*
- * CSHDIRS    save a history like stack of directories
- */
-#define CSHDIRS
-
-/*
  * TESLA	drops DTR on logout. Historical note:
  *		tesla.ee.cornell.edu was a vax11/780 with a develcon
  *		switch that sometimes would not hang up.
@@ -115,7 +110,11 @@
  *		This can be much slower and no memory statistics will be
  *		provided.
  */
-#undef SYSMALLOC
+#if defined(PURIFY) || defined(MALLOC_TRACE)
+# define SYSMALLOC
+#else
+# undef SYSMALLOC
+#endif
 
 /*
  * RCSID	This defines if we want rcs strings in the binary or not

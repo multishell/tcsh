@@ -19,6 +19,11 @@
 #define POSIXJOBS
 
 /*
+ * POSIXSIGS	Use the POSIX signal facilities to emulate BSD signals.
+ */
+#undef POSIXSIGS
+
+/*
  * VFORK	This machine has a vfork().  
  *		It used to be that for job control to work, this define
  *		was mandatory. This is not the case any more.
@@ -52,6 +57,11 @@
  *		(OREO) has BSDJOBS and BSDSIGS but not BSDTIMES.
  */
 #undef BSDTIMES
+
+/*
+ * BSDLIMIT	You have BSD-style resource limit stuff (getrlimit/setrlimit)
+ */
+#undef BSDLIMIT
 
 /*
  * BSDNICE	Your system uses setpriority() instead of nice, to
@@ -103,7 +113,6 @@
  */
 #define DIRENT
 /****************** local defines *********************/
-#define BACKPIPE	/* fork pipelines backwards... */
 
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */

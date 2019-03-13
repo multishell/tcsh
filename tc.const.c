@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.const.c,v 3.12 1992/04/03 22:15:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.const.c,v 3.16 1992/10/05 02:41:30 christos Exp $ */
 /*
  * sh.const.c: String constants for tcsh.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.const.c,v 3.12 1992/04/03 22:15:14 christos Exp $")
+RCSID("$Id: tc.const.c,v 3.16 1992/10/05 02:41:30 christos Exp $")
 
 Char STRlogout[]        = { 'l', 'o', 'g', 'o', 'u', 't', '\0' };
 Char STRautologout[]    = { 'a', 'u', 't', 'o', 'l', 'o', 'g', 'o', 'u', 't', 
@@ -84,23 +84,21 @@ Char STRtildothist[]    = { '~', '/', '.', 'h', 'i', 's', 't', 'o', 'r',
 Char STRnokanji[]       = { 'n', 'o', 'k', 'a', 'n', 'j', 'i', '\0' };
 #endif
 
-#ifdef CSHDIRS
-Char STRdirfile[]     = { '~', '/', '.', 'c', 's', 'h', 'd', 'i', 'r',
-                          's', '\0' };
-Char STRsldtdirs[]    = { '/', '.', 'c', 's', 'h', 'd', 'i', 'r', 's', '\0' };
-Char STRsavedirs[]    = { 's', 'a', 'v', 'e', 'd', 'i', 'r', 's', '\0' };
-#endif
-
+Char STRtildotdirs[]    = { '~', '/', '.', 'c', 's', 'h', 'd', 'i', 'r',
+			    's', '\0' };
+Char STRdirsfile[]      = { 'd', 'i', 'r', 's', 'f', 'i', 'l', 'e', '\0' };
+Char STRsavedirs[]      = { 's', 'a', 'v', 'e', 'd', 'i', 'r', 's', '\0' };
+Char STRloginsh[]       = { 'l', 'o', 'g', 'i', 'n', 's', 'h', '\0' };
+Char STRdirstack[]      = { 'd', 'i', 'r', 's', 't', 'a', 'c', 'k', '\0' };
 Char STRargv[]          = { 'a', 'r', 'g', 'v', '\0' };
 Char STRsavehist[]      = { 's', 'a', 'v', 'e', 'h', 'i', 's', 't', '\0' };
-Char STRsldthist[]      = { '/', '.', 'h', 'i', 's', 't', 'o', 'r', 'y', '\0' };
 Char STRnormal[]        = { 'n', 'o', 'r', 'm', 'a', 'l', '\0' };
 Char STRsldtlogout[]    = { '/', '.', 'l', 'o', 'g', 'o', 'u', 't', '\0' };
 Char STRjobs[]          = { 'j', 'o', 'b', 's', '\0' };
 Char STRsymhash[]       = { '#', ' ', '\0' };
 Char STRsymarrow[]      = { '>', ' ', '\0' };
 Char STRmquestion[]     = { '%', 'R', '?' | QUOTE, ' ', '\0' };
-Char STRCORRECT[]       = { 'C', 'O', 'R', 'R', 'E', 'C', 'T', '>', '%', 'R', 
+Char STRKCORRECT[]      = { 'C', 'O', 'R', 'R', 'E', 'C', 'T', '>', '%', 'R', 
 			    ' ', '(', 'y', '|', 'n', '|', 'e', ')', 
 			    '?' | QUOTE, ' ', '\0' };
 Char STRunalias[]       = { 'u', 'n', 'a', 'l', 'i', 'a', 's', '\0' };
@@ -143,7 +141,7 @@ Char STRLparen[]	= { '(', '\0' };
 Char STRLbrace[]	= { '{', '\0' };
 Char STRfakecom[]	= { '{', ' ', '.', '.', '.', ' ', '}', '\0' };
 Char STRRbrace[]	= { '}', '\0' };
-Char STRPATH[] 		= { 'P', 'A', 'T', 'H', '\0' };
+Char STRKPATH[] 	= { 'P', 'A', 'T', 'H', '\0' };
 Char STRdefault[]	= { 'd', 'e', 'f', 'a', 'u', 'l', 't', '\0' };
 Char STRmn[]		= { '-', 'n', '\0' };
 Char STRminus[]		= { '-', '\0' };
@@ -185,17 +183,19 @@ Char STRunderpause[]	= { '_', 'p', 'a', 'u', 's', 'e', '\0' };
 Char STRbackqpwd[]	= { '`', 'p', 'w', 'd', '`', '\0' };
 Char STRhistchars[]	= { 'h', 'i', 's', 't', 'c', 'h', 'a', 'r', 's', '\0' };
 Char STRhistlit[]	= { 'h', 'i', 's', 't', 'l', 'i', 't', '\0' };
-Char STRUSER[]		= { 'U', 'S', 'E', 'R', '\0' };
+Char STRKUSER[]		= { 'U', 'S', 'E', 'R', '\0' };
 Char STRLOGNAME[]	= { 'L', 'O', 'G', 'N', 'A', 'M', 'E', '\0' };
 Char STRwordchars[]	= { 'w', 'o', 'r', 'd', 'c', 'h', 'a', 'r', 's', '\0' };
-Char STRTERM[]		= { 'T', 'E', 'R', 'M', '\0' };
-Char STRHOME[]		= { 'H', 'O', 'M', 'E', '\0' };
+Char STRKTERM[]		= { 'T', 'E', 'R', 'M', '\0' };
+Char STRKHOME[]		= { 'H', 'O', 'M', 'E', '\0' };
 Char STRbackslash_quote[] = { 'b', 'a', 'c', 'k', 's', 'l', 'a', 's', 'h', '_',
 			     'q', 'u', 'o', 't', 'e', '\0' };
 Char STRRparen[]	= { ')', '\0' };
 Char STRcolon[]		= { ':', '\0' };
 Char STRmail[]		= { 'm', 'a', 'i', 'l', '\0' };
+#ifndef HAVENOUTMP
 Char STRwatch[]		= { 'w', 'a', 't', 'c', 'h', '\0' };
+#endif /* HAVENOUTMP */
 
 Char STRsldottcshrc[]	= { '/', '.', 't', 'c', 's', 'h', 'r', 'c', '\0' };
 Char STRsldotcshrc[]	= { '/', '.', 'c', 's', 'h', 'r', 'c', '\0' };
@@ -247,17 +247,26 @@ Char STRwho[]		= { 'w', 'h', 'o', '\0' };
 Char STRrmstar[]        = { 'r', 'm', 's', 't', 'a', 'r', '\0' };
 Char STRrm[]            = { 'r', 'm', '\0' };
 Char STRshlvl[]		= { 's', 'h', 'l', 'v', 'l', '\0' };
-Char STRSHLVL[]		= { 'S', 'H', 'L', 'V', 'L', '\0' };
-
-Char STRLANG[]  = { 'L', 'A', 'N', 'G', '\0' };
-Char STRLC_CTYPE[] = { 'L', 'C', '_', 'C', 'T', 'Y', 'P', 'E' ,'\0' };
+Char STRKSHLVL[]	= { 'S', 'H', 'L', 'V', 'L', '\0' };
+Char STRLANG[]		= { 'L', 'A', 'N', 'G', '\0' };
+Char STRLC_CTYPE[]	= { 'L', 'C', '_', 'C', 'T', 'Y', 'P', 'E' ,'\0' };
+Char STRLC_NUMERIC[]	= { 'L', 'C', '_', 'N', 'U', 'M', 'E', 'R', 'I',
+			    'C', '\0' };
+Char STRLC_TIME[]	= { 'L', 'C', '_', 'T', 'I', 'M', 'E', '\0' };
+Char STRLC_COLLATE[]	= { 'L', 'C', '_', 'C', 'O', 'L', 'L', 'A', 'T',
+			    'E', '\0' };
+Char STRLC_MESSAGES[]	= { 'L', 'C', '_', 'M', 'E', 'S', 'S', 'A', 'G',
+			    'E', 'S', '\0' };
+Char STRLC_MONETARY[]	= { 'L', 'C', '_', 'M', 'O', 'N', 'E', 'T', 'A',
+			    'R', 'Y', '\0' };
 Char STRNOREBIND[] = { 'N', 'O', 'R', 'E', 'B', 'I', 'N', 'D', '\0' };
 
-#ifdef SIG_WINDOW
+#if defined(SIG_WINDOW) || defined (_VMS_POSIX)  
+/* atp - problem with declaration of str{lines,columns} in sh.func.c (1277) */
 Char STRLINES[] = { 'L', 'I', 'N', 'E', 'S', '\0'};
 Char STRCOLUMNS[] = { 'C', 'O', 'L', 'U', 'M', 'N', 'S', '\0'};
 Char STRTERMCAP[] = { 'T', 'E', 'R', 'M', 'C', 'A', 'P', '\0'};
-#endif /* SIG_WINDOW */
+#endif /* SIG_WINDOW  || _VMS_POSIX */
 
 #ifdef WARP
 Char STRwarp[] = { 'w', 'a', 'r', 'p', '\0' };
@@ -270,3 +279,8 @@ Char STRbsd43[] = { 'b', 's', 'd', '4', '.', '3', '\0' };
 Char STRsys53[] = { 's', 'y', 's', '5', '.', '3', '\0' };
 Char STRver[] = { 'v', 'e', 'r', '\0' };
 #endif /* apollo */
+
+Char STRup[] = { 'u', 'p', '\0' };
+Char STRdown[] = { 'd', 'o', 'w', 'n', '\0' };
+Char STRleft[] = { 'l', 'e', 'f', 't', '\0' };
+Char STRright[] = { 'r', 'i', 'g', 'h', 't', '\0' };

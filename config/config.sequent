@@ -27,6 +27,15 @@
 #endif /* _SEQUENT_ */
 
 /*
+ * POSIXSIGS	Use the POSIX signal facilities to emulate BSD signals.
+ */
+#ifdef _SEQUENT_
+# define POSIXSIGS
+#else /* _SEQUENT_ */
+# undef POSIXSIGS
+#endif /* _SEQUENT_ */
+
+/*
  * VFORK	This machine has a vfork().  
  *		It used to be that for job control to work, this define
  *		was mandatory. This is not the case any more.
@@ -66,6 +75,15 @@
 #endif /* _SEQUENT_ */
 
 /*
+ * BSDLIMIT	You have BSD-style resource limit stuff (getrlimit/setrlimit)
+ */
+#ifdef _SEQUENT_
+# undef BSDLIMIT
+#else /* _SEQUENT_ */
+# define BSDLIMIT
+#endif /* _SEQUENT_ */
+
+/*
  * BSDNICE	Your system uses setpriority() instead of nice, to
  *		change a processes scheduling priority
  */
@@ -95,7 +113,7 @@
  *		you are running. Or set it to 0 if you are not SYSV based
  */
 #ifdef _SEQUENT_
-# define SYSVREL	3
+# define SYSVREL	4
 #else /* _SEQUENT_ */
 # define SYSVREL	0
 #endif /* _SEQUENT_ */
@@ -156,7 +174,6 @@
 
 #ifdef _SEQUENT_
 #define NAMEI_BUG
-#define BACKPIPE
 #else /* _SEQUENT_ */
 #undef NLS
 #endif /* _SEQUENT_ */

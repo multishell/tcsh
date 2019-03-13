@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.types.h,v 3.19 1992/04/03 22:15:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.types.h,v 3.26 1992/10/14 20:19:19 christos Exp $ */
 /* sh.types.h: Do the necessary typedefs for each system.
  *             Up till now I avoided making this into a separate file
  *	       But I just wanted to eliminate the whole mess from sh.h
@@ -47,9 +47,9 @@
 
 
 /***
- *** Suns running sunos4.1
+ *** Suns running sunos3.x - sunos4.1.x
  ***/
-#ifdef sun
+#if (defined(sun) || defined(__sun__)) && SYSVREL == 0
 /* This used to be long, but lint dissagrees... */
 # ifndef _SIGMASK_T
 #  define _SIGMASK_T
@@ -89,7 +89,7 @@
 #   endif /* _GID_T */
 #  endif /* !MACH */
 # endif /* !SUNOS4 */
-#endif /* sun */
+#endif /* (sun || __sun__) && SYSVREL == 0 */
 
 
 /***
@@ -149,9 +149,9 @@ extern char *sbrk();
 #endif
 #endif /* __hpux */
 
-#ifdef _MINIX
+#if defined(_MINIX) || defined(__EMX__) || defined(COHERENT)
 typedef char * caddr_t;
-#endif /* _MINIX */
+#endif /* _MINIX || __EMX__ || COHERENT */
 
 /***
  *** hp9000s500 running hpux-5.2
@@ -163,9 +163,9 @@ typedef char * caddr_t;
 # endif /* _PTR_T */
 #endif /* hp9000s500 */
 
-
 /***
  *** Data General 88000, running dgux ???
+ *** ISN'T_THIS_REALLY_UGLY_OR_IS_IT_JUST_ME?
  ***/
 #ifdef DGUX
 /*
@@ -225,6 +225,8 @@ typedef char * caddr_t;
 #  define _SIZE_T
 # endif /* _SIZE_T */
 #endif /* BSD */
+
+
 /***
  *** BSD RENO advertises itself as POSIX, but
  *** it is missing speed_t 
@@ -278,7 +280,7 @@ typedef char * caddr_t;
 # ifndef _PID_T
 #  define _PID_T
 # endif /* _PID_T */
-#endif /* ultrix */
+#endif /* ultrix || __ultrix */
 
 
 /***
@@ -362,6 +364,18 @@ typedef char * caddr_t;
 #endif /* IRIS3D */
 
 /* 
+ * Motorola MPC running R32V2 (sysV88)
+ */
+#ifdef sysV88
+# ifndef _SIZE_T
+#  define _SIZE_T
+# endif /* _SIZE_T */
+# ifndef _PID_T
+#  define _PID_T
+# endif /* _PID_T */
+#endif /* sysV88 */
+ 
+/* 
  * Amdahl running UTS (Sys V3)
  */
 #ifdef uts
@@ -372,6 +386,27 @@ typedef char * caddr_t;
 #  define _PID_T
 # endif /* _PID_T */
 #endif /* uts */
+
+/* 
+ * Tektronix 4300 running UTek 4.0 (BSD 4.2)
+ */
+#ifdef UTek
+# ifndef _SIZE_T
+#  define _SIZE_T
+# endif /* _SIZE_T */
+#endif /* UTek */
+
+/* 
+ * Tektronix XD88/10 running UTekV (Sys V3)
+ */
+#ifdef UTekV
+# ifndef _SIZE_T
+#  define _SIZE_T
+# endif /* _SIZE_T */
+# ifndef _PID_T
+#  define _PID_T
+# endif /* _PID_T */
+#endif /* UTekV*/
 
 /*
  * UnixPC aka u3b1
@@ -394,13 +429,63 @@ typedef char * caddr_t;
 #endif /* OPUS */
 
 /*
+ * BBN Butterfly gp1000
+ */
+#ifdef butterfly
+# ifndef _PID_T
+#  define _PID_T
+# endif /* _PID_T */
+#endif /* butterfly */
+
+/*
  * Convex
  */
-#if defined(convex) || defined(__convex__)
+#ifdef convex
 # if defined(__SIZE_T) && !defined(_SIZE_T)
 #  define _SIZE_T
 # endif /* __SIZE_T && !_SIZE_T */
-#endif /* convex || __convex__ */
+#endif /* convex */
+
+/*
+ * Alliant FX-2800/FX-80
+ */
+#ifdef alliant
+# ifndef _PID_T
+#  define _PID_T
+# endif /* _PID_T */
+# ifdef mc68000
+   typedef int   pid_t; /* FX-80 */
+# else
+   typedef short pid_t;	/* FX-2800 */
+# endif 
+#endif /* alliant */
+
+/*
+ * DNIX
+ */
+#ifdef DNIX
+# ifndef _PID_T
+#  define _PID_T
+# endif /* _PID_T */
+#endif /* DNIX */
+
+/*
+ *  Apollo running Domain/OS SR10.3 or greater
+ */
+#ifdef apollo
+# ifndef _PID_T
+#  define _PID_T
+# endif /* _PID_T */
+#endif /* apollo */
+
+/*
+ *  Vax running VMS_POSIX
+ */
+#ifdef _VMS_POSIX
+# ifndef _SIZE_T
+#  define _SIZE_T
+# endif /* _SIZE_T */
+#endif /* _VMS_POSIX */
 
 /***
  *** Catch all for non POSIX and/or non ANSI systems.
@@ -421,10 +506,6 @@ typedef char * caddr_t;
 
 # ifndef _PID_T
 #  define _PID_T
-#if defined(i860) && defined(alliant)                 /* FX-2800 */
-# define _PID_T
-   typedef short pid_t;
-# endif       /* FX-2800 */
     typedef int pid_t;
 # endif /* _PID_T */
 

@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.time.c,v 3.7 1992/04/03 22:15:14 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.time.c,v 3.13 1992/11/13 04:19:10 christos Exp $ */
 /*
  * sh.time.c: Shell time keeping and printing.
  */
@@ -36,11 +36,11 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.time.c,v 3.7 1992/04/03 22:15:14 christos Exp $")
+RCSID("$Id: sh.time.c,v 3.13 1992/11/13 04:19:10 christos Exp $")
 
-#if defined(sun) && ! defined(MACH)
+#ifdef SUNOS4
 # include <machine/param.h>
-#endif /* sun */
+#endif /* SUNOS4 */
 
 /*
  * C Shell - routines handling process timing and niceing
@@ -82,7 +82,12 @@ settimes()
     (void) get_process_stats(&time0, PS_SELF, &ru0, &ruch);
     ruadd(&ru0, &ruch);
 # else	/* _SEQUENT_ */
+#  ifndef COHERENT
     time0 = times(&times0);
+#  else /* !COHERENT */
+    time0 = HZ * time(NULL);
+    times(&times0);
+#  endif /* !COHERENT */
     times0.tms_stime += times0.tms_cstime;
     times0.tms_utime += times0.tms_cutime;
     times0.tms_cstime = 0;
@@ -127,7 +132,12 @@ dotime(v, c)
 
     struct tms times_dol;
 
+#ifndef COHERENT
     timedol = times(&times_dol);
+#else
+    timedol = HZ * time(NULL);
+    times(&times_dol);
+#endif
     times_dol.tms_stime += times_dol.tms_cstime;
     times_dol.tms_utime += times_dol.tms_cutime;
     times_dol.tms_cstime = 0;
@@ -230,13 +240,15 @@ ruadd(ru, ru2)
 /* Convert clicks (kernel pages) to kbytes ... */
 /* If there is no PGSHIFT defined, assume it is 11 */
 /* Is this needed for compatability with some old flavor of 4.2 or 4.1? */
-#ifndef PGSHIFT
-# define pagetok(size)   ((size) << 1)
-#else
-# if PGSHIFT>10
-#  define pagetok(size)   ((size) << (PGSHIFT - LOG1024))
+#ifdef SUNOS4
+# ifndef PGSHIFT
+#  define pagetok(size)   ((size) << 1)
 # else
-#  define pagetok(size)   ((size) >> (LOG1024 - PGSHIFT))
+#  if PGSHIFT>10
+#   define pagetok(size)   ((size) << (PGSHIFT - LOG1024))
+#  else
+#   define pagetok(size)   ((size) >> (LOG1024 - PGSHIFT))
+#  endif
 # endif
 #endif
 
@@ -244,11 +256,11 @@ ruadd(ru, ru2)
  * if any other machines return wierd values in the ru_i* stuff, put
  * the adjusting macro here:
  */
-#ifdef sun
+#ifdef SUNOS4
 # define IADJUST(i)	(pagetok(i)/2)
-#else /* sun */
+#else /* SUNOS4 */
 # define IADJUST(i)	(i)
-#endif /* sun */
+#endif /* SUNOS4 */
 
 void
 prusage(r0, r1, e, b)
@@ -428,14 +440,11 @@ prusage(bs, es, e, b)
 		break;
 
 	    case 'M':		/* max. Resident Set Size */
-#ifdef sun
-# ifdef notdef
-		xprintf("%ld", r1->ru_maxrss * 1024L/(long) getpagesize());
-# endif
+#ifdef SUNOS4
 		xprintf("%ld", pagetok(r1->ru_maxrss));
 #else
 		xprintf("%ld", r1->ru_maxrss / 2L);
-#endif				/* sun */
+#endif /* SUNOS4 */
 		break;
 
 	    case 'F':		/* page faults */

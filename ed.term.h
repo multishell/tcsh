@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/ed.term.h,v 1.8 1992/03/27 01:59:46 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/ed.term.h,v 1.10 1992/10/14 20:19:19 christos Exp $ */
 /*
  * ed.term.h: Local terminal header
  */
@@ -87,6 +87,17 @@
 #  define IEXTEN 0
 # endif /* IEXTEN */
 
+/*
+ * emx garbage
+ */
+# ifndef IDEFAULT
+#  define IDEFAULT 0
+# endif /* IDEFAULT */
+
+# ifndef IDELETE
+#  define IDELETE 0
+# endif /* IDELETE */
+
 # ifndef ECHOCTL
 #  define ECHOCTL 0
 # endif /* ECHOCTL */
@@ -130,12 +141,12 @@
  * Work around convex weirdness where turning off IEXTEN makes us
  * lose all postprocessing!
  */
-#if defined(convex) || defined(__convex__)
+#ifdef convex
 # if defined(IEXTEN) && IEXTEN != 0
 #  undef IEXTEN
 #  define IEXTEN 0
 # endif /* IEXTEN != 0 */
-#endif /* convex || __convex__ */
+#endif /* convex */
 
 
 # else /* SGTTY */

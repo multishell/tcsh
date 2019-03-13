@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.init.c,v 3.15 1992/05/09 04:03:53 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.init.c,v 3.24 1992/11/20 08:56:38 christos Exp $ */
 /*
  * sh.init.c: Function and signal tables
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.init.c,v 3.15 1992/05/09 04:03:53 christos Exp $")
+RCSID("$Id: sh.init.c,v 3.24 1992/11/20 08:56:38 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -48,6 +48,7 @@ RCSID("$Id: sh.init.c,v 3.15 1992/05/09 04:03:53 christos Exp $")
 #define	INF	0x7fffffff
 
 struct	biltins bfunc[] = {
+    { ":",		dozip,		0,	INF, },
     { "@",		dolet,		0,	INF, },
     { "alias",		doalias,	0,	INF, },
     { "aliases",	doaliases,	0,	1, /* PWP */ },
@@ -57,6 +58,7 @@ struct	biltins bfunc[] = {
     { "bindkey",	dobindkey,	0,	8, },
     { "break",		dobreak,	0,	0, },
     { "breaksw",	doswbrk,	0,	0, },
+    { "builtins", dobuiltins,	0,	0, },
 #if defined(IIASA) || defined(KAI)
     { "bye",		goodbye,	0,	0, },
 #endif
@@ -101,9 +103,9 @@ struct	biltins bfunc[] = {
     { "limit",		dolimit,	0,	3, },
 #endif /* ! HAVENOLIMIT */
     { "linedit",	doecho,		0,	INF, },
-#ifndef KAI
+#if !defined(HAVENOUTMP) && !defined(KAI)
     { "log",		dolog,		0,	0, },
-#endif
+#endif /* !HAVENOUTMP && !KAI */
     { "login",		dologin,	0,	1, },
     { "logout",		dologout,	0,	0, },
     { "ls-F",		dolist,		0,	INF, },
@@ -111,7 +113,7 @@ struct	biltins bfunc[] = {
     { "migrate",	domigrate,	1,	INF, },
 #endif /* TCF */
 #ifdef NEWGRP
-    { "newgrp",		donewgrp,	1,	1, },
+    { "newgrp",		donewgrp,	1,	2, },
 #endif
     { "nice",		donice,		0,	INF, },
     { "nohup",		donohup,	0,	INF, },
@@ -167,9 +169,9 @@ struct	biltins bfunc[] = {
 #ifdef WARP
     { "warp",		dowarp,		0,	2, },
 #endif
-#ifdef KAI
+#if !defined(HAVENOUTMP) && defined(KAI)
     { "watchlog",	dolog,		0,	0, },
-#endif
+#endif /* !HAVENOUTMP && KAI */
     { "where",		dowhere,	1,	INF, },
     { "which",		dowhich,	1,	INF, },
     { "while",		dowhile,	1,	INF, },
@@ -177,23 +179,23 @@ struct	biltins bfunc[] = {
 int nbfunc = sizeof bfunc / sizeof *bfunc;
 
 struct srch srchn[] = {
-    { "@",		T_LET, },
-    { "break",		T_BREAK, },
-    { "breaksw",	T_BRKSW, },
-    { "case",		T_CASE, },
-    { "default", 	T_DEFAULT, },
-    { "else",		T_ELSE, },
-    { "end",		T_END, },
-    { "endif",		T_ENDIF, },
-    { "endsw",		T_ENDSW, },
-    { "exit",		T_EXIT, },
-    { "foreach", 	T_FOREACH, },
-    { "goto",		T_GOTO, },
-    { "if",		T_IF, },
-    { "label",		T_LABEL, },
-    { "set",		T_SET, },
-    { "switch",		T_SWITCH, },
-    { "while",		T_WHILE, },
+    { "@",		TC_LET, },
+    { "break",		TC_BREAK, },
+    { "breaksw",	TC_BRKSW, },
+    { "case",		TC_CASE, },
+    { "default", 	TC_DEFAULT, },
+    { "else",		TC_ELSE, },
+    { "end",		TC_END, },
+    { "endif",		TC_ENDIF, },
+    { "endsw",		TC_ENDSW, },
+    { "exit",		TC_EXIT, },
+    { "foreach", 	TC_FOREACH, },
+    { "goto",		TC_GOTO, },
+    { "if",		TC_IF, },
+    { "label",		TC_LABEL, },
+    { "set",		TC_SET, },
+    { "switch",		TC_SWITCH, },
+    { "while",		TC_WHILE, },
 };
 int nsrchn = sizeof srchn / sizeof *srchn;
 
@@ -221,18 +223,22 @@ struct	mesg mesg[] = {
 /*  3 */	"QUIT",		"Quit",
 /*  4 */	"ILL",		"Illegal instruction",
 /*  5 */	"TRAP",		"Trace/BPT trap",
-#if SYSVREL > 3
+#if SYSVREL > 3 || defined(__EMX__) || defined(_VMS_POSIX)
 /*  6 */	"ABRT",		"Abort",
-#else /* SYSVREL > 3 */
+#else /* SYSVREL < 3 */
 /*  6 */	"IOT",		"IOT trap",
-#endif /* SYSVREL > 3 */
+#endif /* SYSVREL > 3 || __EMX__ || _VMS_POSIX */
 #ifdef aiws
 /*  7 */	"DANGER", 	"System Crash Imminent",
-#else /* aiws */
+#else /* !aiws */
 # ifdef linux
 /*  7 */	0,		"Signal 7",
-# else /* linux */
+# else /* !linux */
+#  ifdef _CRAY
+/*  7 */	"ERR",		"Error exit",
+#  else /* !_CRAY */
 /*  7 */	"EMT",		"EMT trap",
+#  endif /* _CRAY */
 # endif /* linux */
 #endif /* aiws */
 /*  8 */	"FPE",		"Floating exception",
@@ -242,56 +248,107 @@ struct	mesg mesg[] = {
 /* 11 */	"SEGV",		"Segmentation fault",
 /* 12 */	"USR2",		"User signal 2",
 #else /* linux */
+# ifndef _CRAY
 /* 10 */	"BUS",		"Bus error",
 /* 11 */	"SEGV",		"Segmentation fault",
+# else /* _CRAY */
+/* 10 */	"PRE",		"Program range error",
+/* 11 */	"ORE",		"Operand range error",
+# endif /* !_CRAY */
 /* 12 */	"SYS",		"Bad system call",
 #endif /* linux */
 /* 13 */	"PIPE",		"Broken pipe",
 /* 14 */	"ALRM",		"Alarm clock",
 /* 15 */	"TERM",		"Terminated",
 
-
-#if (SYSVREL > 0) || defined(DGUX) || defined(IBMAIX) || defined(apollo) || defined(masscomp) || defined(ardent)
+#if (SYSVREL > 0) || defined(DGUX) || defined(IBMAIX) || defined(apollo) || defined(masscomp) || defined(ardent) || defined(linux)
 
 # ifdef _sigextra_
 #  undef  _sigextra_
 # endif /* _sigextra_ */
 
-#if !defined(IBMAIX) && !defined(cray) && !defined(linux)
+# if !defined(IBMAIX) && !defined(cray) && !defined(__EMX__) && !defined(linux)
 /* these are the real svid signals */
 /* 16 */	"USR1",		"User signal 1",
 /* 17 */	"USR2", 	"User signal 2",
-# ifdef apollo
+#  ifdef apollo
 /* 18 */	"CLD",		"Death of child",
 /* 19 */	"APOLLO",  	"Apollo-specific fault",
-# else
+#  else
 /* 18 */	"CHLD",		"Child exited",
+#  ifdef SOLARIS2
+/* 19 */	"LOST",  	"Resource Lost",
+#  else /* !SOLARIS2 */
 /* 19 */	"PWR",  	"Power failure",
-# endif /* apollo */
-#endif /* IBMAIX && cray && linux */
+#  endif /* SOLARIS2 */
+#  endif /* apollo */
+# endif /* !IBMAIX && !cray && !__EMX__ && !linux */
 
-#ifdef linux
-# define _sigextra_
+# ifdef __EMX__
+#  define _sigextra_
 /* 16 */	0,		"Signal 16",
-/* 17 */	"CHLD",		"Child exited",
-/* 18 */	"CONT",		"Continued",
-/* 19 */	"STOP",		MSG_STOP,
-/* 20 */	"TSTP",		MSG_TSTP,
-/* 21 */	"TTIN", 	MSG_TTIN,
-/* 22 */	"TTOU", 	MSG_TTOU,
-/* 23 */	0,   		"Signal 23",
-/* 24 */	0,		"Signal 24",
-/* 25 */	0, 		"Signal 25",
-/* 26 */	0,	 	"Signal 26",
-/* 27 */	0,		"Signal 27",
-/* 28 */	"WINCH", 	"Window changed",
-/* 29 */	0,		"Signal 29",
-/* 30 */	0,		"Signal 30",
-/* 31 */	0,		"Signal 31",
-/* 32 */	0,		"Signal 32",
-#endif /* linux */
+/* 17 */	0,		"Signal 17",
+/* 18 */	"CLD",		"Child exited",
+/* 19 */	0,		"Signal 19",
+/* 20 */	0,		"Signal 20",
+/* 21 */	"BREAK",	"Break (Ctrl-Break)",
+# endif /* __EMX__ */
 
-# ifdef cray
+
+# ifdef _CRAYCOM
+#  define _sigextra_
+/* 16 */	"IO",		"Input/output possible signal",
+/* 17 */	"URG",		"Urgent condition on I/O channel",
+/* 18 */	"CHLD",		"Child exited",
+/* 19 */	"PWR",		"Power failure",
+/* 20 */	"MT",		"Multitasking wake-up",
+/* 21 */	"MTKILL",	"Multitasking kill",
+/* 22 */	"BUFIO",	"Fortran asynchronous I/O completion",
+/* 23 */	"RECOVERY",	"Recovery",
+/* 24 */	"UME",		"Uncorrectable memory error",
+/* 25 */	0,		"Signal 25",
+/* 26 */	"CPULIM",	"CPU time limit exceeded",
+/* 27 */	"SHUTDN",	"System shutdown imminent",
+/* 28 */	"NOWAK", 	"micro-tasking group-no wakeup flag set",
+/* 29 */	"THERR",	"Thread error - (use cord -T for detailed info)",
+/* 30 */	0, 		"Signal 30",
+/* 31 */	0, 		"Signal 31",
+/* 32 */	0, 		"Signal 32",
+/* 33 */	0,		"Signal 33",
+/* 34 */	0,		"Signal 34",
+/* 35 */	0,		"Signal 35",
+/* 36 */	0,		"Signal 36",
+/* 37 */	0,		"Signal 37",
+/* 38 */	0,		"Signal 38",
+/* 39 */	0,		"Signal 39",
+/* 40 */	0,		"Signal 40",
+/* 41 */	0,		"Signal 41",
+/* 42 */	0,		"Signal 42",
+/* 43 */	0,		"Signal 43",
+/* 44 */	0,		"Signal 44",
+/* 45 */	0,		"Signal 45",
+/* 46 */	0,		"Signal 46",
+/* 47 */	0,		"Signal 47",
+/* 48 */	0,		"Signal 48",
+/* 49 */	0,		"Signal 49",
+/* 50 */	0,		"Signal 50",
+/* 51 */	0,		"Signal 51",
+/* 52 */	0,		"Signal 52",
+/* 53 */	0,		"Signal 53",
+/* 54 */	0,		"Signal 54",
+/* 55 */	0,		"Signal 55",
+/* 56 */	0,		"Signal 56",
+/* 57 */	0,		"Signal 57",
+/* 58 */	0,		"Signal 58",
+/* 59 */	0,		"Signal 59",
+/* 60 */	0,		"Signal 60",
+/* 61 */	0,		"Signal 61",
+/* 62 */	0,		"Signal 62",
+/* 63 */	0,	    	"Signal 63",
+/* 64 */	0,		"Signal 64",
+# endif /* _CRAYCOM */
+
+# if defined(cray) && !defined(_CRAYCOM)
 # define _sigextra_
 /* 16 */	"IO",		"Input/output possible signal",
 /* 17 */	"URG",		"Urgent condition on I/O channel",
@@ -347,10 +404,10 @@ struct	mesg mesg[] = {
 /*
 **  In the UNIXpc these signal *ARE* used!!
 */
-#ifdef UNIXPC
+# ifdef UNIXPC
 /* 20 */	"WIND",		"Window status changed",
 /* 21 */	"PHONE", 	"Phone status changed",
-#endif
+# endif /* UNIXPC */
 
 # ifdef OREO
 #  define _sigextra_
@@ -433,8 +490,15 @@ struct	mesg mesg[] = {
 /* 29 */	"PROF",		"Profiling timer expired",
 /* 30 */	"XCPU",		"CPU time limit exceeded",
 /* 31 */	"XFSZ", 	"File size limit exceeded",
+#ifdef SOLARIS2
+/* 32 */	"WAITING",	"Process's lwps are blocked",
+/* 33 */	"LWP",		"Special LWP signal",
+/* 34 */	0,		"Maximum number of signals",
+#else /* !SOLARIS2 */
 /* 32 */	0,		"Maximum number of signals",
+#endif /* SOLARIS2 */
 # endif /* SYSVREL > 3 */
+
 # if defined(ISC) && defined(POSIX) 
 #  define _sigextra_
 /* 20 */	"WINCH", 	"Window change",
@@ -603,8 +667,8 @@ struct	mesg mesg[] = {
 /* 64 */	0,		"Signal 64",
 # endif /* m88k || __m88k__ */
 
-#ifdef IBMAIX
-# define _sigextra_
+# ifdef IBMAIX
+#  define _sigextra_
 /* 16 */	"URG",		"Urgent condition on IO channel",
 /* 17 */	"STOP",		MSG_STOP,
 /* 18 */	"TSTP",		MSG_TSTP,
@@ -652,14 +716,13 @@ struct	mesg mesg[] = {
 /* 60 */	"GRANT", 	"HFT monitor mode granted",
 /* 61 */	"RETRACT", 	"HFT monitor mode should be relinguished",
 /* 62 */	"SOUND",	"HFT sound control has completed",
-#ifdef SIGSAK
+#  ifdef SIGSAK
 /* 63 */	"SAK",    	"Secure attention key",
-#else
+#  else
 /* 63 */	0,	    	"Signal 63",
-#endif
+#  endif
 /* 64 */	0,		"Signal 64",
-#endif /* IBMAIX */
-
+# endif /* IBMAIX */
 
 # ifdef _SEQUENT_
 #  define _sigextra_
@@ -678,9 +741,32 @@ struct	mesg mesg[] = {
 /* 32 */	0,		"Signal 32",
 # endif /* _SEQUENT_ */
 
+# ifdef linux
+#  define _sigextra_
+/* 16 */	0,		"Signal 16",
+/* 17 */	"CHLD",		"Child exited",
+/* 18 */	"CONT",		"Continued",
+/* 19 */	"STOP",		MSG_STOP,
+/* 20 */	"TSTP",		MSG_TSTP,
+/* 21 */	"TTIN", 	MSG_TTIN,
+/* 22 */	"TTOU", 	MSG_TTOU,
+/* 23 */	0,   		"Signal 23",
+/* 24 */	0,		"Signal 24",
+/* 25 */	0, 		"Signal 25",
+/* 26 */	0,	 	"Signal 26",
+/* 27 */	0,		"Signal 27",
+/* 28 */	"WINCH", 	"Window changed",
+/* 29 */	0,		"Signal 29",
+/* 30 */	0,		"Signal 30",
+/* 31 */	0,		"Signal 31",
+/* 32 */	0,		"Signal 32",
+# endif /* linux */
+
 # ifndef _sigextra_
+#  ifndef UNIXPC
 /* 20 */	0,		"Signal 20",
 /* 21 */	0,		"Signal 21",
+#  endif /* !UNIXPC */
 /* 22 */	0,		"Signal 22",
 /* 23 */	0,		"Signal 23",
 /* 24 */	0,		"Signal 24",
@@ -694,13 +780,26 @@ struct	mesg mesg[] = {
 /* 32 */	0,		"Signal 32",
 # endif /* _sigextra_ */
 
-
 #else /* bsd */
 
 # ifdef _sigextra_
 #  undef  _sigextra_
 # endif /* _sigextra_ */
 
+# ifdef _VMS_POSIX
+#  define _sigextra_
+/* 16 */	0,		"Signal 16",
+/* 17 */	0,		"Signal 17",
+/* 18 */	"USR1",		"User defined signal 1",
+/* 19 */	"USR2",		"User defined signal 2",
+/* 20 */	"CHLD",		"Child exited",
+/* 21 */	"CONT",		"Continued",
+/* 22 */	"STOP",		MSG_STOP,
+/* 23 */	"TSTP",		MSG_TSTP,
+/* 24 */	"TTIN", 	MSG_TTIN,
+/* 25 */	"TTOU", 	MSG_TTOU,
+/* 26 */        "DEBUG",        "Signaling SS$_DEBUG", 
+# else /* BSD */
 /* 16 */	"URG",		"Urgent condition on IO channel",
 /* 17 */	"STOP",		MSG_STOP,
 /* 18 */	"TSTP",		MSG_TSTP,
@@ -713,33 +812,40 @@ struct	mesg mesg[] = {
 /* 25 */	"XFSZ", 	"Filesize limit exceeded",
 /* 26 */	"VTALRM", 	"Virtual time alarm",
 /* 27 */	"PROF",		"Profiling time alarm",
+# endif /* _VMS_POSIX */
 
-# if defined(RENO) || defined(BSD4_4)
-# define _sigextra_
+# ifndef _sigextra_
+#  if defined(RENO) || defined(BSD4_4)
+#   define _sigextra_
 /* 28 */	"WINCH",	"Window size changed",
 /* 29 */	"INFO",		"Information request",
 /* 30 */	"USR1",		"User defined signal 1",
 /* 31 */	"USR2",		"User defined signal 2",
 /* 32 */	0,		"Signal 32",
-# endif /* RENO || BSD4_4 */
+#  endif /* RENO || BSD4_4 */
+# endif /* !_sigextra_ */
 
-# if (defined(sun) || defined(ultrix) || defined(hp9000) || defined(convex) || defined(__convex__)) && !defined(_sigextra_)
-#  define _sigextra_
+# ifndef _sigextra_
+#  if defined(SUNOS4) || defined(ultrix) || defined(hp9000) || defined(convex)
+#   define _sigextra_
 /* 28 */	"WINCH", 	"Window changed",
 /* 29 */	"LOST",		"Resource lost",
 /* 30 */	"USR1",		"User signal 1",
 /* 31 */	"USR2",		"User signal 2",
 /* 32 */	0,		"Signal 32",
-# endif /* sun */
+#  endif /* SUNOS4 || ultrix || hp9000 || convex */
+# endif /* !_sigextra_ */
 
-# ifdef pyr
-#  define _sigextra_
+# ifndef _sigextra_
+#  ifdef pyr
+#   define _sigextra_
 /* 28 */	"USR1",		"User signal 1",
 /* 29 */	"USR2",		"User signal 2",
 /* 30 */	"PWR",		"Power failure",
 /* 31 */	0,		"Signal 31",
 /* 32 */	0,		"Signal 32",
-# endif /* pyr */
+#  endif /* pyr */
+# endif /* !_sigextra_ */
 
 # ifndef _sigextra_
 /* 28 */	"WINCH",	"Window size changed",

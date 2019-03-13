@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.func.c,v 3.33 1992/05/15 23:49:22 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.func.c,v 3.42 1992/11/13 04:19:10 christos Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.func.c,v 3.33 1992/05/15 23:49:22 christos Exp $")
+RCSID("$Id: sh.func.c,v 3.42 1992/11/13 04:19:10 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -76,7 +76,7 @@ isbfunc(t)
     static struct biltins foregnd = {"%job", dofg1, 0, 0};
     static struct biltins backgnd = {"%job &", dobg1, 0, 0};
 
-    if (lastchr(cp) == ':') {
+    if (*cp != ':' && lastchr(cp) == ':') {
 	label.bname = short2str(cp);
 	return (&label);
     }
@@ -154,13 +154,17 @@ doonintr(v, c)
     xfree((ptr_t) cp);
     if (vv == 0) {
 #ifdef BSDSIGS
-	if (setintr)
+	if (setintr) {
 	    (void) sigblock(sigmask(SIGINT));
-	else
+	    (void) signal(SIGINT, pintr);
+	}
+	else 
 	    (void) signal(SIGINT, SIG_DFL);
 #else /* !BSDSIGS */
-	if (setintr)
+	if (setintr) {
 	    (void) sighold(SIGINT);
+	    (void) sigset(SIGINT, pintr);
+	}
 	else
 	    (void) sigset(SIGINT, SIG_DFL);
 #endif /* BSDSIGS */
@@ -270,7 +274,7 @@ dologin(v, c)
     struct command *c;
 {
     islogin();
-    rechist();
+    rechist(NULL);
     (void) signal(SIGTERM, parterm);
     (void) execl(_PATH_LOGIN, "login", short2str(v[1]), NULL);
     untty();
@@ -285,11 +289,18 @@ donewgrp(v, c)
     Char  **v;
     struct command *c;
 {
+    char **p;
     if (chkstop == 0 && setintr)
 	panystop(0);
     (void) signal(SIGTERM, parterm);
-    (void) execl(_PATH_BIN_NEWGRP, "newgrp", short2str(v[1]), NULL);
-    (void) execl(_PATH_USRBIN_NEWGRP, "newgrp", short2str(v[1]), NULL);
+    p = short2blk(&v[1]);
+    /*
+     * From Beto Appleton (beto@aixwiz.austin.ibm.com)
+     * Newgrp can take 2 arguments...
+     */
+    (void) execv(_PATH_BIN_NEWGRP, "newgrp", p, NULL);
+    (void) execv(_PATH_USRBIN_NEWGRP, "newgrp", p, NULL);
+    blkfree((Char **) p);
     untty();
     xexit(1);
 }
@@ -327,7 +338,7 @@ doif(v, kp)
 	 * following code.
 	 */
 	if (!i)
-	    search(T_IF, 0, NULL);
+	    search(TC_IF, 0, NULL);
 	return;
     }
     /*
@@ -365,7 +376,7 @@ doelse (v, c)
     Char **v;
     struct command *c;
 {
-    search(T_ELSE, 0, NULL);
+    search(TC_ELSE, 0, NULL);
 }
 
 /*ARGSUSED*/
@@ -389,16 +400,16 @@ gotolab(lab)
      * While we still can, locate any unknown ends of existing loops. This
      * obscure code is the WORST result of the fact that we don't really parse.
      */
-    zlast = T_GOTO;
+    zlast = TC_GOTO;
     for (wp = whyles; wp; wp = wp->w_next)
 	if (wp->w_end.type == F_SEEK && wp->w_end.f_seek == 0) {
-	    search(T_BREAK, 0, NULL);
+	    search(TC_BREAK, 0, NULL);
 	    btell(&wp->w_end);
 	}
 	else {
 	    bseek(&wp->w_end);
 	}
-    search(T_GOTO, 0, lab);
+    search(TC_GOTO, 0, lab);
     /*
      * Eliminate loops which were exited.
      */
@@ -421,7 +432,7 @@ doswitch(v, c)
 	v--;
     if (*v)
 	stderror(ERR_SYNTAX);
-    search(T_SWITCH, 0, lp = globone(cp, G_ERROR));
+    search(TC_SWITCH, 0, lp = globone(cp, G_ERROR));
     xfree((ptr_t) lp);
 }
 
@@ -497,7 +508,7 @@ doforeach(v, c)
     /*
      * Pre-read the loop so as to be more comprehensible to a terminal user.
      */
-    zlast = T_FOREACH;
+    zlast = TC_FOREACH;
     if (intty)
 	preread();
     doagain();
@@ -533,7 +544,7 @@ dowhile(v, c)
 	nwp->w_end.f_seek = 0;
 	nwp->w_next = whyles;
 	whyles = nwp;
-	zlast = T_WHILE;
+	zlast = TC_WHILE;
 	if (intty) {
 	    /*
 	     * The tty preread
@@ -558,7 +569,7 @@ preread()
 #else /* !BSDSIGS */
 	(void) sigrelse (SIGINT);
 #endif /* BSDSIGS */
-    search(T_BREAK, 0, NULL);		/* read the expression in */
+    search(TC_BREAK, 0, NULL);		/* read the expression in */
     if (setintr)
 #ifdef BSDSIGS
 	(void) sigblock(sigmask(SIGINT));
@@ -657,7 +668,7 @@ doswbrk(v, c)
     Char **v;
     struct command *c;
 {
-    search(T_BRKSW, 0, NULL);
+    search(TC_BRKSW, 0, NULL);
 }
 
 int
@@ -712,7 +723,7 @@ search(type, level, goal)
 
     Stype = type;
     Sgoal = goal;
-    if (type == T_GOTO) {
+    if (type == TC_GOTO) {
 	struct Ain a;
 	a.type = F_SEEK;
 	a.f_seek = 0;
@@ -720,69 +731,69 @@ search(type, level, goal)
     }
     do {
 	if (intty && fseekp == feobp && aret == F_SEEK)
-	    printprompt(1, isrchx(type == T_BREAK ? zlast : type));
+	    printprompt(1, isrchx(type == TC_BREAK ? zlast : type));
 	/* xprintf("? "), flush(); */
 	aword[0] = 0;
 	(void) getword(aword);
 	switch (srchx(aword)) {
 
-	case T_ELSE:
-	    if (level == 0 && type == T_IF)
+	case TC_ELSE:
+	    if (level == 0 && type == TC_IF)
 		return;
 	    break;
 
-	case T_IF:
+	case TC_IF:
 	    while (getword(aword))
 		continue;
-	    if ((type == T_IF || type == T_ELSE) &&
+	    if ((type == TC_IF || type == TC_ELSE) &&
 		eq(aword, STRthen))
 		level++;
 	    break;
 
-	case T_ENDIF:
-	    if (type == T_IF || type == T_ELSE)
+	case TC_ENDIF:
+	    if (type == TC_IF || type == TC_ELSE)
 		level--;
 	    break;
 
-	case T_FOREACH:
-	case T_WHILE:
-	    if (type == T_BREAK)
+	case TC_FOREACH:
+	case TC_WHILE:
+	    if (type == TC_BREAK)
 		level++;
 	    break;
 
-	case T_END:
-	    if (type == T_BREAK)
+	case TC_END:
+	    if (type == TC_BREAK)
 		level--;
 	    break;
 
-	case T_SWITCH:
-	    if (type == T_SWITCH || type == T_BRKSW)
+	case TC_SWITCH:
+	    if (type == TC_SWITCH || type == TC_BRKSW)
 		level++;
 	    break;
 
-	case T_ENDSW:
-	    if (type == T_SWITCH || type == T_BRKSW)
+	case TC_ENDSW:
+	    if (type == TC_SWITCH || type == TC_BRKSW)
 		level--;
 	    break;
 
-	case T_LABEL:
-	    if (type == T_GOTO && getword(aword) && eq(aword, goal))
+	case TC_LABEL:
+	    if (type == TC_GOTO && getword(aword) && eq(aword, goal))
 		level = -1;
 	    break;
 
 	default:
-	    if (type != T_GOTO && (type != T_SWITCH || level != 0))
+	    if (type != TC_GOTO && (type != TC_SWITCH || level != 0))
 		break;
 	    if (lastchr(aword) != ':')
 		break;
 	    aword[Strlen(aword) - 1] = 0;
-	    if ((type == T_GOTO && eq(aword, goal)) ||
-		(type == T_SWITCH && eq(aword, STRdefault)))
+	    if ((type == TC_GOTO && eq(aword, goal)) ||
+		(type == TC_SWITCH && eq(aword, STRdefault)))
 		level = -1;
 	    break;
 
-	case T_CASE:
-	    if (type != T_SWITCH || level != 0)
+	case TC_CASE:
+	    if (type != TC_SWITCH || level != 0)
 		break;
 	    (void) getword(aword);
 	    if (lastchr(aword) == ':')
@@ -793,8 +804,8 @@ search(type, level, goal)
 	    xfree((ptr_t) cp);
 	    break;
 
-	case T_DEFAULT:
-	    if (type == T_SWITCH && level == 0)
+	case TC_DEFAULT:
+	    if (type == TC_SWITCH && level == 0)
 		level = -1;
 	    break;
 	}
@@ -863,24 +874,24 @@ getword(wp)
 past:
     switch (Stype) {
 
-    case T_IF:
+    case TC_IF:
 	stderror(ERR_NAME | ERR_NOTFOUND, "then/endif");
 	break;
 
-    case T_ELSE:
+    case TC_ELSE:
 	stderror(ERR_NAME | ERR_NOTFOUND, "endif");
 	break;
 
-    case T_BRKSW:
-    case T_SWITCH:
+    case TC_BRKSW:
+    case TC_SWITCH:
 	stderror(ERR_NAME | ERR_NOTFOUND, "endsw");
 	break;
 
-    case T_BREAK:
+    case TC_BREAK:
 	stderror(ERR_NAME | ERR_NOTFOUND, "end");
 	break;
 
-    case T_GOTO:
+    case TC_GOTO:
 	setname(short2str(Sgoal));
 	stderror(ERR_NAME | ERR_NOTFOUND, "label");
 	break;
@@ -923,7 +934,7 @@ static void
 toend()
 {
     if (whyles->w_end.type == F_SEEK && whyles->w_end.f_seek == 0) {
-	search(T_BREAK, 0, NULL);
+	search(TC_BREAK, 0, NULL);
 	btell(&whyles->w_end);
 	whyles->w_end.f_seek--;
     }
@@ -1130,6 +1141,22 @@ done:
 	blkfree(gargv), gargv = 0;
 }
 
+/* check whether an environment variable should invoke 'set_locale()' */
+static bool islocale_var(var)
+register Char *var;
+{
+    static Char *locale_vars[] = {
+	STRLANG,	STRLC_CTYPE,	STRLC_NUMERIC,	STRLC_TIME,
+	STRLC_COLLATE,	STRLC_MESSAGES,	STRLC_MONETARY, 0
+    };
+    register Char **v;
+
+    for (v = locale_vars; *v; ++v)
+	if (eq(var, *v))
+	    return 1;
+    return 0;
+}
+
 /* from "Karl Berry." <karl%mote.umb.edu@relay.cs.net> -- for NeXT things
    (and anything else with a modern compiler) */
 
@@ -1152,13 +1179,14 @@ dosetenv(v, c)
 	    (void) sigrelse (SIGINT);
 #endif /* BSDSIGS */
 	for (ep = STR_environ; *ep; ep++)
-	    xprintf("%s\n", short2str(*ep));
+	    xprintf("%S\n", *ep);
 	return;
     }
     if ((lp = *v++) == 0)
 	lp = STRNULL;
-    Setenv(vp, lp = globone(lp, G_APPEND));
-    if (eq(vp, STRPATH)) {
+
+    tsetenv(vp, lp = globone(lp, G_APPEND));
+    if (eq(vp, STRKPATH)) {
 	importpath(lp);
 	dohash(NULL, NULL);
     }
@@ -1166,14 +1194,24 @@ dosetenv(v, c)
     else if (eq(vp, STRSYSTYPE))
 	dohash(NULL, NULL);
 #endif /* apollo */
-    else if (eq(vp, STRLANG) || eq(vp, STRLC_CTYPE)) {
+    else if (islocale_var(vp)) {
 #ifdef NLS
 	int     k;
 
+# ifdef SETLOCALEBUG
+	dont_free = 1;
+# endif /* SETLOCALEBUG */
 	(void) setlocale(LC_ALL, "");
 # ifdef LC_COLLATE
 	(void) setlocale(LC_COLLATE, "");
 # endif
+# ifdef SETLOCALEBUG
+	dont_free = 0;
+# endif /* SETLOCALEBUG */
+# ifdef STRCOLLBUG
+	fix_strcoll_bug();
+# endif /* STRCOLLBUG */
+	tw_cmd_free();	/* since the collation sequence has changed */
 	for (k = 0200; k <= 0377 && !Isprint(k); k++)
 	    continue;
 	AsciiOnly = k > 0377;
@@ -1188,13 +1226,13 @@ dosetenv(v, c)
     else if (eq(vp, STRNOREBIND)) {
 	NoNLSRebind = 1;
     }
-    else if (eq(vp, STRTERM)) {
+    else if (eq(vp, STRKTERM)) {
 	set(STRterm, Strsave(lp));
 	GotTermCaps = 0;
 	ed_Init();
     }
-    else if (eq(vp, STRHOME)) {
-	Char *cp = Strsave(value(vp));	/* get the old value back */
+    else if (eq(vp, STRKHOME)) {
+ 	Char *cp = Strsave(value(vp));	/* get the old value back */
 
 	/*
 	 * convert to canonical pathname (possibly resolving symlinks)
@@ -1207,15 +1245,25 @@ dosetenv(v, c)
 	dtilde();
 	xfree((ptr_t) cp);
     }
-    else if (eq(vp, STRSHLVL)) 
+    else if (eq(vp, STRKSHLVL)) 
 	set(STRshlvl, Strsave(lp));
-    else if (eq(vp, STRUSER))
+    else if (eq(vp, STRKUSER))
 	set(STRuser, Strsave(lp));
 #ifdef SIG_WINDOW
+    /*
+     * Load/Update $LINES $COLUMNS
+     */
     else if ((eq(lp, STRNULL) &&
 	      (eq(vp, STRLINES) || eq(vp, STRCOLUMNS))) ||
 	     eq(vp, STRTERMCAP)) {
 	check_window_size(1);
+    }
+    /*
+     * Change the size to the one directed by $LINES and $COLUMNS
+     */
+    else if (eq(vp, STRLINES) || eq(vp, STRCOLUMNS)) {
+	GotTermCaps = 0;
+	ed_Init();
     }
 #endif /* SIG_WINDOW */
     xfree((ptr_t) lp);
@@ -1254,20 +1302,39 @@ dounsetenv(v, c)
 		if (!Gmatch(name, *v))
 		    continue;
 		maxi = 1;
+
+		/* Unset the name. This wasn't being done until
+		 * later but most of the stuff following won't
+		 * work (particularly the setlocale() and getenv()
+		 * stuff) as intended until the name is actually
+		 * removed. (sg)
+		 */
+		Unsetenv(name);
+
 		if (eq(name, STRNOREBIND))
 		    NoNLSRebind = 0;
 #ifdef apollo
 		else if (eq(name, STRSYSTYPE))
 		    dohash(NULL, NULL);
 #endif /* apollo */
-		else if (eq(name, STRLANG) || eq(name, STRLC_CTYPE)) {
+		else if (islocale_var(name)) {
 #ifdef NLS
 		    int     k;
 
+# ifdef SETLOCALEBUG
+		    dont_free = 1;
+# endif /* SETLOCALEBUG */
 		    (void) setlocale(LC_ALL, "");
 # ifdef LC_COLLATE
 		    (void) setlocale(LC_COLLATE, "");
 # endif
+# ifdef SETLOCALEBUG
+		    dont_free = 0;
+# endif /* SETLOCALEBUG */
+# ifdef STRCOLLBUG
+		    fix_strcoll_bug();
+# endif /* STRCOLLBUG */
+		    tw_cmd_free();/* since the collation sequence has changed */
 		    for (k = 0200; k <= 0377 && !Isprint(k); k++)
 			continue;
 		    AsciiOnly = k > 0377;
@@ -1282,16 +1349,15 @@ dounsetenv(v, c)
 
 		}
 		/*
-		 * Delete name, and start again cause the environment changes
+		 * start again cause the environment changes
 		 */
-		Unsetenv(name);
 		break;
 	    }
     xfree((ptr_t) name); name = NULL;
 }
 
 void
-Setenv(name, val)
+tsetenv(name, val)
     Char   *name, *val;
 {
 #ifdef SETENV_IN_LIB
@@ -1388,7 +1454,7 @@ doumask(v, c)
 }
 
 #ifndef HAVENOLIMIT
-# ifndef BSDTIMES
+# ifndef BSDLIMIT
    typedef long RLIM_TYPE;
 #  ifndef RLIM_INFINITY
 #   ifndef _MINIX
@@ -1404,10 +1470,30 @@ doumask(v, c)
 #  else /* aiws */
 #   define toset(a) ((a) + 1)
 #  endif /* aiws */
-# else /* BSDTIMES */
-   typedef int RLIM_TYPE;
-# endif /* BSDTIMES */
+# else /* BSDLIMIT */
+#  if defined(BSD4_4) && !defined(__386BSD__)
+    typedef quad_t RLIM_TYPE;
+#  else
+    typedef int RLIM_TYPE;
+#  endif /* BSD4_4 && !__386BSD__ */
+# endif /* BSDLIMIT */
 
+# if defined(hpux) && defined(BSDLIMIT)
+/* Yes hpux8.0 has limits but <sys/resource.h> does not make them public */
+/* Yes, we could have defined _KERNEL, and -I/etc/conf/h, but is that better? */
+#  ifndef RLIMIT_CPU
+#   define RLIMIT_CPU		0
+#   define RLIMIT_FSIZE		1
+#   define RLIMIT_DATA		2
+#   define RLIMIT_STACK		3
+#   define RLIMIT_CORE		4
+#   define RLIMIT_RSS		5
+#   define RLIMIT_NOFILE	6
+#  endif /* RLIMIT_CPU */
+#  ifndef RLIM_INFINITY
+#   define RLIM_INFINITY	0x7fffffff
+#  endif /* RLIM_INFINITY */
+# endif /* hpux && BSDLIMIT */
 
 struct limits limits[] = 
 {
@@ -1466,13 +1552,13 @@ struct limits limits[] =
     -1, 		NULL, 		0, 	NULL
 };
 
-static struct limits *findlim();
-static RLIM_TYPE getval();
-static void limtail();
-static void plim();
-static int setlim();
+static struct limits *findlim	__P((Char *));
+static RLIM_TYPE getval		__P((struct limits *, Char **));
+static void limtail		__P((Char *, char*));
+static void plim		__P((struct limits *, int));
+static int setlim		__P((struct limits *, int, RLIM_TYPE));
 
-#if defined(convex) || defined(__convex__)
+#ifdef convex
 static  RLIM_TYPE
 restrict_limit(value)
     double  value;
@@ -1481,12 +1567,14 @@ restrict_limit(value)
      * is f too large to cope with? return the maximum or minimum int
      */
     if (value > (double) INT_MAX)
-	return (INT_MAX);
+	return (RLIM_TYPE) INT_MAX;
     else if (value < (double) INT_MIN)
-	return (INT_MIN);
+	return (RLIM_TYPE) INT_MIN;
     else
-	return ((int) value);
+	return (RLIM_TYPE) value;
 }
+#else /* !convex */
+# define restrict_limit(x)	((RLIM_TYPE) (x))
 #endif /* convex */
 
 
@@ -1518,7 +1606,7 @@ dolimit(v, c)
 {
     register struct limits *lp;
     register RLIM_TYPE limit;
-    char    hard = 0;
+    int    hard = 0;
 
     v++;
     if (*v && eq(*v, STRmh)) {
@@ -1545,20 +1633,15 @@ getval(lp, v)
     register struct limits *lp;
     Char  **v;
 {
-# if defined(convex) || defined(__convex__)
-    RLIM_TYPE restrict_limit __P((double));
-# endif /* convex */
-
     register float f;
 #ifndef atof	/* This can be a macro on linux */
     extern double  atof __P((const char *));
 #endif /* atof */
-    static int lmin = 0x80000000, lmax = 0x7fffffff;
     Char   *cp = *v++;
 
     f = atof(short2str(cp));
 
-# if defined(convex) || defined(__convex__)
+# ifdef convex
     /*
      * is f too large to cope with. limit f to minint, maxint  - X-6768 by
      * strike
@@ -1572,11 +1655,7 @@ getval(lp, v)
 	cp++;
     if (*cp == 0) {
 	if (*v == 0)
-# if defined(convex) || defined(__convex__)
-	    return ((RLIM_TYPE) restrict_limit((f + 0.5) * lp->limdiv));
-# else /* convex */
-	    return ((RLIM_TYPE) ((f + 0.5) * lp->limdiv));
-# endif /* convex */
+	    return restrict_limit((f + 0.5) * lp->limdiv);
 	cp = *v;
     }
     switch (*cp) {
@@ -1584,12 +1663,7 @@ getval(lp, v)
     case ':':
 	if (lp->limconst != RLIMIT_CPU)
 	    goto badscal;
-#  if defined(convex) || defined(__convex__)
-	return ((RLIM_TYPE)
-		restrict_limit((f * 60.0 + atof(short2str(cp + 1)))));
-#  else /* convex */
-	return ((RLIM_TYPE) (f * 60.0 + atof(short2str(cp + 1))));
-#  endif /* convex */
+	return restrict_limit((f * 60.0 + atof(short2str(cp + 1))));
     case 'h':
 	if (lp->limconst != RLIMIT_CPU)
 	    goto badscal;
@@ -1646,14 +1720,12 @@ badscal:
 # endif /* RLIMIT_CPU */
 	stderror(ERR_NAME | ERR_SCALEF);
     }
-# if defined(convex) || defined(__convex__)
-    return ((RLIM_TYPE) restrict_limit((f + 0.5)));
+# ifdef convex
+    return restrict_limit((f + 0.5));
 # else
     f += 0.5;
-    if (f > (float) lmax)
-	return lmax;
-    else if (f < (float) lmin)
-	return lmin;
+    if (f > (float) RLIM_INFINITY)
+	return RLIM_INFINITY;
     else
 	return ((RLIM_TYPE) f);
 # endif /* convex */
@@ -1675,44 +1747,49 @@ limtail(cp, str)
 static void
 plim(lp, hard)
     register struct limits *lp;
-    Char    hard;
+    int hard;
 {
-# ifdef BSDTIMES
+# ifdef BSDLIMIT
     struct rlimit rlim;
-# endif /* BSDTIMES */
+# endif /* BSDLIMIT */
     RLIM_TYPE limit;
+    int     div = lp->limdiv;
 
     xprintf("%s \t", lp->limname);
 
-# ifndef BSDTIMES
+# ifndef BSDLIMIT
     limit = ulimit(lp->limconst, 0);
 #  ifdef aiws
     if (lp->limconst == RLIMIT_DATA)
 	limit -= 0x20000000;
 #  endif /* aiws */
-# else /* BSDTIMES */
+# else /* BSDLIMIT */
     (void) getrlimit(lp->limconst, &rlim);
     limit = hard ? rlim.rlim_max : rlim.rlim_cur;
-# endif /* BSDTIMES */
+# endif /* BSDLIMIT */
+
+# if !defined(BSDLIMIT) || defined(hpux)
+    /*
+     * Christos: filesize comes in 512 blocks. we divide by 2 to get 1024
+     * blocks. Note we cannot pre-multiply cause we might overflow (A/UX)
+     */
+    if (lp->limconst == RLIMIT_FSIZE) {
+	if (limit >= (RLIM_INFINITY / 512))
+	    limit = RLIM_INFINITY;
+	else
+	    div = (div == 1024 ? 2 : 1);
+    }
+# endif /* !BSDLIMIT || hpux */
 
     if (limit == RLIM_INFINITY)
 	xprintf("unlimited");
+    else
 # ifdef RLIMIT_CPU
-    else if (lp->limconst == RLIMIT_CPU)
+    if (lp->limconst == RLIMIT_CPU)
 	psecs((long) limit);
+    else
 # endif /* RLIMIT_CPU */
-    else
-# ifndef BSDTIMES
-    if (lp->limconst == RLIMIT_FSIZE)
-	/*
-	 * Christos: filesize comes in 512 blocks. we divide by 2 to get 1024
-	 * blocks. Note we cannot pre-multiply cause we might overflow (A/UX)
-	 */
-	xprintf("%ld %s", (long) (limit / (lp->limdiv == 1024 ? 2 : 1)), 
-	        lp->limscale);
-    else
-# endif /* BSDTIMES */
-	xprintf("%ld %s", (long) (limit / lp->limdiv), lp->limscale);
+	xprintf("%ld %s", (long) (limit / div), lp->limscale);
     xputchar('\n');
 }
 
@@ -1724,7 +1801,7 @@ dounlimit(v, c)
 {
     register struct limits *lp;
     int     lerr = 0;
-    Char    hard = 0;
+    int    hard = 0;
 
     v++;
     if (*v && eq(*v, STRmh)) {
@@ -1749,23 +1826,28 @@ dounlimit(v, c)
 static int
 setlim(lp, hard, limit)
     register struct limits *lp;
-    Char    hard;
+    int    hard;
     RLIM_TYPE limit;
 {
-# ifdef BSDTIMES
+# ifdef BSDLIMIT
     struct rlimit rlim;
 
     (void) getrlimit(lp->limconst, &rlim);
 
+#  ifdef hpux
+    /* Even though hpux has setrlimit(), it expects fsize in 512 byte blocks */
+    if (limit != RLIM_INFINITY && lp->limconst == RLIMIT_FSIZE)
+	limit /= 512;
+#  endif /* hpux */
     if (hard)
 	rlim.rlim_max = limit;
-    else if (limit == RLIM_INFINITY && geteuid() != 0)
+    else if (limit == RLIM_INFINITY && euid != 0)
 	rlim.rlim_cur = rlim.rlim_max;
     else
 	rlim.rlim_cur = limit;
 
     if (setrlimit(lp->limconst, &rlim) < 0) {
-# else /* BSDTIMES */
+# else /* BSDLIMIT */
     if (limit != RLIM_INFINITY && lp->limconst == RLIMIT_FSIZE)
 	limit /= 512;
 # ifdef aiws
@@ -1773,7 +1855,7 @@ setlim(lp, hard, limit)
 	limit += 0x20000000;
 # endif /* aiws */
     if (ulimit(toset(lp->limconst), limit) < 0) {
-# endif /* BSDTIMES */
+# endif /* BSDLIMIT */
 	xprintf("%s: %s: Can't %s%s limit\n", bname, lp->limname,
 		limit == RLIM_INFINITY ? "remove" : "set",
 		hard ? " hard" : "");
@@ -1850,10 +1932,10 @@ doeval(v, c)
     Char  **oevalvec;
     Char   *oevalp;
     int     odidfds;
-#ifndef FIOCLEX
+#ifndef CLOSE_ON_EXEC
     int     odidcch;
-#endif /* FIOCLEX */
-    jmp_buf osetexit;
+#endif /* CLOSE_ON_EXEC */
+    jmp_buf_t osetexit;
     int     my_reenter;
     Char  **savegv;
     int     saveIN, saveOUT, saveDIAG;
@@ -1862,9 +1944,9 @@ doeval(v, c)
     oevalvec = evalvec;
     oevalp = evalp;
     odidfds = didfds;
-#ifndef FIOCLEX
+#ifndef CLOSE_ON_EXEC
     odidcch = didcch;
-#endif /* FIOCLEX */
+#endif /* CLOSE_ON_EXEC */
     oSHIN = SHIN;
     oSHOUT = SHOUT;
     oSHDIAG = SHDIAG;
@@ -1908,9 +1990,9 @@ doeval(v, c)
 	SHIN = dcopy(0, -1);
 	SHOUT = dcopy(1, -1);
 	SHDIAG = dcopy(2, -1);
-#ifndef FIOCLEX
+#ifndef CLOSE_ON_EXEC
 	didcch = 0;
-#endif /* FIOCLEX */
+#endif /* CLOSE_ON_EXEC */
 	didfds = 0;
 	process(0);
     }
@@ -1918,9 +2000,9 @@ doeval(v, c)
     evalvec = oevalvec;
     evalp = oevalp;
     doneinp = 0;
-#ifndef FIOCLEX
+#ifndef CLOSE_ON_EXEC
     didcch = odidcch;
-#endif /* FIOCLEX */
+#endif /* CLOSE_ON_EXEC */
     didfds = odidfds;
     (void) close(SHIN);
     (void) close(SHOUT);
@@ -1936,4 +2018,56 @@ doeval(v, c)
     resexit(osetexit);
     if (my_reenter)
 	stderror(ERR_SILENT);
+}
+
+/*************************************************************************/
+/* print list of builtin commands */
+
+/*ARGSUSED*/
+void
+dobuiltins(v, c)
+Char **v;
+struct command *c;
+{
+    /* would use print_by_column() in tw.parse.c but that assumes
+     * we have an array of Char * to pass.. (sg)
+     */
+    extern int Tty_raw_mode;
+    extern int TermH;		/* from the editor routines */
+    extern int lbuffed;		/* from sh.print.c */
+
+    register struct biltins *b;
+    register int row, col, columns, rows;
+    unsigned int w, maxwidth;
+
+    lbuffed = 0;		/* turn off line buffering */
+
+    /* find widest string */
+    for (maxwidth = 0, b = bfunc; b < &bfunc[nbfunc]; ++b)
+	maxwidth = max(maxwidth, strlen(b->bname));
+    ++maxwidth;					/* for space */
+
+    columns = (TermH + 1) / maxwidth;	/* PWP: terminal size change */
+    if (!columns)
+	columns = 1;
+    rows = (nbfunc + (columns - 1)) / columns;
+
+    for (b = bfunc, row = 0; row < rows; row++) {
+	for (col = 0; col < columns; col++) {
+	    if (b < &bfunc[nbfunc]) {
+		w = strlen(b->bname);
+		xprintf("%s", b->bname);
+		if (col < (columns - 1))	/* Not last column? */
+		    for (; w < maxwidth; w++)
+			xputchar(' ');
+		++b;
+	    }
+	}
+	if (Tty_raw_mode)
+	    xputchar('\r');
+	xputchar('\n');
+    }
+
+    lbuffed = 1;		/* turn back on line buffering */
+    flush();
 }

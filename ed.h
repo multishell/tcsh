@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/ed.h,v 3.16 1992/05/11 14:23:58 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/ed.h,v 3.20 1992/10/05 02:41:30 christos Exp $ */
 /*
  * ed.h: Editor declarations and globals
  */
@@ -91,6 +91,8 @@ extern KEYCMD NumFuns;		/* number of KEYCMDs in above table */
 #define CC_REFRESH		14
 #define CC_EXPAND_VARS		15
 #define CC_NORMALIZE_PATH	16
+#define CC_LIST_ALL		17
+#define CC_COMPLETE_ALL		18
 
 typedef union Xmapval {		/* value passed to the Xkey routines */
     KEYCMD cmd;
@@ -136,7 +138,7 @@ EXTERN Char *LastWhich;		/* points to end of which buffer */
 EXTERN Char *CursWhich;		/* points to the cursor point in which buf */
 EXTERN int HistWhich;		/* Hist_num is saved in this */
 EXTERN char Expand;		/* true if we are expanding a line */
-EXTERN Char HistLit;		/* true if history lines are shown literal */
+extern Char HistLit;		/* true if history lines are shown literal */
 EXTERN Char CurrentHistLit;	/* Literal status of current show history line */
 
 /*

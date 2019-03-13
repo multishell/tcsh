@@ -3,20 +3,25 @@
  *
  * All source files should #include this FIRST.
  *
- * Edit this to match your system type.
+ * This is the config file for VMS-POSIX systems
  */
 
 /****************** System dependant compilation flags ****************/
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
  */
-#undef POSIX
+#define POSIX
 
 /*
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
- *		job control facilities.
+ *		job control facilities. says so in $posix/unistd.h ...
  */
-#undef POSIXJOBS
+#define POSIXJOBS
+
+/* 
+ * POSIXSIGS    Use the POSIX signal facilities to emulate BSD Signals .
+ */
+#define POSIXSIGS
 
 /*
  * VFORK	This machine has a vfork().  
@@ -31,63 +36,62 @@
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
  */
-#define VFORK
+#undef VFORK
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and
  *		a tty that deals correctly
  */
-#define BSDJOBS
+#undef BSDJOBS
 
 /*
  * BSDSIGS	You have 4.2-style signals, rather than USG style.
  *		Note: POSIX systems should not define this unless they
  *		have sigvec() and friends (ie: 4.3BSD-RENO, HP-UX).
  */
-#define BSDSIGS
+#undef BSDSIGS
 
 /*
  * BSDTIMES	You have BSD-style process time stuff (like rusage)
  *		This may or may not be true.  For example, Apple Unix
  *		(OREO) has BSDJOBS and BSDSIGS but not BSDTIMES.
  */
-#define BSDTIMES
+#undef BSDTIMES
 
 /*
  * BSDNICE	Your system uses setpriority() instead of nice, to
  *		change a processes scheduling priority
  */
-#define BSDNICE
+#undef BSDNICE
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
- * 		This is usually the case for SYSV systems, where
+ * 		This is usually the case for SVID systems, where
  *		BSD uses sgttyb. POSIX systems should define this
  *		anyway, even though they use struct termios.
  */
-#undef TERMIO
+#define TERMIO
 
 /*
- * SYSVREL	Your machine is SYSV based (HPUX, A/UX)
+ * SVSVREL	Your machine is SVID compliant (Sys V, HPUX, A/UX)
  *		NOTE: don't do this if you are on a Pyramid -- tcsh is
  *		built in a BSD universe.
- *		Set SYSVREL to 1, 2, 3, or 4, depending the version of System V
- *		you are running. Or set it to 0 if you are not SYSV based
+ *		Set SVID to 1, 2, or 3, depending the version of System V
+ *		you are running. Or set it to 0 if you are not SVID based
  */
-#define SYSVREL	0
+#define SVSVREL	0
 
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
  *		to send command output to /dev/null
- *		do this for all flavors of SunOS and anything else that has YP.
  */
-#define YPBUGS
+#undef YPBUGS
 
 /*
  * SIGVOID	Define this if your signal handlers return void.  On older
  *		systems, signal returns int, but on newer ones, it returns void.
  */
-#undef SIGVOID 
+#define SIGVOID 
 
 /*
  * HAVEDUP2	Define this if your system supports dup2().
@@ -97,14 +101,46 @@
 /*
  * UTHOST	Does the utmp file have a host field?
  */
-#define UTHOST
+#undef UTHOST
 
 /*
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
  */
-#undef DIRENT
+#define DIRENT
 /****************** local defines *********************/
-#define BSD	/* We really look like BSD 4.2 */
+
+#define NEEDgetwd
+
+#ifndef _POSIX_SOURCE
+# define _POSIX_SOURCE
+#endif
+
+#ifndef vax
+# define vax
+#endif
+
+#ifndef VAX
+# define VAX
+#endif
+
+#ifndef _VMS_POSIX
+# define _VMS_POSIX
+#endif
+
+#define HAVENOUTMP
+#define HAVENOLIMIT
+#define NO_CRYPT
+
+/* Avoid conflicts with the standard library */
+#define glob		vms_glob
+#define globfree	vms_globfree
+
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
+
+#undef NLS
+#undef SYSMALLOC
+#define SYSMALLOC
+
+#undef AUTOLOGOUT

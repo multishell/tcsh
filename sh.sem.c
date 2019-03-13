@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.sem.c,v 3.18 1992/03/08 02:17:22 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.sem.c,v 3.24 1992/10/14 20:19:19 christos Exp $ */
 /*
  * sh.sem.c: I/O redirections and job forking. A touchy issue!
  *	     Most stuff with builtins is incorrect
@@ -37,23 +37,23 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.sem.c,v 3.18 1992/03/08 02:17:22 christos Exp $")
+RCSID("$Id: sh.sem.c,v 3.24 1992/10/14 20:19:19 christos Exp $")
 
 #include "tc.h"
 
-#ifdef FIOCLEX
+#ifdef CLOSE_ON_EXEC
 # ifndef SUNOS4
 #  ifndef CLEX_DUPS
 #   define CLEX_DUPS
 #  endif /* CLEX_DUPS */
 # endif /* !SUNOS4 */
-#endif /* FIOCLEX */
+#endif /* CLOSE_ON_EXEC */
 
-#ifdef sparc
-# ifndef MACH
+#if defined(__sparc__) || defined(sparc)
+# if !defined(MACH) && SYSVREL == 0
 #  include <vfork.h>
-# endif /* !MACH */
-#endif /* sparc */
+# endif /* !MACH && SYSVREL == 0 */
+#endif /* __sparc__ || sparc */
 
 #ifdef VFORK
 static	sigret_t	vffree	__P((int));
@@ -102,9 +102,9 @@ execute(t, wanttty, pipein, pipeout)
     int     wanttty;
     int *pipein, *pipeout;
 {
-#if defined(convex) || defined(__convex__)
+#ifdef convex
     extern bool use_fork;	/* use fork() instead of vfork()? */
-#endif 
+#endif /* convex */
 
     bool    forked;
     struct biltins *bifunc;
@@ -324,10 +324,9 @@ execute(t, wanttty, pipein, pipeout)
 		int     oSHIN, oSHOUT, oSHDIAG, oOLDSTD, otpgrp;
 		int     oisoutatty, oisdiagatty;
 
-# ifndef FIOCLEX
+# ifndef CLOSE_ON_EXEC
 		int     odidcch;
-
-# endif  /* !FIOCLEX */
+# endif  /* !CLOSE_ON_EXEC */
 # ifdef BSDSIGS
 		sigmask_t omask;
 # endif /* BSDSIGS */
@@ -364,9 +363,9 @@ execute(t, wanttty, pipein, pipeout)
 		osetintr = setintr;
 		ohaderr = haderr;
 		odidfds = didfds;
-# ifndef FIOCLEX
+# ifndef CLOSE_ON_EXEC
 		odidcch = didcch;
-# endif /* !FIOCLEX */
+# endif /* !CLOSE_ON_EXEC */
 		oSHIN = SHIN;
 		oSHOUT = SHOUT;
 		oSHDIAG = SHDIAG;
@@ -384,14 +383,14 @@ execute(t, wanttty, pipein, pipeout)
 # ifdef SAVESIGVEC
 		savesm = savesigvec(savesv);
 # endif /* SAVESIGVEC */
-# if defined(convex) || defined(__convex__)
+# ifdef convex
 		if (use_fork)
 		    pid = fork();
 		else
 		    pid = vfork();
-# else /* !convex && !__convex__ */
+# else /* !convex */
 		pid = vfork();
-# endif /* convex || __CONVEX__ */
+# endif /* convex */
 
 		if (pid < 0) {
 # ifdef BSDSIGS
@@ -417,9 +416,9 @@ execute(t, wanttty, pipein, pipeout)
 		    haderr = ohaderr;
 		    didfds = odidfds;
 		    SHIN = oSHIN;
-# ifndef FIOCLEX
+# ifndef CLOSE_ON_EXEC
 		    didcch = odidcch;
-# endif /* !FIOCLEX */
+# endif /* !CLOSE_ON_EXEC */
 		    SHOUT = oSHOUT;
 		    SHDIAG = oSHDIAG;
 		    OLDSTD = oOLDSTD;
@@ -504,18 +503,7 @@ execute(t, wanttty, pipein, pipeout)
 			(void) signal(SIGQUIT, SIG_IGN);
 		    }
 
-# ifdef _SEQUENT_
-		    /*
-		     * On some machines (POSIX) the process group leader
-		     * cannot be a zombie. On those machines, the following
-		     * might help. Note that BACKPIPE will break if the
-		     * last process exits too soon.
-		     * (From Jaap)
-		     */
-		    pgetty(_gv.wanttty ? _gv.wanttty : 1, pgrp);
-# else /* _SEQUENT_ */
 		    pgetty(_gv.wanttty, pgrp);
-# endif /* _SEQUENT_ */
 
 		    if (t->t_dflg & F_NOHUP)
 			(void) signal(SIGHUP, SIG_IGN);
@@ -528,7 +516,7 @@ execute(t, wanttty, pipein, pipeout)
 # endif /* BSDNICE */
 # ifdef F_VER
 		    if (t->t_dflg & F_VER) {
-			Setenv(STRSYSTYPE, t->t_systype ? STRbsd43 : STRsys53);
+			tsetenv(STRSYSTYPE, t->t_systype ? STRbsd43 : STRsys53);
 			dohash(NULL, NULL);
 		    }
 # endif /* F_VER */
@@ -608,9 +596,9 @@ execute(t, wanttty, pipein, pipeout)
 	isdiagatty = isatty(SHDIAG);
 	(void) close(SHIN);
 	SHIN = -1;
-#ifndef FIOCLEX
+#ifndef CLOSE_ON_EXEC
 	didcch = 0;
-#endif /* !FIOCLEX */
+#endif /* !CLOSE_ON_EXEC */
 	didfds = 0;
 	_gv.wanttty = -1;
 	t->t_dspr->t_dflg |= t->t_dflg & F_NOINTERRUPT;
@@ -698,11 +686,15 @@ int snum;
 {
     register Char **v;
 
-    if ((v = gargv) != 0)
-	gargv = 0, xfree((ptr_t) v);
+    if ((v = gargv) != 0) {
+	gargv = 0;
+	xfree((ptr_t) v);
+    }
 
-    if ((v = pargv) != 0)
-	pargv = 0, xfree((ptr_t) v);
+    if ((v = pargv) != 0) {
+	pargv = 0;
+	xfree((ptr_t) v);
+    }
 
     _exit(1);
 #ifndef SIGVOID
@@ -815,17 +807,15 @@ doio(t, pipein, pipeout)
 	else {
 	    (void) close(0);
 	    (void) dup(OLDSTD);
-#ifdef FIONCLEX
-# ifdef CLEX_DUPS
+#if defined(CLOSE_ON_EXEC) && defined(CLEX_DUPS)
 	    /*
 	     * PWP: Unlike Bezerkeley 4.3, FIONCLEX for Pyramid is preserved
 	     * across dup()s, so we have to UNSET it here or else we get a
 	     * command with NO stdin, stdout, or stderr at all (a bad thing
 	     * indeed)
 	     */
-	    (void) ioctl(0, FIONCLEX, NULL);
-# endif /* CLEX_DUPS */
-#endif /* FIONCLEX */
+	    (void) close_on_exec(0, 0);
+#endif /* CLOSE_ON_EXEC && CLEX_DUPS */
 	}
     }
     if (t->t_drit) {
@@ -871,11 +861,9 @@ doio(t, pipein, pipeout)
 	(void) close(1);
 	(void) dup(SHOUT);
 	is1atty = isoutatty;
-#ifdef FIONCLEX
-# ifdef CLEX_DUPS
-	(void) ioctl(1, FIONCLEX, NULL);
-# endif /* CLEX_DUPS */
-#endif /* FIONCLEX */
+# if defined(CLOSE_ON_EXEC) && defined(CLEX_DUPS)
+	(void) close_on_exec(1, 0);
+# endif /* CLOSE_ON_EXEC && CLEX_DUPS */
     }
 
     (void) close(2);
@@ -886,11 +874,9 @@ doio(t, pipein, pipeout)
     else {
 	(void) dup(SHDIAG);
 	is2atty = isdiagatty;
-#ifdef FIONCLEX
-# ifdef CLEX_DUPS
-	(void) ioctl(2, FIONCLEX, NULL);
-# endif /* CLEX_DUPS */
-#endif /* FIONCLEX */
+# if defined(CLOSE_ON_EXEC) && defined(CLEX_DUPS)
+	(void) close_on_exec(2, 0);
+# endif /* CLOSE_ON_EXEC && CLEX_DUPS */
     }
     didfds = 1;
 }

@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.func.c,v 3.29 1992/04/10 16:38:09 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.func.c,v 3.37 1992/10/27 16:18:15 christos Exp $ */
 /*
  * tc.func.c: New tcsh builtins.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.func.c,v 3.29 1992/04/10 16:38:09 christos Exp $")
+RCSID("$Id: tc.func.c,v 3.37 1992/10/27 16:18:15 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -274,8 +274,7 @@ dolist(v, c)
 	Char   *dp, *tmp, buf[MAXPATHLEN];
 
 	for (k = 0, i = 0; v[k] != NULL; k++) {
-	    tmp = dnormalize(v[k], symlinks == SYM_IGNORE || 
-				   symlinks == SYM_EXPAND);
+	    tmp = dnormalize(v[k], symlinks == SYM_IGNORE);
 	    dp = &tmp[Strlen(tmp) - 1];
 	    if (*dp == '/' && dp != tmp)
 #ifdef apollo
@@ -288,7 +287,7 @@ dolist(v, c)
 			xputchar('\n');
 		    print_by_column(STRNULL, &v[i], k - i, FALSE);
 		}
-		xprintf("%s: %s.\n", short2str(tmp), strerror(errno));
+		xprintf("%S: %s.\n", tmp, strerror(errno));
 		i = k + 1;
 	    }
 	    else if (S_ISDIR(st.st_mode)) {
@@ -301,7 +300,7 @@ dolist(v, c)
 		}
 		if (k != 0 && v[1] != NULL)
 		    xputchar('\n');
-		xprintf("%s:\n", short2str(tmp));
+		xprintf("%S:\n", tmp);
 		for (cp = tmp, dp = buf; *cp; *dp++ = (*cp++ | QUOTE))
 		    continue;
 		if (dp[-1] != (Char) ('/' | QUOTE))
@@ -399,9 +398,20 @@ dowhich(v, c)
     lex[0].word = STRNULL;
     lex[2].word = STRret;
 
+    gflag = 0, tglob(v);
+    if (gflag) {
+	v = globall(v);
+	if (v == 0)
+	    stderror(ERR_NAME | ERR_NOMATCH);
+    }
+    else {
+	v = gargv = saveblk(v);
+	trim(v);
+    }
+
     while (*++v) {
 	if ((vp = adrof1(*v, &aliases)) != NULL) {
-	    xprintf("%s: \t aliased to ", short2str(*v));
+	    xprintf("%S: \t aliased to ", *v);
 	    blkpr(vp->vec);
 	    xputchar('\n');
 	}
@@ -410,6 +420,8 @@ dowhich(v, c)
 	    tellmewhat(lex);
 	}
     }
+    if (gargv)
+	blkfree(gargv), gargv = 0;
 }
 
 /* PWP: a hack to start up your stopped editor on a single keystroke */
@@ -471,7 +483,7 @@ fg_proc_entry(pp)
 #ifdef BSDSIGS
     sigmask_t omask;
 #endif
-    jmp_buf osetexit;
+    jmp_buf_t osetexit;
     bool    ohaderr;
     bool    oGettingInput;
 
@@ -562,8 +574,8 @@ auto_lock()
 
 # define XCRYPT(a, b) crypt16(a, b)
 
-    if ((pw = getpwuid(geteuid())) != NULL &&	/* effective user passwd  */
-        (apw = getauthuid(geteuid())) != NULL) 	/* enhanced ultrix passwd */
+    if ((pw = getpwuid(euid)) != NULL &&	/* effective user passwd  */
+        (apw = getauthuid(euid)) != NULL) 	/* enhanced ultrix passwd */
 	srpp = apw->a_password;
 
 #endif /* PW_AUTH && !XCRYPT */
@@ -575,7 +587,7 @@ auto_lock()
 
 # define XCRYPT(a, b) crypt(a, b)
 
-    if ((pw = getpwuid(geteuid())) != NULL &&	/* effective user passwd  */
+    if ((pw = getpwuid(euid)) != NULL &&	/* effective user passwd  */
 	(spw = getspnam(pw->pw_name)) != NULL)	/* shadowed passwd	  */
 	srpp = spw->sp_pwdp;
 
@@ -586,7 +598,7 @@ auto_lock()
 
 #define XCRYPT(a, b) crypt(a, b)
 
-    if ((pw = getpwuid(geteuid())) != NULL)	/* effective user passwd  */
+    if ((pw = getpwuid(euid)) != NULL)	/* effective user passwd  */
 	srpp = pw->pw_passwd;
 
 #endif /* !XCRYPT */
@@ -639,6 +651,7 @@ auto_logout()
 #ifdef TESLA
     do_logout = 1;
 #endif /* TESLA */
+    GettingInput = FALSE; /* make flush() work to write hist files. Huber*/
     goodbye(NULL, NULL);
 }
 
@@ -786,7 +799,7 @@ period_cmd()
     periodic_active = 1;
     if (!whyles && adrof1(STRperiodic, &aliases)) {
 	vp = value(STRtperiod);
-	if (vp == NULL)
+	if (vp == STRNULL)
 	    return;
 	interval = getn(vp);
 	(void) time(&t);
@@ -816,7 +829,7 @@ aliasrun(cnt, s1, s2)
 {
     struct wordent w, *new1, *new2;	/* for holding alias name */
     struct command *t = NULL;
-    jmp_buf osetexit;
+    jmp_buf_t osetexit;
 
     getexit(osetexit);
     if (seterr) {
@@ -1019,7 +1032,7 @@ rmstar(cp)
     if (*tag) {
 	xprintf("command line now is:\n");
 	for (we = cp->next; we != cp; we = we->next)
-	    xprintf("%s ", short2str(we->word));
+	    xprintf("%S ", we->word);
     }
 #endif /* RMDEBUG */
     return;
@@ -1094,8 +1107,7 @@ continue_jobs(cp)
     if (*tag) {
 	xprintf("command line now is:\n");
 	for (we = cp->next; we != cp; we = we->next)
-	    xprintf("%s ",
-		    short2str(we->word));
+	    xprintf("%S ", we->word);
     }
 #endif /* CNDEBUG */
     return;
@@ -1391,7 +1403,7 @@ getusername(hm)
 	tcache = NULL;
 	return NULL;
     }
-    if (((h = value(STRhome)) != NULL) &&
+    if (((h = value(STRhome)) != STRNULL) &&
 	(Strncmp(p = *hm, h, j = Strlen(h)) == 0) &&
 	(p[j] == '/' || p[j] == '\0')) {
 	*hm = &p[j];
@@ -1418,7 +1430,7 @@ doaliases(v, c)
     Char  **v;
     struct command *c;
 {
-    jmp_buf oldexit;
+    jmp_buf_t oldexit;
     Char  **vec, *lp;
     int     fd;
     Char    buf[BUFSIZE], line[BUFSIZE];
@@ -1505,22 +1517,174 @@ shlvl(val)
 
     if ((cp = getenv("SHLVL")) != NULL) {
 
-	val += atoi(cp);
+	if (loginsh)
+	    val = 1;
+	else
+	    val += atoi(cp);
 
 	if (val <= 0) {
 	    unsetv(STRshlvl);
-	    Unsetenv(STRSHLVL);
+	    Unsetenv(STRKSHLVL);
 	}
 	else {
 	    Char    buff[BUFSIZE];
 
 	    Itoa(val, buff);
 	    set(STRshlvl, Strsave(buff));
-	    Setenv(STRSHLVL, buff);
+	    tsetenv(STRKSHLVL, buff);
 	}
     }
     else {
 	set(STRshlvl, SAVE("1"));
-	Setenv(STRSHLVL, str2short("1"));
+	tsetenv(STRKSHLVL, str2short("1"));
     }
 }
+
+
+/* fixio():
+ *	Try to recover from a read error
+ */
+int
+fixio(fd, e)
+    int fd, e;
+{
+    switch (e) {
+    case -1:	/* Make sure that the code is reachable */
+
+#ifdef EWOULDBLOCK
+    case EWOULDBLOCK:
+# define TRY_AGAIN
+#endif /* EWOULDBLOCK */
+
+#if defined(POSIX) && defined(EAGAIN)
+# if !defined(EWOULDBLOCK) || EWOULDBLOCK != EAGAIN
+    case EAGAIN:
+#  define TRY_AGAIN
+# endif /* !EWOULDBLOCK || EWOULDBLOCK != EAGAIN */
+#endif /* POSIX && EAGAIN */
+
+	e = 0;
+#ifdef TRY_AGAIN
+# if defined(F_SETFL) && defined(O_NDELAY)
+	if ((e = fcntl(fd, F_GETFL, 0)) == -1)
+	    return -1;
+
+	if (fcntl(fd, F_SETFL, e & ~O_NDELAY) == -1)
+	    return -1;
+	else 
+	    e = 1;
+# endif /* F_SETFL && O_NDELAY */
+
+# ifdef FIONBIO
+	e = 0;
+	if (ioctl(fd, FIONBIO, (ioctl_t) &e) == -1)
+	    return -1;
+	else
+	    e = 1;
+# endif	/* FIONBIO */
+
+#endif /* TRY_AGAIN */
+	return e ? 0 : -1;
+
+    case EINTR:
+	return 0;
+
+    default:
+	return -1;
+    }
+}
+
+/* collate():
+ *	String collation
+ */
+int
+collate(a, b)
+    const Char *a;
+    const Char *b;
+{
+    int rv;
+    /* This actually strips the quote bit */
+    char *sa = strsave(short2str(a));
+    char *sb = strsave(short2str(b));
+
+#if defined(NLS) && !defined(NOSTRCOLL)
+    errno = 0;	/* strcoll sets errno, another brain-damage */
+
+    rv = strcoll(sa, sb);
+
+    if (errno != 0) {
+	xfree((ptr_t) sa);
+	xfree((ptr_t) sb);
+	stderror(ERR_SYSTEM, "strcoll", strerror(errno));
+    }
+#else
+    rv = strcmp(sa, sb);
+#endif /* NLS && !NOSTRCOLL */
+
+    xfree((ptr_t) sa);
+    xfree((ptr_t) sb);
+
+    return rv;
+}
+
+#ifdef HASHBANG
+/*
+ * From: peter@zeus.dialix.oz.au (Peter Wemm)
+ * If exec() fails look first for a #! [word] [word] ....
+ * If it is, splice the header into the argument list and retry.
+ */
+#define HACKBUFSZ 1024		/* Max chars in #! vector */
+#define HACKVECSZ 128		/* Max words in #! vector */
+int
+hashbang(fd, vp)
+    int fd;
+    Char ***vp;
+{
+    unsigned char lbuf[HACKBUFSZ];
+    char *sargv[HACKVECSZ];
+    unsigned char *p, *ws;
+    int sargc = 0;
+
+    if (read(fd, (char *) lbuf, HACKBUFSZ) <= 0)
+	return -1;
+
+    ws = 0;	/* word started = 0 */
+
+    for (p = lbuf; p < &lbuf[HACKBUFSZ]; )
+	switch (*p) {
+	case ' ':
+	case '\t':
+	    if (ws) {	/* a blank after a word.. save it */
+		*p = '\0';
+		if (sargc < HACKVECSZ - 1)
+		    sargv[sargc++] = ws;
+		ws = NULL;
+	    }
+	    p++;
+	    continue;
+
+	case '\0':	/* Whoa!! what the hell happened */
+	    return -1;
+
+	case '\n':	/* The end of the line. */
+	    if (ws) {	/* terminate the last word */
+		*p = '\0';
+		if (sargc < HACKVECSZ - 1)
+		    sargv[sargc++] = ws;
+		sargv[sargc] = NULL;
+		ws = NULL;
+		*vp = blk2short(sargv);
+		return 0;
+	    }
+	    else
+		return -1;
+
+	default:
+	    if (!ws)	/* Start a new word? */
+		ws = p; 
+	    p++;
+	    break;
+	}
+    return -1;
+}
+#endif /* HASHBANG */

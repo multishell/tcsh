@@ -38,6 +38,11 @@
 #endif
 
 /*
+ * POSIXSIGS	Use the POSIX signal facilities to emulate BSD signals.
+ */
+#undef POSIXSIGS
+
+/*
  * VFORK	This machine has a vfork().  
  *		It used to be that for job control to work, this define
  *		was mandatory. This is not the case any more.
@@ -79,6 +84,15 @@
 #else
 # undef BSDTIMES
 #endif
+
+/*
+ * BSDLIMIT	You have BSD-style resource limit stuff (getrlimit/setrlimit)
+ */
+#ifndef aiws
+# define BSDLIMIT
+#else
+# undef BSDLIMIT
+#endif 
 
 /*
  * BSDNICE	Your system uses setpriority() instead of nice, to

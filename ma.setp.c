@@ -82,12 +82,14 @@
  **********************************************************************
  */
 #include "sh.h"
-RCSID("$Id: ma.setp.c,v 1.4 1992/03/28 00:32:37 christos Exp $")
+RCSID("$Id: ma.setp.c,v 1.7 1992/11/20 08:56:38 christos Exp $")
 
 #ifdef MACH
 
 #define MAXDIRS 64		/* max directories on a path */
-#define NULL 0
+#ifndef NULL
+# define NULL 0
+#endif
 
 static int npaths;		/* # pathlist arguments */
 
@@ -229,20 +231,20 @@ static int
 initpaths(paths)
 register char **paths;
 {
-    register char *path, *value, *p, *q;
+    register char *path, *val, *p, *q;
     register int i, done;
     register struct pelem *pe, *pathend;
 
     freepaths();
     for (npaths = 0; path = paths[npaths]; npaths++) {
-	value = index(path, '=');
-	if (value == NULL) {
+	val = index(path, '=');
+	if (val == NULL) {
 	    if (eflag)
 		xprintf("setpath: value missing in path '%s'\n", path);
 	    freepaths();
 	    return(-1);
 	}
-	*value++ = '\0';
+	*val++ = '\0';
 	pe = (struct pelem *)xmalloc((unsigned)(sizeof(struct pelem)));
 	setzero((char *) pe, sizeof(struct pelem));
 	if (pathhead == NULL)
@@ -261,10 +263,10 @@ register char **paths;
 		pe->pdef = syspath[i].defalt;
 		break;
 	    }
-	q = value;
+	q = val;
 	for (;;) {
 	    q = index(p = q, ':');
-	    done = (*q == '\0');
+	    done = (q == NULL);
 	    if (!done)
 		*q++ = '\0';
 	    p = strsave(p);
@@ -367,7 +369,7 @@ char *localsyspath;
 	pe->pdirs = 0;
 	for (;;) {
 	    new = index(p = new, ':');
-	    done = (*new == '\0');
+	    done = (new == NULL);
 	    if (!done)
 		*new++ = '\0';
 	    p = strsave(p);

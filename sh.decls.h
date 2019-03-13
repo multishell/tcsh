@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.decls.h,v 3.11 1992/05/02 23:39:58 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.decls.h,v 3.15 1992/10/27 16:18:15 christos Exp $ */
 /*
  * sh.decls.h	 External declarations from sh*.c
  */
@@ -49,7 +49,6 @@ extern	void		  initdesc	__P((void));
 extern	sigret_t	  pintr		__P((int));
 extern	void		  pintr1	__P((bool));
 extern	void		  process	__P((bool));
-extern	void		  rechist	__P((void));
 extern	void		  untty		__P((void));
 #ifdef PROF
 extern	void		  done		__P((int));
@@ -70,10 +69,10 @@ extern	Char		 *dnormalize	__P((Char *, int));
 extern	void		  dopushd	__P((Char **, struct command *));
 extern	void		  dopopd	__P((Char **, struct command *));
 extern	void		  dfree		__P((struct directory *));
+extern	void		  dsetstack	__P((void));
 extern	int		  getstakd	__P((Char *, int));
-#ifdef	CSHDIRS
-extern	void		  recdirs	__P((void));
-#endif
+extern	void		  recdirs	__P((Char *));
+extern	void		  loaddirs	__P((Char *));
 
 /*
  * sh.dol.c
@@ -120,7 +119,7 @@ extern	int		  tenex		__P((Char *, int));
 /*
  * sh.func.c
  */
-extern	void		  Setenv	__P((Char *, Char *));
+extern	void		  tsetenv	__P((Char *, Char *));
 extern	void		  Unsetenv	__P((Char *));
 extern	void		  doalias	__P((Char **, struct command *));
 extern	void		  dobreak	__P((Char **, struct command *));
@@ -160,6 +159,7 @@ extern	void		  prvars	__P((void));
 extern	int		  srchx		__P((Char *));
 extern	void		  unalias	__P((Char **, struct command *));
 extern	void		  wfree		__P((void));
+extern	void		  dobuiltins	__P((Char **, struct command *));
 
 /*
  * sh.glob.c
@@ -183,8 +183,11 @@ extern	int		  sortscmp	__P((Char **, Char **));
  * sh.hist.c
  */
 extern	void	 	  dohist	__P((Char **, struct command *));
-extern struct Hist 	 *enthist	__P((int, struct wordent *, bool));
+extern  struct Hist 	 *enthist	__P((int, struct wordent *, bool));
 extern	void	 	  savehist	__P((struct wordent *));
+extern	void		  fmthist	__P((int, ptr_t, char *));
+extern	void		  rechist	__P((Char *));
+extern	void		  loadhist	__P((Char *));
 
 
 /*
@@ -218,9 +221,9 @@ extern	Char		**blkspl	__P((Char **, Char **));
 extern  void		  copy		__P((char *, char *, int));
 #endif
 extern	void		  closem	__P((void));
-#ifndef FIOCLEX
+#ifndef CLOSE_ON_EXEC
 extern  void 		  closech	__P((void));
-#endif
+#endif /* !CLOSE_ON_EXEC */
 extern	Char		**copyblk	__P((Char **));
 extern	int		  dcopy		__P((int, int));
 extern	int		  dmove		__P((int, int));
@@ -232,6 +235,7 @@ extern	int		  prefix	__P((Char *, Char *));
 extern	Char		**saveblk	__P((Char **));
 extern	void		  setzero	__P((char *, int));
 extern	Char		 *strip		__P((Char *));
+extern	Char		 *quote		__P((Char *));
 extern	char		 *strsave	__P((const char *));
 extern	char		 *strspl	__P((char *, char *));
 #ifndef POSIX
@@ -264,9 +268,9 @@ extern	void		  pcsecs	__P((clock_t));
 extern	void		  pcsecs	__P((time_t));
 # endif /* !POSIX */
 #endif /* BSDTIMES */
-#ifdef RLIMIT_CPU
+#ifdef BSDLIMIT
 extern	void		  psecs		__P((long));
-#endif /* RLIMIT_CPU */
+#endif /* BSDLIMIT */
 extern	int		  putpure	__P((int));
 extern	int		  putraw	__P((int));
 extern	void		  xputchar	__P((int));
@@ -296,6 +300,7 @@ extern	void		  prestjob	__P((void));
 extern	void		  psavejob	__P((void));
 extern	void		  pstart	__P((struct process *, int));
 extern	void		  pwait		__P((void));
+extern  struct process   *pfind		__P((Char *));
 
 /*
  * sh.sem.c
@@ -331,11 +336,14 @@ extern	void		  dotime	__P((Char **, struct command *));
 #ifdef BSDTIMES
 extern	void		  prusage	__P((struct rusage *, struct rusage *, 
 					     timeval_t *, timeval_t *));
+extern	void		  ruadd		__P((struct rusage *, struct rusage *));
 #else /* BSDTIMES */
 # ifdef _SEQUENT_
 extern	void		  prusage	__P((struct process_stats *,
 					     struct process_stats *, 
 					     timeval_t *, timeval_t *));
+extern	void		  ruadd		__P((struct process_stats *,
+					     struct process_stats *));
 # else /* !_SEQUENT_ */
 #  ifdef POSIX
 extern	void		  prusage	__P((struct tms *, struct tms *, 
@@ -348,7 +356,6 @@ extern	void		  prusage	__P((struct tms *, struct tms *,
 #endif /* BSDTIMES */
 extern	void		  settimes	__P((void));
 #if defined(BSDTIMES) || defined(_SEQUENT_)
-extern	void		  ruadd		__P((struct rusage *, struct rusage *));
 extern	void		  tvsub		__P((struct timeval *, 
 					     struct timeval *, 
 					     struct timeval *));

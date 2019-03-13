@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.sig.h,v 3.9 1992/05/15 23:49:22 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.sig.h,v 3.14 1992/10/14 20:19:19 christos Exp $ */
 /*
  * tc.sig.h: Signal handling
  *
@@ -42,21 +42,21 @@
 # include <signal.h>
 # ifndef SIGCHLD
 #  define SIGCHLD SIGCLD
-# endif				/* SIGCHLD */
-#else				/* SYSVREL == 0 */
+# endif /* SIGCHLD */
+#else /* SYSVREL == 0 */
 # include <sys/signal.h>
-#endif				/* SYSVREL > 0 */
+#endif /* SYSVREL > 0 */
 
-#if defined(sun) || defined(DGUX)
+#if defined(SUNOS4) || defined(DGUX) || defined(hp800)
 # define SAVESIGVEC
-#endif /* sun || DGUX */
+#endif /* SUNOS4 || DGUX || hp800 */
 
-#if (SYSVREL > 0 && SYSVREL < 3 && !defined(BSDSIGS)) || defined(_MINIX)
+#if (SYSVREL > 0 && SYSVREL < 3 && !defined(BSDSIGS)) || defined(_MINIX) || defined(COHERENT)
 /*
  * If we have unreliable signals...
  */
 # define UNRELSIGS
-#endif /* SYSVREL > 0 && SYSVREL < 3 && !BSDSIGS */
+#endif /* SYSVREL > 0 && SYSVREL < 3 && !BSDSIGS || _MINIX || COHERENT */
 
 #ifdef BSDSIGS
 /*
@@ -68,19 +68,19 @@
 typedef struct sigaction sigvec_t;
 #  define sv_handler sa_handler
 #  define sv_flags sa_flags
-# endif	/* _SEQUENT || (_POSIX_SOURCE && !hpux) */
+# endif /* _SEQUENT || (_POSIX_SOURCE && !hpux) */
 
 # ifdef hpux
 #  define HAVE_SIGVEC
 #  define mysigvec(a, b, c)	sigvector(a, b, c)
 typedef struct sigvec sigvec_t;
 #  define NEEDsignal
-# endif	/* hpux */
+# endif /* hpux */
 
 # ifndef HAVE_SIGVEC
 #  define mysigvec(a, b, c)	sigvec(a, b, c)
 typedef struct sigvec sigvec_t;
-# endif	/* HAVE_SIGVEC */
+# endif /* HAVE_SIGVEC */
 
 # undef HAVE_SIGVEC
 #endif /* BSDSIGS */
@@ -101,20 +101,30 @@ typedef struct sigvec sigvec_t;
  * I hope I get to fix that.
  */
 #  define killpg(a, b) kill((a), (b))
-# endif	/* BSDJOBS */
+# endif /* BSDJOBS */
 #endif /* SYSVREL > 0 */
 
 #ifdef _MINIX
-#include <signal.h>
+# include <signal.h>
 #  define killpg(a, b) kill((a), (b))
 #endif /* _MINIX */
+
+#ifdef _VMS_POSIX
+# define killpg(a, b) kill(-(a), (b))
+#endif /* atp _VMS_POSIX */
 
 #if !defined(NSIG) && defined(SIGMAX)
 # define NSIG (SIGMAX+1)
 #endif /* !NSIG && SIGMAX */
+#if !defined(NSIG) && defined(_SIG_MAX)
+# define NSIG (_SIG_MAX+1)
+#endif /* !NSIG && _SIG_MAX */
 #if !defined(NSIG) && defined(_NSIG)
 # define NSIG _NSIG
 #endif /* !NSIG && _NSIG */
+#if !defined(MAXSIG) && defined(NSIG)
+# define MAXSIG NSIG
+#endif /* !MAXSIG && NSIG */
 
 #ifdef BSDSIGS
 /*
@@ -122,25 +132,23 @@ typedef struct sigvec sigvec_t;
  */
 # ifdef sigmask
 #  undef sigmask
-# endif				/* sigmask */
+# endif /* sigmask */
 # define	sigmask(s)	(1 << ((s)-1))
-# ifdef _SEQUENT_
+# ifdef POSIXSIGS
 #  define 	sigpause(a)	bsd_sigpause(a)
 #  define 	signal(a, b)	bsd_signal(a, b)
-# else /* _SEQUENT_ */
+# endif /* POSIXSIGS */
+# ifndef _SEQUENT_
 #  define	sighold(s)	sigblock(sigmask(s))
 #  define	sigignore(s)	signal(s, SIG_IGN)
 #  define 	sigset(s, a)	signal(s, a)
-# endif	/* _SEQUENT_ */
+# endif /* !_SEQUENT_ */
 # ifdef aiws
 #  define 	sigrelse(a)	sigsetmask(sigblock(0) & ~sigmask(a))
 #  undef	killpg
 #  define 	killpg(a, b)	kill(-getpgrp(a), b)
 #  define	NEEDsignal
-# endif	/* aiws */
-# ifdef linux
-#  define	sigpause(a)	bsd_sigpause(a)
-# endif /* linux */
+# endif /* aiws */
 #endif /* BSDSIGS */
 
 
@@ -152,10 +160,10 @@ typedef struct sigvec sigvec_t;
 #else
 # ifdef SIGWINDOW
 #  define SIG_WINDOW SIGWINDOW
-# endif	/* SIGWINDOW */
+# endif /* SIGWINDOW */
 #endif /* SIGWINCH */
 
-#if defined(convex) || defined(__convex__)
+#ifdef convex
 # ifdef notdef
 /* Does not seem to work right... Christos */
 #  define SIGSYNCH       0 
@@ -166,7 +174,7 @@ typedef struct sigvec sigvec_t;
 #  define SYNCHMASK 	(sigmask(SIGCHLD))
 # endif
 extern sigret_t synch_handler();
-#endif /* convex || __convex__ */
+#endif /* convex */
 
 #ifdef SAVESIGVEC
 # define NSIGSAVED 7
@@ -198,6 +206,6 @@ extern sigret_t synch_handler();
 	    mysigvec(SIGTERM, &(sv)[5], (sigvec_t *) 0),	\
 	    mysigvec(SIGHUP,  &(sv)[6], (sigvec_t *) 0),	\
 	    sigsetmask(sm))
-# endif				/* SAVESIGVEC */
+# endif /* SAVESIGVEC */
 
-#endif				/* _h_tc_sig */
+#endif /* _h_tc_sig */

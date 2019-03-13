@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.h,v 3.0 1991/07/04 23:38:58 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.h,v 3.1 1992/06/16 20:46:26 christos Exp $ */
 /*
  * tc.h: Tcsh includes
  */
@@ -41,5 +41,9 @@
 #include "tc.os.h"
 #include "tc.sig.h"
 #include "tc.decls.h"
+
+#define FMT_PROMPT	0
+#define FMT_WHO		1
+#define FMT_HISTORY	2
 
 #endif /* _h_tc */

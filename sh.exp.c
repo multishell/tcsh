@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.exp.c,v 3.8 1992/03/27 01:59:46 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.exp.c,v 3.16 1992/11/14 20:40:02 christos Exp $ */
 /*
  * sh.exp.c: Expression evaluations
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.exp.c,v 3.8 1992/03/27 01:59:46 christos Exp $")
+RCSID("$Id: sh.exp.c,v 3.16 1992/11/14 20:40:02 christos Exp $")
 
 /*
  * C shell
@@ -59,24 +59,141 @@ RCSID("$Id: sh.exp.c,v 3.8 1992/03/27 01:59:46 christos Exp $")
 #define EQMATCH 7
 #define NOTEQMATCH 8
 
-static	int	 exp1	__P((Char ***, bool));
-static	int	 exp2	__P((Char ***, bool));
-static	int	 exp2a	__P((Char ***, bool));
-static	int	 exp2b	__P((Char ***, bool));
-static	int	 exp2c	__P((Char ***, bool));
-static	Char 	*exp3	__P((Char ***, bool));
-static	Char 	*exp3a	__P((Char ***, bool));
-static	Char 	*exp4	__P((Char ***, bool));
-static	Char 	*exp5	__P((Char ***, bool));
-static	Char 	*exp6	__P((Char ***, bool));
-static	void	 evalav	__P((Char **));
-static	int	 isa	__P((Char *, int));
-static	int	 egetn	__P((Char *));
+static	int	 sh_access	__P((Char *, int));
+static	int	 exp1		__P((Char ***, bool));
+static	int	 exp2		__P((Char ***, bool));
+static	int	 exp2a		__P((Char ***, bool));
+static	int	 exp2b		__P((Char ***, bool));
+static	int	 exp2c		__P((Char ***, bool));
+static	Char 	*exp3		__P((Char ***, bool));
+static	Char 	*exp3a		__P((Char ***, bool));
+static	Char 	*exp4		__P((Char ***, bool));
+static	Char 	*exp5		__P((Char ***, bool));
+static	Char 	*exp6		__P((Char ***, bool));
+static	void	 evalav		__P((Char **));
+static	int	 isa		__P((Char *, int));
+static	int	 egetn		__P((Char *));
 
 #ifdef EDEBUG
-static	void	 etracc	__P((char *, Char *, Char ***));
-static	void	 etraci	__P((char *, int, Char ***));
+static	void	 etracc		__P((char *, Char *, Char ***));
+static	void	 etraci		__P((char *, int, Char ***));
 #endif
+
+
+/*
+ * shell access function according to POSIX and non POSIX
+ * From Beto Appleton (beto@aixwiz.aix.ibm.com)
+ */
+static int
+sh_access(fname, mode)
+    Char *fname;
+    int mode;
+{
+#ifdef POSIX
+    struct stat     statb;
+#endif /* POSIX */
+    char *name = short2str(fname);
+
+    if (*name == '\0')
+	return 1;
+
+#ifndef POSIX
+    return access(name, mode);
+#else /* POSIX */
+
+    /*
+     * POSIX 1003.2-d11.2 
+     *	-r file		True if file exists and is readable. 
+     *	-w file		True if file exists and is writable. 
+     *			True shall indicate only that the write flag is on. 
+     *			The file shall not be writable on a read-only file
+     *			system even if this test indicates true.
+     *	-x file		True if file exists and is executable. 
+     *			True shall indicate only that the execute flag is on. 
+     *			If file is a directory, true indicates that the file 
+     *			can be searched.
+     */
+    if (mode != W_OK && mode != X_OK)
+	return access(name, mode);
+
+    if (stat(name, &statb) == -1) 
+	return 1;
+
+    if (access(name, mode) == 0) {
+#ifdef S_ISDIR
+	if (S_ISDIR(statb.st_mode) && mode == X_OK)
+	    return 0;
+#endif /* S_ISDIR */
+
+	/* root needs permission for someone */
+	switch (mode) {
+	case W_OK:
+	    mode = S_IWUSR | S_IWGRP | S_IWOTH;
+	    break;
+	case X_OK:
+	    mode = S_IXUSR | S_IXGRP | S_IXOTH;
+	    break;
+	default:
+	    abort();
+	    break;
+	}
+
+    } 
+
+    else if (euid == statb.st_uid)
+	mode <<= 6;
+
+    else if (egid == statb.st_gid)
+	mode <<= 3;
+
+# ifdef NGROUPS_MAX
+    else {
+#  if defined(__386BSD__) || defined(BSD4_4)
+    /*
+     * These two decided that setgroup() should take an array of int's
+     * and they define _SC_NGROUPS_MAX without having sysconf
+     */
+#   undef _SC_NGROUPS_MAX	
+#   define GID_T int
+#  else
+#   define GID_T gid_t
+#  endif /* __386BSD__ || BSD4_4 */
+	/* you can be in several groups */
+	int	n;
+	GID_T	*groups;
+
+	/*
+	 * Try these things to find a positive maximum groups value:
+	 *   1) sysconf(_SC_NGROUPS_MAX)
+	 *   2) NGROUPS_MAX
+	 *   3) getgroups(0, unused)
+	 * Then allocate and scan the groups array if one of these worked.
+	 */
+#  ifdef _SC_NGROUPS_MAX
+	if ((n = sysconf(_SC_NGROUPS_MAX)) == -1)
+#  endif /* _SC_NGROUPS_MAX */
+	    n = NGROUPS_MAX;
+	if (n <= 0)
+	    n = getgroups(0, (GID_T *) NULL);
+
+	if (n > 0) {
+	    groups = (GID_T *) xmalloc((size_t) (n * sizeof(GID_T)));
+	    n = getgroups(n, groups);
+	    while (--n >= 0)
+		if (groups[n] == statb.st_gid) {
+		    mode <<= 3;
+		    break;
+		}
+	}
+    }
+# endif /* NGROUPS_MAX */
+
+    if (statb.st_mode & mode)
+	return 0;
+    else
+	return 1;
+#endif /* !POSIX */
+}
 
 int
 expr(vp)
@@ -455,7 +572,7 @@ exp6(vp, ignore)
 	Char   *fakecom[2];
 
 	faket.t_dtyp = NODE_COMMAND;
-	faket.t_dflg = 0;
+	faket.t_dflg = F_BACKQ;
 	faket.t_dcar = faket.t_dcdr = faket.t_dspr = NULL;
 	faket.t_dcom = fakecom;
 	fakecom[0] = STRfakecom;
@@ -513,15 +630,15 @@ exp6(vp, ignore)
 	    switch (*ft) {
 
 	    case 'r':
-		i = !access(short2str(ep), R_OK);
+		i = !sh_access(ep, R_OK);
 		break;
 
 	    case 'w':
-		i = !access(short2str(ep), W_OK);
+		i = !sh_access(ep, W_OK);
 		break;
 
 	    case 'x':
-		i = !access(short2str(ep), X_OK);
+		i = !sh_access(ep, X_OK);
 		break;
 
 	    case 'X':	/* tcsh extension, name is an executable in the path
@@ -531,16 +648,7 @@ exp6(vp, ignore)
 		break;
 
 	    case 't':	/* SGI extension, true when file is a tty */
-		{
-		    int fd;
-
-		    if ((fd = open(short2str(ep), O_RDONLY)) == -1)
-			i = 0;
-		    else {
-			i = isatty(fd);
-			(void) close(fd);
-		    }
-		}
+		i = isatty(atoi(short2str(ep)));
 		break;
 
 	    default:
@@ -555,11 +663,19 @@ exp6(vp, ignore)
 		switch (*ft) {
 
 		case 'f':
+#ifdef S_ISREG
 		    i = S_ISREG(stb.st_mode);
+#else
+		    i = 0;
+#endif
 		    break;
 
 		case 'd':
+#ifdef S_ISDIR
 		    i = S_ISDIR(stb.st_mode);
+#else
+		    i = 0;
+#endif
 		    break;
 
 		case 'p':
@@ -578,9 +694,53 @@ exp6(vp, ignore)
 #endif
 		    break;
 
+		/* 
+		 * ARGH!!! sgi defines (-s == ! -z) Why? Can you change it? 
+		 * Here I am not going to be compatible; they should fix it!
+		 */
 		case 's':
-#ifdef S_ISSOCK
+# ifdef S_ISSOCK
 		    i = S_ISSOCK(stb.st_mode);
+# else
+		    i = 0;
+# endif
+		    break;
+
+		case 'b':
+#ifdef S_ISBLK
+		    i = S_ISBLK(stb.st_mode);
+#else
+		    i = 0;
+#endif
+		    break;
+
+		case 'c':
+#ifdef S_ISCHR
+		    i = S_ISCHR(stb.st_mode);
+#else
+		    i = 0;
+#endif
+		    break;
+
+		case 'u':
+#ifdef S_ISUID
+		    i = (S_ISUID & stb.st_mode) != 0;
+#else
+		    i = 0;
+#endif
+		    break;
+
+		case 'g':
+#ifdef S_ISGID
+		    i = (S_ISGID & stb.st_mode) != 0;
+#else
+		    i = 0;
+#endif
+		    break;
+
+		case 'k':
+#ifdef S_ISVTX
+		    i = (S_ISVTX & stb.st_mode) != 0;
 #else
 		    i = 0;
 #endif

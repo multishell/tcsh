@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/ed.chared.c,v 3.23 1992/04/10 16:38:09 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/ed.chared.c,v 3.31 1992/10/14 20:19:19 christos Exp $ */
 /*
  * ed.chared.c: Character editing functions.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.chared.c,v 3.23 1992/04/10 16:38:09 christos Exp $")
+RCSID("$Id: ed.chared.c,v 3.31 1992/10/14 20:19:19 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -74,7 +74,6 @@ static	void	 c_delafter		__P((int));
 static	void	 c_delbefore		__P((int));
 static	Char	*c_prev_word		__P((Char *, Char *, int));
 static	Char	*c_next_word		__P((Char *, Char *, int));
-static	void	 c_copy			__P((Char *, Char *, int));
 static	Char	*c_number		__P((Char *, int *, int));
 static	Char	*c_expand		__P((Char *));
 static	void	 c_excl			__P((Char *));
@@ -276,30 +275,6 @@ c_nexword(p, high, n)
  * Ray Moody <ray@gibbs.physics.purdue.edu>
  * this is a neat, but odd, addition.
  */
-
-/*
- * c_copy is sorta like bcopy() except that we handle overlap between
- * source and destination memory
- */
-
-static void
-c_copy(src, dst, length)
-    register Char *src, *dst;
-    register int length;
-{
-    if (src > dst) {
-	while (length--) {
-	    *dst++ = *src++;
-	}
-    }
-    else {
-	src += length;
-	dst += length;
-	while (length--) {
-	    *--dst = *--src;
-	}
-    }
-}
 
 /*
  * c_number: Ignore character p points to, return number appearing after that.
@@ -518,10 +493,12 @@ excl_sw:
      */
     if (LastChar + (bend - buf) - (q - op) >= InputLim)
 	goto excl_err;
-    c_copy(q, q + (bend - buf) - (q - op), LastChar - q);
+    (void) memmove((ptr_t) (q + (bend - buf) - (q - op)), (ptr_t) q, 
+		   (size_t) ((LastChar - q) * sizeof(Char)));
     LastChar += (bend - buf) - (q - op);
     Cursor += (bend - buf) - (q - op);
-    c_copy(buf, op, (bend - buf));
+    (void) memmove((ptr_t) op, (ptr_t) buf, 
+		   (size_t) ((bend - buf) * sizeof(Char)));
     *LastChar = '\0';
     return(op + (bend - buf));
 excl_err:
@@ -1285,7 +1262,7 @@ e_newline(c)
     *LastChar = '\0';		/* just in case */
     if (VImode)
 	InsertPos = InputBuf;	/* Reset editing position */
-    return(CC_NEWLINE);	/* we must do a ResetInLine later */
+    return(CC_NEWLINE);
 }
 
 /*ARGSUSED*/
@@ -1295,9 +1272,6 @@ e_send_eof(c)
 {				/* for when ^D is ONLY send-eof */
     PastBottom();
     *LastChar = '\0';		/* just in case */
-#ifdef notdef
-    ResetInLine();		/* reset the input pointers */
-#endif
     return(CC_EOF);
 }
 
@@ -1308,6 +1282,15 @@ e_complete(c)
 {
     *LastChar = '\0';		/* just in case */
     return(CC_COMPLETE);
+}
+
+/*ARGSUSED*/
+CCRETVAL
+e_complete_all(c)
+    int c;
+{
+    *LastChar = '\0';		/* just in case */
+    return(CC_COMPLETE_ALL);
 }
 
 /*ARGSUSED*/
@@ -1457,7 +1440,7 @@ c_hsetpat()
 #ifdef SDEBUG
     xprintf("\nHist_num = %d\n", Hist_num);
     xprintf("patlen = %d\n", patlen);
-    xprintf("patbuf = \"%s\"\n", short2str(patbuf));
+    xprintf("patbuf = \"%S\"\n", patbuf);
     xprintf("Cursor %d LastChar %d\n", Cursor - InputBuf, LastChar - InputBuf);
 #endif
 }
@@ -1499,14 +1482,16 @@ e_up_search_hist(c)
 	hp = hp->Hnext;
 
     while (hp != NULL) {
+	Char sbuf[BUFSIZE], *hl;
 	if (hp->histline == NULL) {
-	    Char sbuf[BUFSIZE];
 	    hp->histline = Strsave(sprlex(sbuf, &hp->Hlex));
 	}
+	hl = HistLit ? hp->histline : sprlex(sbuf, &hp->Hlex);
 #ifdef SDEBUG
-	xprintf("Comparing with \"%s\"\n", short2str(hp->histline));
+	xprintf("Comparing with \"%S\"\n", hl);
 #endif
-	if ((Strncmp(hp->histline, InputBuf, LastChar-InputBuf) || hp->histline[LastChar-InputBuf]) && c_hmatch(hp->histline)) {
+	if ((Strncmp(hl, InputBuf, LastChar-InputBuf) || 
+	     hl[LastChar-InputBuf]) && c_hmatch(hl)) {
 	    found++;
 	    break;
 	}
@@ -1549,14 +1534,16 @@ e_down_search_hist(c)
     c_hsetpat();		/* Set search pattern !! */
 
     for (h = 1; h < Hist_num && hp; h++) {
+	Char sbuf[BUFSIZE], *hl;
 	if (hp->histline == NULL) {
-	    Char sbuf[BUFSIZE];
 	    hp->histline = Strsave(sprlex(sbuf, &hp->Hlex));
 	}
+	hl = HistLit ? hp->histline : sprlex(sbuf, &hp->Hlex);
 #ifdef SDEBUG
-	xprintf("Comparing with \"%s\"\n", short2str(hp->histline));
+	xprintf("Comparing with \"%S\"\n", hl);
 #endif
-	if ((Strncmp(hp->histline, InputBuf, LastChar-InputBuf) || hp->histline[LastChar-InputBuf]) && c_hmatch(hp->histline))
+	if ((Strncmp(hl, InputBuf, LastChar-InputBuf) || 
+	     hl[LastChar-InputBuf]) && c_hmatch(hl))
 	    found = h;
 	hp = hp->Hnext;
     }
@@ -1642,6 +1629,16 @@ e_list_choices(c)
     PastBottom();
     *LastChar = '\0';		/* just in case */
     return(CC_LIST_CHOICES);
+}
+
+/*ARGSUSED*/
+CCRETVAL
+e_list_all(c)
+    int c;
+{
+    PastBottom();
+    *LastChar = '\0';		/* just in case */
+    return(CC_LIST_ALL);
 }
 
 /*ARGSUSED*/
@@ -1823,6 +1820,31 @@ e_delwordprev(c)
 	Cursor = InputBuf;	/* bounds check */
     return(CC_REFRESH);
 }
+
+/* added by mtk@ari.ncl.omron.co.jp (920818) */
+/* rename e_delnext() -> e_delnext_eof() */
+/*ARGSUSED*/
+CCRETVAL
+e_delnext_eof(c)
+    int c;
+{
+    if (Cursor == LastChar) {/* if I'm at the end */
+	if (!VImode) {
+		return(CC_ERROR);
+	}
+	else {
+	    if (Cursor != InputBuf)
+		Cursor--;
+	    else
+		return(CC_ERROR);
+	}
+    }
+    c_delafter(Argument);	/* delete after dot */
+    if (Cursor > LastChar)
+	Cursor = LastChar;	/* bounds check */
+    return(CC_REFRESH);
+}
+
 
 /*ARGSUSED*/
 CCRETVAL
@@ -2265,8 +2287,8 @@ v_repeat_srch(c)
     int c;
 {
 #ifdef SDEBUG
-    xprintf("dir %d patlen %d patbuf %s\n", 
-	    c, patlen, short2str(patbuf));
+    xprintf("dir %d patlen %d patbuf %S\n", 
+	    c, patlen, patbuf);
 #endif
 
     LastCmd = (KEYCMD) c;  /* Hack to stop c_hsetpat */
@@ -2386,6 +2408,7 @@ v_action(c)
     }
 #endif
 }
+
 #ifdef COMMENT
 /* by: Brian Allison <uiucdcs!convex!allison@RUTGERS.EDU> */
 static void
@@ -2405,7 +2428,7 @@ c_get_word(begin, end)
 	*begin = ++cp;
     }
 }
-#endif				/* COMMENT */
+#endif /* COMMENT */
 
 /*ARGSUSED*/
 CCRETVAL
@@ -2716,7 +2739,7 @@ CCRETVAL
 e_startover(c)
     int c;
 {				/* erase all of current line, start again */
-    ResetInLine();		/* reset the input pointers */
+    ResetInLine(0);		/* reset the input pointers */
     return(CC_REFRESH);
 }
 
@@ -2747,7 +2770,7 @@ e_tty_int(c)
 {			
 #ifdef _MINIX
     /* SAK PATCH: erase all of current line, start again */
-    ResetInLine();		/* reset the input pointers */
+    ResetInLine(0);		/* reset the input pointers */
     xputchar('\n');
     ClearDisp();
     return (CC_REFRESH);
@@ -2756,7 +2779,36 @@ e_tty_int(c)
     return (CC_NORM);
 #endif /* _MINIX */
 }
-  
+
+/*
+ * From: ghazi@cesl.rutgers.edu (Kaveh R. Ghazi)
+ * Function to send a character back to the input stream in cooked
+ * mode. Only works if we have TIOCSTI
+ */
+/*ARGSUSED*/
+CCRETVAL
+e_stuff_char(c)
+     int c;
+{
+#ifdef TIOCSTI
+     extern int Tty_raw_mode;
+     int was_raw = Tty_raw_mode;
+     char ch = c;
+
+     if (was_raw)
+         Cookedmode();
+
+     write(SHIN, "\n", 1);
+     (void) ioctl(SHIN, TIOCSTI, (ioctl_t) &ch);
+
+     if (was_raw)
+         Rawmode();
+     return(e_redisp(c));
+#else /* !TIOCSTI */  
+     return(CC_ERROR);
+#endif /* !TIOCSTI */  
+}
+
 /*ARGSUSED*/
 CCRETVAL
 e_insovr(c)

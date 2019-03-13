@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/ed.inputl.c,v 3.21 1992/04/10 16:45:27 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/ed.inputl.c,v 3.31 1992/11/13 04:19:10 christos Exp $ */
 /*
  * ed.inputl.c: Input line handling.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.inputl.c,v 3.21 1992/04/10 16:45:27 christos Exp $")
+RCSID("$Id: ed.inputl.c,v 3.31 1992/11/13 04:19:10 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -78,16 +78,24 @@ Inputl()
     Char   *SaveChar, *CorrChar;
     Char    Origin[INBUFSIZE], Change[INBUFSIZE];
     int     matchval;		/* from tenematch() */
+    COMMAND fn;
 
     if (!MapsAreInited)		/* double extra just in case */
 	ed_InitMaps();
 
     ClearDisp();		/* reset the display stuff */
-    ResetInLine();		/* reset the input pointers */
+    ResetInLine(0);		/* reset the input pointers */
     if (GettingInput)
 	MacroLvl = -1;		/* editor was interrupted during input */
 
-#ifdef FIONREAD
+    if (imode) {
+	if (!Strcmp(*(imode->vec), STRinsert))
+	    inputmode = MODE_INSERT;
+	else if (!Strcmp(*(imode->vec), STRoverwrite))
+	    inputmode = MODE_REPLACE;
+    }
+
+#if defined(FIONREAD) && !defined(OREO)
     if (!Tty_raw_mode && MacroLvl < 0) {
 	long    chrs = 0;
 
@@ -97,7 +105,7 @@ Inputl()
 		return 0;
 	}
     }
-#endif
+#endif /* FIONREAD && !OREO */
 
     GettingInput = 1;
     NeedsRedraw = 0;
@@ -166,9 +174,6 @@ Inputl()
 	    break;		/* keep going... */
 
 	case CC_EOF:		/* end of file typed */
-#ifdef notdef
-	    PromptBuf[0] = '\0';
-#endif
 	    num = 0;
 	    break;
 
@@ -181,9 +186,6 @@ Inputl()
 	    HistWhich = Hist_num;
 	    Hist_num = 0;	/* for the history commands */
 	    num = LastChar - InputBuf;	/* number characters read */
-#ifdef notdef
-	    ResetInLine();	/* reset the input pointers */
-#endif
 	    break;
 
 	case CC_NEWLINE:	/* normal end of line */
@@ -216,6 +218,14 @@ Inputl()
 			    Refresh();
 			    break;
 			}
+			else if (ch == 'a') {
+			    xprintf("abort\n");
+			    *LastChar = '\0';
+			    Cursor = LastChar;
+			    printprompt(0, NULL);
+			    Refresh();
+			    break;
+			}
 			xprintf("no\n");
 		    }
 		    flush();
@@ -227,17 +237,7 @@ Inputl()
 	    /*
 	     * For continuation lines, we set the prompt to prompt 2
 	     */
-	    if (imode) {
-		if (!Strcmp(*(imode->vec), STRinsert))
-		    inputmode = MODE_INSERT;
-		else if (!Strcmp(*(imode->vec), STRoverwrite))
-		    inputmode = MODE_REPLACE;
-	    }
 	    printprompt(1, NULL);
-#ifdef notdef
-	    ResetInLine();	/* reset the input pointers */
-	    PromptBuf[0] = '\0';
-#endif
 	    break;
 
 	case CC_CORRECT:
@@ -268,6 +268,8 @@ Inputl()
 
 
 	case CC_COMPLETE:
+	case CC_COMPLETE_ALL:
+	    fn = (retval == CC_COMPLETE_ALL) ? RECOGNIZE_ALL : RECOGNIZE;
 	    if (adrof(STRautoexpand))
 		(void) e_expand_history(0);
 	    /*
@@ -276,7 +278,7 @@ Inputl()
 	     * completion, independently of autolisting.
 	     */
 	    expnum = Cursor - InputBuf;
-	    switch (matchval = tenematch(InputBuf, Cursor-InputBuf, RECOGNIZE)){
+	    switch (matchval = tenematch(InputBuf, Cursor-InputBuf, fn)){
 	    case 1:
 		if (non_unique_match && matchbeep &&
 		    (Strcmp(*(matchbeep->vec), STRnotunique) == 0))
@@ -313,7 +315,8 @@ Inputl()
 		if (autol && (Strcmp(*(autol->vec), STRambiguous) != 0 || 
 				     expnum == Cursor - InputBuf)) {
 		    PastBottom();
-		    (void) tenematch(InputBuf, Cursor-InputBuf, LIST);
+		    fn = (retval == CC_COMPLETE_ALL) ? LIST_ALL : LIST;
+		    (void) tenematch(InputBuf, Cursor-InputBuf, fn);
 		}
 		break;
 	    }
@@ -329,13 +332,16 @@ Inputl()
 	    break;
 
 	case CC_LIST_CHOICES:
+	case CC_LIST_ALL:
+	    fn = (retval == CC_LIST_ALL) ? LIST_ALL : LIST;
 	    /* should catch ^C here... */
-	    if (tenematch(InputBuf, Cursor - InputBuf, LIST) < 0)
+	    if (tenematch(InputBuf, Cursor - InputBuf, fn) < 0)
 		Beep();
 	    Refresh();
 	    Argument = 1;
 	    DoingArg = 0;
 	    break;
+
 
 	case CC_LIST_GLOB:
 	    if (tenematch(InputBuf, Cursor - InputBuf, GLOB) < 0)
@@ -399,7 +405,7 @@ Inputl()
 #endif				/* DEBUG_EDIT */
 	    /* put (real) cursor in a known place */
 	    ClearDisp();	/* reset the display stuff */
-	    ResetInLine();	/* reset the input pointers */
+	    ResetInLine(1);	/* reset the input pointers */
 	    Refresh();		/* print the prompt again */
 	    Argument = 1;
 	    DoingArg = 0;
@@ -447,7 +453,7 @@ doeval1(v)
     Char   *oevalp;
     int     my_reenter;
     Char  **savegv;
-    jmp_buf osetexit;
+    jmp_buf_t osetexit;
 
     oevalvec = evalvec;
     oevalp = evalp;
@@ -508,11 +514,17 @@ RunCommand(str)
     cmd[0] = str;
     cmd[1] = NULL;
 
+    (void) Cookedmode();
+    GettingInput = 0;
+
     doeval1(cmd);
     
+    (void) Rawmode();
+    GettingInput = 1;
+
     ClearLines();
     ClearDisp();
-    NeedsRedraw = 1;
+    NeedsRedraw = 0;
     Refresh();
 }
 
@@ -531,7 +543,7 @@ GetNextCommand(cmdnum, ch)
 #ifdef	KANJI
 	if (!adrof(STRnokanji) && (*ch & META)) {
 	    MetaNext = 0;
-	    cmd = CcViMap[' '];
+	    cmd = F_INSERT;
 	    break;
 	}
 	else
@@ -570,12 +582,7 @@ GetNextChar(cp)
     register Char *cp;
 {
     register int num_read;
-#if defined(EWOULDBLOCK) || (defined(POSIX) && defined(EAGAIN))
-# if defined(FIONBIO) || (defined(F_SETFL) && defined(O_NDELAY))
-#  define TRY_AGAIN
     int     tried = 0;
-# endif /* FIONBIO || (F_SETFL && O_NDELAY) */
-#endif /* EWOULDBLOCK || (POSIX && EAGAIN) */
     unsigned char tcp;
 
     for (;;) {
@@ -597,44 +604,16 @@ GetNextChar(cp)
     if (Rawmode() < 0)		/* make sure the tty is set up correctly */
 	return 0;		/* oops: SHIN was closed */
 
-    while ((num_read = read(SHIN, (char *) &tcp, 1)) == -1)
-	switch (errno) {
-	    /*
-	     * Someone might have set our file descriptor to non blocking From
-	     * Gray Watson (gray%antr.uucp@med.pitt.edu), Thanks!!!
-	     */
-#ifdef EWOULDBLOCK
-	case EWOULDBLOCK:
-#endif /* EWOULDBLOCK */
-#if defined(POSIX) && defined(EAGAIN)
-# if defined(EWOULDBLOCK) && EAGAIN != EWOULDBLOCK
-	case EAGAIN:
-# endif /* EWOULDBLOCK && EAGAIN != EWOULDBLOCK */
-#endif /* POSIX && EAGAIN */
-#ifdef TRY_AGAIN
-	    if (!tried) {
-# if defined(F_SETFL) && defined(O_NDELAY)
-		(void) fcntl(SHIN, F_SETFL,
-			     fcntl(SHIN, F_GETFL, 0) & ~O_NDELAY);
-# endif /* F_SETFL && O_NDELAY */
-# ifdef FIONBIO
-		(void) ioctl(SHIN, FIONBIO, (ioctl_t) & tried);
-# endif /* FIONBIO */
-		tried = 1;
-		break;
-	    }
-	    *cp = tcp;
-	    return (num_read);
-#endif /* TRY_AGAIN */
-	case EINTR:
-	    break;
-	default:
-#ifdef DEBUG_EDIT
-	    xprintf("GetNextChar(): errno == %d\n", errno);
-#endif /* DEBUG_EDIT */
-	    *cp = tcp;
-	    return num_read;
+    while ((num_read = read(SHIN, (char *) &tcp, 1)) == -1) {
+	if (errno == EINTR)
+	    continue;
+	if (!tried && fixio(SHIN, errno) != -1)
+	    tried = 1;
+	else {
+	    *cp = '\0';
+	    return -1;
 	}
+    }
     *cp = tcp;
     return num_read;
 }

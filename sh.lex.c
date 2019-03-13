@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.lex.c,v 3.20 1992/05/15 23:49:22 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.lex.c,v 3.27 1992/11/13 04:19:10 christos Exp $ */
 /*
  * sh.lex.c: Lexical analysis into tokens
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.lex.c,v 3.20 1992/05/15 23:49:22 christos Exp $")
+RCSID("$Id: sh.lex.c,v 3.27 1992/11/13 04:19:10 christos Exp $")
 
 #include "ed.h"
 /* #define DEBUG_INP */
@@ -133,12 +133,20 @@ static Char getCtmp;
 #define	ungetC(c)	peekc = (Char) c
 #define	ungetD(c)	peekd = (Char) c
 
+/* Use Htime to store timestamps picked up from history file for enthist()
+ * if reading saved history (sg)
+ */
+time_t Htime = (time_t)0;
+static time_t a2time_t __P((Char *));
+
+
 int
 lex(hp)
-    register struct wordent *hp;
+    struct wordent *hp;
 {
-    register struct wordent *wdp;
+    struct wordent *wdp;
     int     c;
+
 
     histvalid = 0;
     histlinep = histline;
@@ -162,17 +170,17 @@ lex(hp)
      * be ready and rarin to go even if it is interrupted.
      */
     do {
-	register struct wordent *new;
+	struct wordent *new;
 
 	new = (struct wordent *) xmalloc((size_t) sizeof(*wdp));
-	new->word = 0;
+	new->word = STRNULL;
 	new->prev = wdp;
 	new->next = hp;
 	wdp->next = new;
+	hp->prev = new;
 	wdp = new;
 	wdp->word = word();
     } while (wdp->word[0] != '\n');
-    hp->prev = wdp;
     if (histlinep < histline + BUFSIZE) {
 	*histlinep = '\0';
 	if (histlinep > histline && histlinep[-1] == '\n')
@@ -186,14 +194,41 @@ lex(hp)
     return (hadhist);
 }
 
+static time_t
+a2time_t(word)
+    Char * word;
+{
+    /* Attempt to distinguish timestamps from other possible entries.
+     * Format: "+NNNNNNNNNN" (10 digits, left padded with ascii '0') */
+
+    time_t ret;
+    Char *s;
+    int ct;
+
+    if (!word || *(s = word) != '+')
+	return (time_t)0;
+
+    for (++s, ret = 0, ct = 0; *s; ++s, ++ct)
+    {
+	if (!isdigit((unsigned char)*s))
+	    return (time_t)0;
+	ret = ret * 10 + (time_t)((unsigned char)*s - '0');
+    }
+
+    if (ct != 10)
+	return (time_t)0;
+
+    return ret;
+}
+
 void
 prlex(sp0)
     struct wordent *sp0;
 {
-    register struct wordent *sp = sp0->next;
+    struct wordent *sp = sp0->next;
 
     for (;;) {
-	xprintf("%s", short2str(sp->word));
+	xprintf("%S", sp->word);
 	sp = sp->next;
 	if (sp == sp0)
 	    break;
@@ -204,37 +239,39 @@ prlex(sp0)
 
 void
 copylex(hp, fp)
-    register struct wordent *hp;
-    register struct wordent *fp;
+    struct wordent *hp;
+    struct wordent *fp;
 {
-    register struct wordent *wdp;
+    struct wordent *wdp;
 
     wdp = hp;
     fp = fp->next;
     do {
-	register struct wordent *new;
+	struct wordent *new;
 	
 	new = (struct wordent *) xmalloc((size_t) sizeof(*wdp));
+	new->word = STRNULL;
 	new->prev = wdp;
 	new->next = hp;
 	wdp->next = new;
+	hp->prev = new;
 	wdp = new;
 	wdp->word = Strsave(fp->word);
 	fp = fp->next;
     } while (wdp->word[0] != '\n');
-    hp->prev = wdp;
 }
 
 void
 freelex(vp)
-    register struct wordent *vp;
+    struct wordent *vp;
 {
-    register struct wordent *fp;
+    struct wordent *fp;
 
     while (vp->next != vp) {
 	fp = vp->next;
 	vp->next = fp->next;
-	xfree((ptr_t) fp->word);
+	if (fp->word != STRNULL)
+	    xfree((ptr_t) fp->word);
 	xfree((ptr_t) fp);
     }
     vp->prev = vp;
@@ -243,11 +280,12 @@ freelex(vp)
 static Char *
 word()
 {
-    register Char c, c1;
-    register Char *wp;
+    Char c, c1;
+    Char *wp;
     Char    wbuf[BUFSIZE];
-    register bool dolflg;
-    register int i;
+    Char    hbuf[12], h;
+    bool dolflg;
+    int i;
 
     wp = wbuf;
     i = BUFSIZE - 4;
@@ -272,10 +310,15 @@ loop:
 	    if (intty)
 		break;
 	    c = 0;
+	    h = 0;
 	    do {
 		c1 = c;
 		c = getC(0);
+		if (h < 12)
+		    hbuf[h++] = c;
 	    } while (c != '\n');
+	    hbuf[11] = '\0';
+	    Htime = a2time_t(hbuf); 
 	    if (c1 == '\\')
 		goto loop;
 	    /*FALLTHROUGH*/
@@ -380,9 +423,9 @@ ret:
 
 static int
 getC1(flag)
-    register int flag;
+    int flag;
 {
-    register Char c;
+    Char c;
 
     for (;;) {
 	if ((c = peekc) != 0) {
@@ -438,9 +481,9 @@ getC1(flag)
 static void
 getdol()
 {
-    register Char *np, *ep;
+    Char *np, *ep;
     Char    name[4 * MAXVARLEN + 1];
-    register int c;
+    int c;
     int     sc;
     bool    special = 0, toolong;
 
@@ -453,7 +496,7 @@ getdol()
     }
     if (c == '{')
 	*np++ = (Char) c, c = getC(DOEXCL);
-    if (c == '#' || c == '?')
+    if (c == '#' || c == '?' || c == '%')
 	special++, *np++ = (Char) c, c = getC(DOEXCL);
     *np++ = (Char) c;
     switch (c) {
@@ -470,7 +513,8 @@ getdol()
     case '\n':
 	ungetD(c);
 	np--;
-	seterror(ERR_NEWLINE);
+	if (!special)
+	    seterror(ERR_NEWLINE);
 	*np = 0;
 	addla(name);
 	return;
@@ -520,10 +564,14 @@ getdol()
 	    }
 	}
 	else {
-	    *np = 0;
-	    seterror(ERR_VARILL);
-	    addla(name);
-	    return;
+	    if (!special)
+		seterror(ERR_VARILL);
+	    else {
+		ungetD(c);
+		*--np = 0;
+		addla(name);
+		return;
+	    }
 	}
 	if (toolong) {
 	    seterror(ERR_VARTOOLONG);
@@ -619,7 +667,7 @@ getdol()
 	    if (!any("htrqxesul", c)) {
 		if ((amodflag || gmodflag) && c == '\n')
 		    stderror(ERR_VARSYN);	/* strike */
-		seterror(ERR_VARMOD, c);
+		seterror(ERR_BADMOD, c);
 		*np = 0;
 		addla(name);
 		return;
@@ -676,9 +724,9 @@ static void
 getexcl(sc)
     int    sc;
 {
-    register struct wordent *hp, *ip;
+    struct wordent *hp, *ip;
     int     left, right, dol;
-    register int c;
+    int c;
 
     if (sc == 0) {
 	sc = getC(0);
@@ -753,9 +801,9 @@ static struct wordent *
 getsub(en)
     struct wordent *en;
 {
-    register Char *cp;
+    Char *cp;
     int     delim;
-    register int c;
+    int c;
     int     sc;
     bool global;
     Char    orhsb[sizeof(rhsb) / sizeof(Char)];
@@ -892,6 +940,17 @@ getsub(en)
     return (en);
 }
 
+/*
+ * 
+ * From Beto Appleton (beto@aixwiz.austin.ibm.com)
+ *
+ * when using history substitution, and the variable
+ * 'history' is set to a value higher than 1000,
+ * the shell might either freeze (hang) or core-dump.
+ * We raise the limit to 50000000
+ */
+
+#define HIST_PURGE -50000000
 static struct wordent *
 dosub(sc, en, global)
     int     sc;
@@ -901,12 +960,13 @@ dosub(sc, en, global)
     struct wordent lexi;
     bool    didsub = 0, didone = 0;
     struct wordent *hp = &lexi;
-    register struct wordent *wdp;
-    register int i = exclc;
+    struct wordent *wdp;
+    int i = exclc;
+    struct Hist *hst;
 
     wdp = hp;
     while (--i >= 0) {
-	register struct wordent *new = 
+	struct wordent *new = 
 		(struct wordent *) xcalloc(1, sizeof *wdp);
 
 	new->word = 0;
@@ -943,7 +1003,12 @@ dosub(sc, en, global)
     if (didsub == 0)
 	seterror(ERR_MODFAIL);
     hp->prev = wdp;
-    return (&enthist(-1000, &lexi, 0)->Hlex);
+    /* 
+     * ANSI mode HP/UX compiler chokes on
+     * return &enthist(HIST_PURGE, &lexi, 0)->Hlex;
+     */
+    hst = enthist(HIST_PURGE, &lexi, 0);
+    return &(hst->Hlex);
 }
 
 static Char *
@@ -953,8 +1018,8 @@ subword(cp, type, adid)
     bool   *adid;
 {
     Char    wbuf[BUFSIZE];
-    register Char *wp, *mp, *np;
-    register int i;
+    Char *wp, *mp, *np;
+    int i;
 
     *adid = 0;
     switch (type) {
@@ -1027,8 +1092,8 @@ domod(cp, type)
     Char   *cp;
     int     type;
 {
-    register Char *wp, *xp;
-    register int c;
+    Char *wp, *xp;
+    int c;
 
     switch (type) {
 
@@ -1091,7 +1156,7 @@ domod(cp, type)
 
 static int
 matchs(str, pat)
-    register Char *str, *pat;
+    Char *str, *pat;
 {
     while (*str && *pat && *str == *pat)
 	str++, pat++;
@@ -1100,11 +1165,11 @@ matchs(str, pat)
 
 static int
 getsel(al, ar, dol)
-    register int *al, *ar;
+    int *al, *ar;
     int     dol;
 {
-    register int c = getC(0);
-    register int i;
+    int c = getC(0);
+    int i;
     bool    first = *al < 0;
 
     switch (c) {
@@ -1188,9 +1253,9 @@ static struct wordent *
 gethent(sc)
     int     sc;
 {
-    register struct Hist *hp;
-    register Char *np;
-    register int c;
+    struct Hist *hp;
+    Char *np;
+    int c;
     int     event;
     bool    back = 0;
 
@@ -1315,12 +1380,12 @@ findev(cp, anyarg)
     Char   *cp;
     bool    anyarg;
 {
-    register struct Hist *hp;
+    struct Hist *hp;
 
     for (hp = Histlist.Hnext; hp; hp = hp->Hnext) {
 	Char   *dp;
-	register Char *p, *q;
-	register struct wordent *lp = hp->Hlex.next;
+	Char *p, *q;
+	struct wordent *lp = hp->Hlex.next;
 	int     argno = 0;
 
 	/*
@@ -1364,7 +1429,7 @@ findev(cp, anyarg)
 
 static void
 setexclp(cp)
-    register Char *cp;
+    Char *cp;
 {
     if (cp && cp[0] == '\n')
 	return;
@@ -1382,7 +1447,7 @@ int
 readc(wanteof)
     bool    wanteof;
 {
-    register int c;
+    int c;
     static  sincereal;
 
 #ifdef DEBUG_INP
@@ -1497,6 +1562,9 @@ reread:
 		    (ctpgrp = tcgetpgrp(FSHTTY)) != -1 &&
 		    tpgrp != ctpgrp) {
 		    (void) tcsetpgrp(FSHTTY, tpgrp);
+# ifdef _SEQUENT_
+		    if (ctpgrp)
+# endif /* _SEQUENT */
 		    (void) killpg((pid_t) ctpgrp, SIGHUP);
 		    xprintf("Reset tty pgrp from %d to %d\n", ctpgrp, tpgrp);
 		    goto reread;
@@ -1528,9 +1596,9 @@ reread:
 static int
 bgetc()
 {
-    register int buf, off;
+    int buf;
     int c;
-    register int numleft = 0, roomleft;
+    int numleft = 0, roomleft;
     extern Char InputBuf[];
     char    tbuf[BUFSIZE + 1];
 
@@ -1559,7 +1627,7 @@ bgetc()
 again:
     buf = (int) fseekp / BUFSIZE;
     if (buf >= fblocks) {
-	register Char **nfbuf =
+	Char **nfbuf =
 	(Char **) xcalloc((size_t) (fblocks + 2),
 			  sizeof(Char **));
 
@@ -1574,8 +1642,9 @@ again:
 	    goto again;
     }
     if (fseekp >= feobp) {
-	buf = (int) feobp / BUFSIZE;
+	int off;
 	off = (int) feobp % BUFSIZE;
+	buf = (int) feobp / BUFSIZE;
 	roomleft = BUFSIZE - off;
 	for (;;) {
 	    if (editing && intty) {	/* then use twenex routine */
@@ -1586,10 +1655,25 @@ again:
 		    numleft = c;
 		    goto again;
 		}
-		if (c > 0)
-		    copy((char *) (fbuf[buf] + off),
-			 (char *) InputBuf, (int) (c * sizeof(Char)));
-		/* copy (fbuf[buf] + off, ttyline, c); */
+		if (c > 0) {
+		    /* 
+		     * Cannot really happen, but it does! 
+		     * I really cannot explain why the following if 
+		     * statement can get executed, but at least when it
+		     * does we are not going to core-dump any more.
+		     * It has something to do with a weird interaction
+		     * with run-fg-editor or interrupts I think, but 
+		     * I have not been able to pin it down!
+		     */
+		    if (buf >= fblocks || off > BUFSIZE) {
+			/* start with fresh buffer */
+			feobp = fseekp = fblocks * BUFSIZE;
+			numleft = c;
+			goto again;
+		    }
+		    (void) memmove((ptr_t) (fbuf[buf] + off), (ptr_t) InputBuf,
+				   (size_t) (c * sizeof(Char)));
+		}
 		numleft = 0;
 	    }
 	    else {
@@ -1604,38 +1688,7 @@ again:
 	    }
 	    if (c >= 0)
 		break;
-	    switch (errno) {
-#ifdef EWOULDBLOCK
-	    case EWOULDBLOCK:
-# define TRY_AGAIN
-#endif /* EWOULDBLOCK */
-#if defined(POSIX) && defined(EAGAIN)
-# if defined(EWOULDBLOCK) && EWOULDBLOCK != EAGAIN
-	    case EAGAIN:
-#  define TRY_AGAIN
-# endif /* EWOULDBLOCK && EWOULDBLOCK != EAGAIN */
-#endif /* POSIX && EAGAIN */
-#ifdef TRY_AGAIN
-# if defined(F_SETFL) && defined(O_NDELAY)
-		(void) fcntl(SHIN, F_SETFL, fcntl(SHIN,F_GETFL,0) & ~O_NDELAY);
-# endif /* F_SETFL && O_NDELAY */
-# ifdef FIONBIO
-		c = 0;
-		(void) ioctl(SHIN, FIONBIO, (ioctl_t) &c);
-# endif	/* FIONBIO */
-# if (defined(F_SETFL) && defined(O_NDELAY)) || defined(FIONBIO)
-		c = 0;
-# endif	/* (F_SETFL && O_NDELAY) || FIONBIO */
-		break;
-#endif /* TRY_AGAIN */
-	    case EINTR:
-		c = 0;
-		break;
-	    default:
-		c = -1;
-		break;
-	    }
-	    if (c == -1)
+	    if ((c = fixio(SHIN, errno)) == -1)
 		break;
 	}
 	if (c <= 0)
@@ -1652,7 +1705,7 @@ again:
 static void
 bfree()
 {
-    register int sb, i;
+    int sb, i;
 
     if (cantell)
 	return;
@@ -1751,14 +1804,15 @@ btoeof()
 void
 settell()
 {
+    off_t x;
     cantell = 0;
     if (arginp || onelflg || intty)
 	return;
-    if (lseek(SHIN, (off_t) 0, L_INCR) < 0 || errno == ESPIPE)
+    if ((x = lseek(SHIN, (off_t) 0, L_INCR)) == -1)
 	return;
     fbuf = (Char **) xcalloc(2, sizeof(Char **));
     fblocks = 1;
     fbuf[0] = (Char *) xcalloc(BUFSIZE, sizeof(Char));
-    fseekp = fbobp = feobp = lseek(SHIN, (off_t) 0, L_INCR);
+    fseekp = fbobp = feobp = x;
     cantell = 1;
 }

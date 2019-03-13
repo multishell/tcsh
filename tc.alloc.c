@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.alloc.c,v 3.12 1992/05/02 23:39:58 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.alloc.c,v 3.19 1992/11/13 04:19:10 christos Exp $ */
 /*
  * tc.alloc.c (Caltech) 2/21/82
  * Chris Kingsley, kingsley@cit-20.
@@ -44,16 +44,24 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.alloc.c,v 3.12 1992/05/02 23:39:58 christos Exp $")
+RCSID("$Id: tc.alloc.c,v 3.19 1992/11/13 04:19:10 christos Exp $")
 
 static char   *memtop = NULL;		/* PWP: top of current memory */
 static char   *membot = NULL;		/* PWP: bottom of allocatable memory */
+
+int dont_free = 0;
 
 #ifndef SYSMALLOC
 
 #undef RCHECK
 #undef DEBUG
 
+/*
+ * Lots of os routines are busted and try to free invalid pointers. 
+ * Although our free routine is smart enough and it will pick bad 
+ * pointers most of the time, in cases where we know we are going to get
+ * a bad pointer, we'd rather leak.
+ */
 
 #ifndef NULL
 #define	NULL 0
@@ -111,10 +119,6 @@ union overhead {
  */
 #define	NBUCKETS ((sizeof(long) << 3) - 3)
 static union overhead *nextf[NBUCKETS];
-
-#ifdef sun
-extern ptr_t sbrk __P((int));
-#endif
 
 /*
  * nmalloc[i] is the difference between the number of mallocs and frees
@@ -214,7 +218,7 @@ malloc(nbytes)
 	return ((memalign_t) 0);
     else
 	return ((memalign_t) 0);
-#endif				/* !lint */
+#endif /* !lint */
 }
 
 #ifndef lint
@@ -284,7 +288,11 @@ free(cp)
     register int size;
     register union overhead *op;
 
-    if (cp == NULL)
+    /*
+     * the don't free flag is there so that we avoid os bugs in routines
+     * that free invalid pointers!
+     */
+    if (cp == NULL || dont_free)
 	return;
     CHECK(!memtop || !membot, "free(%lx) called before any allocations.", cp);
     CHECK(cp > (ptr_t) memtop, "free(%lx) above top of memory.", cp);
@@ -333,31 +341,6 @@ calloc(i, j)
 #endif
 }
 
-#ifndef lint
-/* PWP: a bcopy that does overlapping extents correctly */
-static void
-mybcopy(from, to, len)
-    char   *from, *to;
-    size_t len;
-{
-    register char *sp, *dp;
-
-    if (from == to)
-	return;
-    if (from < to) {
-	/* len is unsigned, len > 0 is equivalent to len != 0 */
-	for (sp = &from[len - 1], dp = &to[len - 1]; len != 0; len--, sp--, dp--)
-	    *dp = *sp;
-    }
-    else {
-	/* len is unsigned, len > 0 is equivalent to len != 0 */
-	for (sp = from, dp = to; len != 0; len--, sp++, dp++)
-	    *dp = *sp;
-    }
-}
-
-#endif
-
 /*
  * When a program attempts "storage compaction" as mentioned in the
  * old malloc man page, it realloc's an already freed block.  Usually
@@ -371,8 +354,7 @@ mybcopy(from, to, len)
  */
 #ifndef lint
 int     realloc_srchlen = 4;	/* 4 should be plenty, -1 =>'s whole list */
-
-#endif				/* lint */
+#endif /* lint */
 
 memalign_t
 realloc(cp, nbytes)
@@ -421,7 +403,8 @@ realloc(cp, nbytes)
 	 * smaller of the old and new size
 	 */
 	onb = (1 << (i + 3)) - MEMALIGN(sizeof(union overhead)) - RSLOP;
-	mybcopy(cp, res, onb < nbytes ? onb : nbytes);
+	(void) memmove((ptr_t) res, (ptr_t) cp, 
+		       (size_t) (onb < nbytes ? onb : nbytes));
     }
     if (was_alloced)
 	free(cp);
@@ -431,7 +414,7 @@ realloc(cp, nbytes)
 	return ((memalign_t) 0);
     else
 	return ((memalign_t) 0);
-#endif				/* !lint */
+#endif /* !lint */
 }
 
 
@@ -479,37 +462,58 @@ findbucket(freep, srchlen)
  ** Also we call our error routine if we run out of memory.
  **/
 memalign_t
-Malloc(n)
+smalloc(n)
     size_t  n;
 {
     ptr_t   ptr;
 
     n = n ? n : 1;
 
+#ifndef _VMS_POSIX
+    if (membot == NULL)
+	membot == (char*) sbrk(0);
+#endif /* !_VMS_POSIX */
+
     if ((ptr = malloc(n)) == (ptr_t) 0) {
 	child++;
 	stderror(ERR_NOMEM);
     }
+#ifdef _VMS_POSIX
+    if (memtop < ((char *) ptr) + n)
+	memtop = ((char *) ptr) + n;
+    if (membot == NULL)
+	membot = (char*) ptr;
+#endif /* _VMS_POSIX */
     return ((memalign_t) ptr);
 }
 
 memalign_t
-Realloc(p, n)
+srealloc(p, n)
     ptr_t   p;
     size_t  n;
 {
     ptr_t   ptr;
 
     n = n ? n : 1;
+
+    if (membot == NULL)
+	membot == (char*) sbrk(0);
+
     if ((ptr = (p ? realloc(p, n) : malloc(n))) == (ptr_t) 0) {
 	child++;
 	stderror(ERR_NOMEM);
     }
+#ifdef _VMS_POSIX
+    if (memtop < ((char *) ptr) + n)
+	memtop = ((char *) ptr) + n;
+    if (membot == NULL)
+	membot = (char*) ptr;
+#endif /* _VMS_POSIX */
     return ((memalign_t) ptr);
 }
 
 memalign_t
-Calloc(s, n)
+scalloc(s, n)
     size_t  s, n;
 {
     char   *sptr;
@@ -517,6 +521,10 @@ Calloc(s, n)
 
     n *= s;
     n = n ? n : 1;
+
+    if (membot == NULL)
+	membot == (char*) sbrk(0);
+
     if ((ptr = malloc(n)) == (ptr_t) 0) {
 	child++;
 	stderror(ERR_NOMEM);
@@ -528,18 +536,25 @@ Calloc(s, n)
 	    *sptr++ = 0;
 	while (--n);
 
+#ifdef _VMS_POSIX
+    if (memtop < ((char *) ptr) + n)
+	memtop = ((char *) ptr) + n;
+    if (membot == NULL)
+	membot = (char*) ptr;
+#endif /* _VMS_POSIX */
+
     return ((memalign_t) ptr);
 }
 
 void
-Free(p)
+sfree(p)
     ptr_t   p;
 {
-    if (p)
+    if (p && !dont_free)
 	free(p);
 }
 
-#endif				/* SYSMALLOC */
+#endif /* SYSMALLOC */
 
 /*
  * mstats - print out statistics about malloc
@@ -577,9 +592,11 @@ showall(v, c)
 	    (unsigned long) membot, (unsigned long) memtop,
 	    (unsigned long) sbrk(0));
 #else
+#ifndef _VMS_POSIX
     memtop = (char *) sbrk(0);
+#endif /* !_VMS_POSIX */
     xprintf("Allocated memory from 0x%lx to 0x%lx (%ld).\n",
 	    (unsigned long) membot, (unsigned long) memtop, 
 	    (unsigned long) (memtop - membot));
-#endif				/* SYSMALLOC */
+#endif /* SYSMALLOC */
 }

@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.decls.h,v 3.15 1992/05/09 04:03:53 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.decls.h,v 3.21 1992/10/14 20:19:19 christos Exp $ */
 /*
  * tc.decls.h: Function declarations from all the tcsh modules
  */
@@ -47,10 +47,10 @@ extern	memalign_t	  realloc	__P((ptr_t, size_t));
 extern	memalign_t	  calloc	__P((size_t, size_t));
 
 #else /* SYSMALLOC */
-extern	void		  Free		__P((ptr_t));
-extern	memalign_t	  Malloc	__P((size_t));
-extern	memalign_t	  Realloc	__P((ptr_t, size_t));
-extern	memalign_t	  Calloc	__P((size_t, size_t));
+extern	void		  sfree		__P((ptr_t));
+extern	memalign_t	  smalloc	__P((size_t));
+extern	memalign_t	  srealloc	__P((ptr_t, size_t));
+extern	memalign_t	  scalloc	__P((size_t, size_t));
 #endif /* SYSMALLOC */
 extern	void		  showall	__P((Char **, struct command *));
 
@@ -96,6 +96,11 @@ extern	Char		 *gettilde	__P((Char *));
 extern	Char		 *getusername	__P((Char **));
 extern	void		  doaliases	__P((Char **, struct command *));
 extern	void		  shlvl		__P((int));
+extern	int		  fixio		__P((int, int));
+extern	int		  collate	__P((const Char *, const Char *));
+#ifdef HASHBANG
+extern	int		  hashbang	__P((int, Char ***));
+#endif /* HASHBANG */
 
 
 /*
@@ -134,14 +139,23 @@ extern	int		  xtcsetpgrp	__P((int, int));
 # undef tcgetpgrp
 # define tcgetpgrp(a) 	  xtcgetpgrp(a)
 # undef tcsetpgrp
-# define tcsetpgrp(a, b)  xtcsetpgrp(a, b)
+# define tcsetpgrp(a, b)  xtcsetpgrp((a), (b))
 #endif /* NEEDtcgetpgrp */
 
 #ifdef YPBUGS
 extern	void	 	  fix_yp_bugs	__P((void));
 #endif /* YPBUGS */
+#ifdef STRCOLLBUG
+extern	void	 	  fix_strcoll_bug	__P((void));
+#endif /* STRCOLLBUG */
 
 extern	void	 	  osinit	__P((void));
+
+#ifdef NEEDmemmove
+extern void 		 *xmemmove	__P((ptr_t, const ptr_t, size_t));
+# define memmove(a, b, c) xmemmove((a), (b), (c))
+#endif /* NEEDmemmove */
+
 
 #ifdef NEEDgetwd
 extern	char		 *xgetwd	__P((char *));
@@ -152,7 +166,7 @@ extern	char		 *xgetwd	__P((char *));
 #ifdef NEEDgethostname
 extern	int	 	  xgethostname	__P((char *, int));
 # undef gethostname
-# define gethostname(a, b) xgethostname(a, b)
+# define gethostname(a, b) xgethostname((a), (b))
 #endif /* NEEDgethostname */
 
 #ifdef NEEDnice
@@ -187,6 +201,8 @@ extern	void		  xvsprintf	__P((char *, char *, va_list));
  * tc.prompt.c
  */
 extern	void		  printprompt	__P((int, char *));
+extern	void		  tprintf	__P((int, Char *, Char *, size_t, 
+					     char *, time_t, ptr_t));
 
 /*
  * tc.sched.c
@@ -199,72 +215,86 @@ extern	void		  sched_run	__P((void));
  * tc.sig.c
  */
 #ifndef BSDSIGS
-# if SYSVREL < 3 || defined(UNIXPC)
-extern	sigret_t	(*sigset	__P((int, sigret_t (*)(int)))) ();
-extern	void		  sigrelse	__P((int));
-extern	void		  sighold	__P((int));
-extern	void		  sigignore	__P((int));
-extern	void 		  sigpause	__P((int));
-# endif
+# ifdef UNRELSIGS
+#  ifdef COHERENT
+extern	sigret_t	(*xsignal	__P((int, sigret_t (*)(int)))) ();
+#   define signal(x,y)	  xsignal(x,y)
+#  endif /* COHERENT */
+extern	sigret_t	(*xsigset	__P((int, sigret_t (*)(int)))) ();
+#  define sigset(x,y)	  xsigset(x,y)
+extern	void		  xsigrelse	__P((int));
+#  define sigrelse(x)	  xsigrelse(x)
+extern	void		  xsighold	__P((int));
+#  define sighold(x)	  xsighold(x)
+extern	void		  xsigignore	__P((int));
+#  define sigignore(x)	  xsigignore(x)
+extern	void 		  xsigpause	__P((int));
+#  define sigpause(x)	  xsigpause(x)
+extern	pid_t 		  ourwait	__P((int *));
+# endif /* UNRELSIGS */
 # ifdef SXA
 extern	void 		  sigpause	__P((int));
-# endif
-extern	pid_t 		  ourwait	__P((int *));
-#endif
+# endif /* SXA */
+#endif /* !BSDSIGS */
+
 #ifdef NEEDsignal
 extern	sigret_t	(*xsignal	__P((int, sigret_t (*)(int)))) ();
-#define signal(a, b)	  xsignal(a, b)
-#endif
-#if defined(_SEQUENT_) || defined(linux)
+# define signal(a, b)	  xsignal(a, b)
+#endif /* NEEDsignal */
+#ifdef _SEQUENT_
 extern	sigmask_t	  sigsetmask	__P((sigmask_t));
 extern	sigmask_t	  sigblock	__P((sigmask_t));
 extern	void		  bsd_sigpause	__P((sigmask_t));
 extern  sigret_t        (*bsd_signal    __P((int, sigret_t (*)(int)))) ();
-#endif /* _SEQUENT_ || linux */
+#endif /* _SEQUENT_ */
 #ifdef SIGSYNCH
 extern	sigret_t	  synch_handler	__P((int));
-#endif
+#endif /* SIGSYNCH */
 
 
 /*
  * tc.str.c:
  */
 #ifdef SHORT_STRINGS
-extern	Char		 *s_strchr	__P((Char *, int));
-extern	Char		 *s_strrchr	__P((Char *, int));
-extern	Char		 *s_strcat	__P((Char *, Char *));
-#ifdef NOTUSED
-extern	Char		 *s_strncat	__P((Char *, Char *, size_t));
-#endif
-extern	Char		 *s_strcpy	__P((Char *, Char *));
-extern	Char		 *s_strncpy	__P((Char *, Char *, size_t));
-extern	Char		 *s_strspl	__P((Char *, Char *));
-extern	size_t		  s_strlen	__P((Char *));
-extern	int		  s_strcmp	__P((Char *, Char *));
-extern	int		  s_strncmp	__P((Char *, Char *, size_t));
-extern	Char		 *s_strsave	__P((Char *));
-extern	Char		 *s_strend	__P((Char *));
-extern	Char		 *s_strstr	__P((Char *, Char *));
-extern	Char		 *str2short	__P((char *));
+extern	Char		 *s_strchr	__P((const Char *, int));
+extern	Char		 *s_strrchr	__P((const Char *, int));
+extern	Char		 *s_strcat	__P((Char *, const Char *));
+# ifdef NOTUSED
+extern	Char		 *s_strncat	__P((Char *, const Char *, size_t));
+# endif /* NOTUSED */
+extern	Char		 *s_strcpy	__P((Char *, const Char *));
+extern	Char		 *s_strncpy	__P((Char *, const Char *, size_t));
+extern	Char		 *s_strspl	__P((const Char *, const Char *));
+extern	size_t		  s_strlen	__P((const Char *));
+extern	int		  s_strcmp	__P((const Char *, const Char *));
+extern	int		  s_strncmp	__P((const Char *, const Char *, 
+					     size_t));
+extern	Char		 *s_strsave	__P((const Char *));
+extern	Char		 *s_strend	__P((const Char *));
+extern	Char		 *s_strstr	__P((const Char *, const Char *));
+extern	Char		 *str2short	__P((const char *));
 extern	Char		**blk2short	__P((char **));
-extern	char		 *short2str	__P((Char *));
+extern	char		 *short2str	__P((const Char *));
 extern	char		**short2blk	__P((Char **));
-#endif
-extern	char		 *short2qstr	__P((Char *));
+#endif /* SHORT_STRINGS */
+extern	char		 *short2qstr	__P((const Char *));
 
 
 /*
  * tc.vers.h:
  */
 extern	void		  fix_version	__P((void));
-extern	Char		 *gethosttype	__P((void));
+extern	char		 *gethosttype	__P((void));
 
 /*
  * tc.who.c
  */
+#ifndef HAVENOUTMP
 extern	void		  initwatch	__P((void));
 extern	void		  resetwatch	__P((void));
 extern	void		  watch_login	__P((void));
+extern	char 		 *who_info	__P((ptr_t, int, char *));
 extern	void		  dolog		__P((Char **, struct command *));
+#endif /* HAVENOUTMP */
 
-#endif				/* _h_tc_decls */
+#endif /* _h_tc_decls */

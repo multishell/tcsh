@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/tw.comp.c,v 1.17 1992/04/24 22:28:11 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/tw.comp.c,v 1.20 1992/10/10 18:17:34 christos Exp $ */
 /*
  * tw.comp.c: File completion builtin
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tw.comp.c,v 1.17 1992/04/24 22:28:11 christos Exp $")
+RCSID("$Id: tw.comp.c,v 1.20 1992/10/10 18:17:34 christos Exp $")
 
 #include "tw.h"
 #include "ed.h"
@@ -315,8 +315,14 @@ tw_result(act, pat)
     case 'n':
 	looking = TW_NONE;
 	break;
+    case 'p':
+	looking = TW_PATHNAME;
+	break;
     case 's':
 	looking = TW_SHELLVAR;
+	break;
+    case 't':
+	looking = TW_TEXT;
 	break;
     case 'v':
 	looking = TW_VARIABLE;
@@ -344,6 +350,17 @@ tw_result(act, pat)
 	res = Strsave(act);
 	if ((act = Strchr(&res[1], '`')) != NULL)
 	    *++act = '\0';
+	
+	if (didfds == 0) {
+	    /*
+	     * Make sure that we have some file descriptors to
+	     * play with, so that the processes have at least 0, 1, 2
+	     * open
+	     */
+	    (void) dcopy(SHIN, 0);
+	    (void) dcopy(SHOUT, 1);
+	    (void) dcopy(SHDIAG, 2);
+	}
 	if ((act = globone(res, G_APPEND)) != NULL) {
 	    xfree((ptr_t) res), res = NULL;
 	    *pat = res = Strsave(act);

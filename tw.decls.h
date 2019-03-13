@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/tw.decls.h,v 3.9 1992/04/24 21:50:47 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/tw.decls.h,v 3.10 1992/10/05 02:41:30 christos Exp $ */
 /*
  * tw.decls.h: Tenex external declarations
  */
@@ -56,7 +56,7 @@ extern	 int		  fcompare		__P((Char **, Char **));
 extern	 void		  print_by_column	__P((Char *, Char *[], int, 
 						     int));
 extern	 int		  StrQcmp		__P((Char *, Char *));
-extern	 Char		 *Getenv		__P((Char *));
+extern	 Char		 *tgetenv		__P((Char *));
 
 /*
  * tw.init.c

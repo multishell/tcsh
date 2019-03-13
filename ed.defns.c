@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/ed.defns.c,v 3.12 1992/03/21 02:46:07 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/ed.defns.c,v 3.15 1992/10/05 02:41:30 christos Exp $ */
 /*
  * ed.defns.c: Editor function definitions and initialization
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.defns.c,v 3.12 1992/03/21 02:46:07 christos Exp $")
+RCSID("$Id: ed.defns.c,v 3.15 1992/10/05 02:41:30 christos Exp $")
 
 #include "ed.h"
 
@@ -251,8 +251,16 @@ PFCmd   CcFuncTbl[] = {		/* table of available commands */
 #define		V_CHARTO_BACK	102
     e_normalize_path,
 #define		F_PATH_NORM	103
+    e_delnext_eof,		/* added by mtk@ari.ncl.omron.co.jp (920818) */
+#define		F_DELNEXT_EOF	104
+    e_stuff_char,		
+#define		F_STUFF_CHAR	105
+    e_complete_all,
+#define		F_COMPLETE_ALL	106
+    e_list_all,
+#define		F_LIST_ALL	107
     0				/* DUMMY VALUE */
-#define		F_NUM_FNS	104
+#define		F_NUM_FNS	108
 };
 
 KEYCMD  NumFuns = F_NUM_FNS;
@@ -1105,12 +1113,16 @@ struct KeyFuncs FuncNames[] = {
     "Clear screen leaving current line on top",
     "complete-word", F_COMPLETE,
     "Complete current word",
+    "complete-word-raw", F_COMPLETE_ALL,
+    "Complete current word ignoring programmable completions",
     "copy-prev-word", F_COPYPREV,
     "Copy current word to cursor",
     "copy-region-as-kill", F_COPYREGION,
     "Copy area between mark and cursor to cut buffer",
     "delete-char", F_DELNEXT,
     "Delete character under cursor",
+    "delete-char-or-eof", F_DELNEXT_EOF,
+    "Delete character under cursor or end of file if there is no character",	
     "delete-char-or-list", F_LIST_DELNEXT,
     "Delete character under cursor or list completions if at end of line",
     "delete-word", F_DELWORDNEXT,
@@ -1163,6 +1175,8 @@ struct KeyFuncs FuncNames[] = {
     "Cut the entire line and save in cut buffer",
     "list-choices", F_LIST_CHOICES,
     "List choices for completion",
+    "list-choices-raw", F_LIST_ALL,
+    "List choices for completion overriding programmable completion",
     "list-glob", F_LIST_GLOB,
     "List file name wildcard matches",
     "list-or-eof", F_LIST_EOF,
@@ -1197,6 +1211,8 @@ struct KeyFuncs FuncNames[] = {
     "Correct the spelling of current word",
     "spell-line", F_CORRECT_L,
     "Correct the spelling of entire line",
+    "stuff-char", F_STUFF_CHAR,
+    "Send character to tty in cooked mode",
     "toggle-literal-history", F_TOGGLE_HIST,
     "Toggle between literal and lexical current history line",
     "transpose-chars", F_CHARSWITCH,
@@ -1386,13 +1402,14 @@ ed_InitVIMaps()
     register int i;
 
     VImode = 1;
-    ResetXmap(VImode);
+    ResetXmap();
     for (i = 0; i < 256; i++) {
 	CcKeyMap[i] = CcViMap[i];
 	CcAltMap[i] = CcViCmdMap[i];
     }
     ed_InitMetaBindings();
     ed_InitNLSMaps();
+    ResetArrowKeys();
     BindArrowKeys();
 }
 
@@ -1403,7 +1420,7 @@ ed_InitEmacsMaps()
     Char    buf[3];
 
     VImode = 0;
-    ResetXmap(VImode);
+    ResetXmap();
     for (i = 0; i < 256; i++) {
 	CcKeyMap[i] = CcEmacsMap[i];
 	CcAltMap[i] = F_UNASSIGNED;
@@ -1426,6 +1443,11 @@ ed_InitEmacsMaps()
     AddXkey(buf, XmapCmd(F_PATH_NORM),     XK_CMD);
     buf[1] = 'N';
     AddXkey(buf, XmapCmd(F_PATH_NORM),     XK_CMD);
+    buf[1] = '\t';
+    AddXkey(buf, XmapCmd(F_COMPLETE_ALL),  XK_CMD);
+    buf[1] = 004;	/* ^D */
+    AddXkey(buf, XmapCmd(F_LIST_ALL),  	   XK_CMD);
+    ResetArrowKeys();
     BindArrowKeys();
 }
 

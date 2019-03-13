@@ -10,13 +10,18 @@
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
  */
-#undef POSIX
+#define POSIX
 
 /*
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
  *		job control facilities.
  */
-#undef POSIXJOBS
+#define POSIXJOBS
+
+/*
+ * POSIXSIGS	Use the POSIX signal facilities to emulate BSD signals.
+ */
+#undef POSIXSIGS
 
 /*
  * VFORK	This machine has a vfork().  
@@ -31,7 +36,7 @@
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
  */
-#define VFORK
+#undef VFORK
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and
@@ -44,20 +49,25 @@
  *		Note: POSIX systems should not define this unless they
  *		have sigvec() and friends (ie: 4.3BSD-RENO, HP-UX).
  */
-#define BSDSIGS
+#undef BSDSIGS
 
 /*
  * BSDTIMES	You have BSD-style process time stuff (like rusage)
  *		This may or may not be true.  For example, Apple Unix
  *		(OREO) has BSDJOBS and BSDSIGS but not BSDTIMES.
  */
-#define BSDTIMES
+#undef BSDTIMES
+
+/*
+ * BSDLIMIT	You have BSD-style resource limit stuff (getrlimit/setrlimit)
+ */
+#undef BSDLIMIT
 
 /*
  * BSDNICE	Your system uses setpriority() instead of nice, to
  *		change a processes scheduling priority
  */
-#define BSDNICE
+#undef BSDNICE
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
@@ -65,7 +75,7 @@
  *		BSD uses sgttyb. POSIX systems should define this
  *		anyway, even though they use struct termios.
  */
-#undef TERMIO
+#define TERMIO
 
 /*
  * SYSVREL	Your machine is SYSV based (HPUX, A/UX)
@@ -74,14 +84,13 @@
  *		Set SYSVREL to 1, 2, 3, or 4, depending the version of System V
  *		you are running. Or set it to 0 if you are not SYSV based
  */
-#define SYSVREL	0
+#define SYSVREL	3
 
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
  *		to send command output to /dev/null
- *		This is fixed in sunos 4.1, broken in 4.0..
  */
-#define YPBUGS
+#undef YPBUGS
 
 /*
  * SIGVOID	Define this if your signal handlers return void.  On older
@@ -104,12 +113,12 @@
  */
 #define DIRENT
 /****************** local defines *********************/
-/*
- * SUNOS4	You are running SunOS 4 (on a Sun 2, 3, 4, or 386i)
- */
-#define SUNOS4
+#ifndef sysV88
+#define sysV88  /* Motorola MPC */
+#endif /* !sysV88 */
+
+#define NOSTRCOLL
+#define PW_SHADOW
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
-
-#undef NLS

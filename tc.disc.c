@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.disc.c,v 3.3 1992/03/27 01:59:46 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.disc.c,v 3.6 1992/10/10 18:17:34 christos Exp $ */
 /*
  * tc.disc.c: Functions to set/clear line disciplines
  *
@@ -37,7 +37,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.disc.c,v 3.3 1992/03/27 01:59:46 christos Exp $")
+RCSID("$Id: tc.disc.c,v 3.6 1992/10/10 18:17:34 christos Exp $")
 
 #ifdef OREO
 #include <compat.h>
@@ -47,7 +47,7 @@ RCSID("$Id: tc.disc.c,v 3.3 1992/03/27 01:59:46 christos Exp $")
 
 static bool add_discipline = 0;	/* Did we add a line discipline	 */
 
-#if defined(IRIS4D) || defined(OREO)
+#if defined(IRIS4D) || defined(OREO) || defined(sonyrisc)
 # define HAVE_DISC
 # ifndef POSIX
 static struct termio otermiob;
@@ -79,8 +79,12 @@ int     f;
 
     if (ioctl(f, TCGETA, (ioctl_t) & termiob) == 0) {
 	otermiob = termiob;
-	if (termiob.c_line != NTTYDISC || termiob.c_cc[VSWTCH] == 0) {
+#if (SYSVREL < 4) || !defined(IRIS4D)
+	if (termiob.c_line != NTTYDISC || termiob.c_cc[VSWTCH] == 0) { /*}*/
 	    termiob.c_line = NTTYDISC;
+#else
+	if (termiob.c_cc[VSWTCH] == 0) {
+#endif
 	    termiob.c_cc[VSWTCH] = CSWTCH;
 	    if (ioctl(f, TCSETA, (ioctl_t) & termiob) != 0)
 		return (-1);
@@ -90,7 +94,7 @@ int     f;
 	return (-1);
     add_discipline = 1;
     return (0);
-#endif				/* IRIS4D */
+#endif /* IRIS4D */
 
 
 #ifdef OREO
@@ -103,9 +107,10 @@ int     f;
     struct ltchars ltcbuf;
 
     if (ioctl(f, TCGETA, (ioctl_t) & termiob) == 0) {
+	int comp = getcompat(COMPAT_BSDTTY);
 	otermiob = termiob;
-	if ((getcompat(COMPAT_BSDTTY) & COMPAT_BSDTTY) != COMPAT_BSDTTY) {
-	    setcompat(COMPAT_BSDTTY);
+	if ((comp & COMPAT_BSDTTY) != COMPAT_BSDTTY) {
+	    (void) setcompat(comp | COMPAT_BSDTTY);
 	    if (ioctl(f, TIOCGLTC, (ioctl_t) & ltcbuf) != 0)
 		xprintf("Couldn't get local chars.\n");
 	    else {

@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.wait.h,v 3.5 1992/05/15 23:49:22 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.wait.h,v 3.8 1992/10/14 20:19:19 christos Exp $ */
 /*
  * tc.wait.h: <sys/wait.h> for machines that don't have it or have it and
  *	      is incorrect.
@@ -43,7 +43,7 @@
  * We try to use the system's wait.h when we can...
  */
 
-#if SYSVREL > 0
+#if SYSVREL > 0 && !defined(linux)
 # ifdef hpux
 #  ifndef __hpux
 #   define NEEDwait
@@ -57,20 +57,20 @@
 #   include <sys/wait.h> /* 7.0 fixed it again */
 #  endif /* __hpux */
 # else /* hpux */
-#  if defined(OREO) || defined(IRIS4D) || defined(POSIX)
+#  if (defined(OREO) || defined(IRIS4D) || defined(POSIX)) && !defined(_VMS_POSIX)
 #   include <sys/wait.h>
 #  else	/* OREO || IRIS4D || POSIX */
 #   define NEEDwait
 #  endif /* OREO || IRIS4D || POSIX */
 # endif	/* hpux */
-#else /* SYSVREL == 0 */
+#else /* SYSVREL == 0 || linux */
 # ifdef _MINIX
 #  undef NEEDwait
 #  include "mi.wait.h"
 # else
 #  include <sys/wait.h>
 # endif /* _MINIX */
-#endif /* SYSVREL == 0 */
+#endif /* SYSVREL == 0 || linux */
 
 #ifdef NEEDwait
 /*
@@ -96,7 +96,7 @@ union wait {
 #  define w_stopval     w_S.w_Stopval
 #  define w_stopsig     w_S.w_Stopsig
 # else /* _SEQUENT_ */
-#  if defined(vax) || defined(i386)
+#  if defined(vax) || defined(i386) || defined(_I386)
     union {
 	struct {
 	    unsigned int w_Termsig:7;
@@ -111,20 +111,25 @@ union wait {
 	}       w_S;
     }       w_P;
 #  else /* mc68000 || sparc || ??? */
+#    if defined(_CRAY) || defined(ANY_OTHER_64BIT_MACHINE)
+#      define DUMMY_BITS	48
+#    else /* _CRAY */
+#      define DUMMY_BITS	16
+#    endif /* _CRAY */
     union {
 	struct {
-	    unsigned int w_Dummy:16;
+	    unsigned int w_Dummy:DUMMY_BITS;
 	    unsigned int w_Retcode:8;
 	    unsigned int w_Coredump:1;
 	    unsigned int w_Termsig:7;
 	}       w_T;
 	struct {
-	    unsigned int w_Dummy:16;
+	    unsigned int w_Dummy:DUMMY_BITS;
 	    unsigned int w_Stopsig:8;
 	    unsigned int w_Stopval:8;
 	}       w_S;
     }       w_P;
-#  endif /* vax || i386 */
+#  endif /* vax || i386 || _I386 */
 };
 
 #  define w_termsig	w_P.w_T.w_Termsig

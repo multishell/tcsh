@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/sh.h,v 3.35 1992/05/15 23:49:22 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.h,v 3.47 1992/11/13 08:47:03 christos Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -37,19 +37,7 @@
 #ifndef _h_sh
 #define _h_sh
 
-/* This is separated instead of a #else of above because makedepend is
-easily confused. */
-
-#ifndef CONFIGH
-# define CONFIGH "config.h"
-#endif
-
-/*
- * Avoid cpp bugs (CONFIGH is always defined at this point)
- */
-#ifdef CONFIGH
-# include CONFIGH
-#endif
+#include "config.h"
 
 #ifndef EXTERN
 # define EXTERN extern
@@ -65,6 +53,10 @@ easily confused. */
 # define BSDJOBS
 #endif 
 
+#if defined(POSIXSIGS) && !defined(BSDSIGS)
+# define BSDSIGS
+#endif
+
 #ifdef SHORT_STRINGS
 typedef short Char;
 # define SAVE(a) (Strsave(str2short(a)))
@@ -72,6 +64,15 @@ typedef short Char;
 typedef char Char;
 # define SAVE(a) (strsave(a))
 #endif 
+
+#ifdef PURIFY
+/* Re-define those, cause purify might use them */
+# define xprintf 	printf
+# define xsprintf	sprintf
+# define xvprintf	vprintf
+/* exit normally, allowing purify to trace leaks */
+# define _exit		exit
+#endif /* PURIFY */
 
 /*
  * If your compiler complains, then you can either
@@ -96,15 +97,20 @@ typedef int sigret_t;
  *	BUFSIZE		The i/o buffering size; also limits word size
  *	MAILINTVL	How often to mailcheck; more often is more expensive
  */
-#ifndef BUFSIZE
-#define	BUFSIZE	1024		/* default buffer size */
+#ifdef BUFSIZE
+# if	   BUFSIZE < 1024
+#  undef   BUFSIZE
+#  define  BUFSIZE	1024	/* buffer size should be no less than this */
+# endif
+#else
+# define   BUFSIZE	1024
 #endif /* BUFSIZE */
 
 #define FORKSLEEP	10	/* delay loop on non-interactive fork failure */
 #define	MAILINTVL	600	/* 10 minutes */
 
 #ifndef INBUFSIZE
-# define INBUFSIZE	1024	/* Num input characters on the command line */
+# define INBUFSIZE    2*BUFSIZE /* Num input characters on the command line */
 #endif /* INBUFSIZE */
 
 
@@ -149,6 +155,17 @@ typedef int sigret_t;
 # undef word
 #endif 
 
+/* 
+ * Path separator in environment variables
+ */
+#ifndef PATHSEP
+# ifdef __EMX__
+#  define PATHSEP ';'
+# else /* unix */
+#  define PATHSEP ':'
+# endif /* __EMX__ */
+#endif /* !PATHSEP */
+
 /*
  * This macro compares the st_dev field of struct stat. On aix on ibmESA
  * st_dev is a structure, so comparison does not work. 
@@ -168,14 +185,14 @@ typedef int sigret_t;
 # include <locale.h>
 #endif 
 
-#ifndef _MINIX
+#if !defined(_MINIX) && !defined(_VMS_POSIX)
 #include <sys/param.h>
-#endif /* _MINIX */
+#endif /* _MINIX && vmsposix atp */
 #include <sys/stat.h>
 
-#ifdef BSDTIMES
+#if defined(BSDTIMES) || defined(BSDLIMIT)
 # include <sys/time.h>
-# if SYSVREL>3
+# if SYSVREL>3 && !defined(sgi)
 #  include "/usr/ucbinclude/sys/resource.h"
 # else
 #  include <sys/resource.h>
@@ -202,6 +219,10 @@ typedef int sigret_t;
 #  define CSWTCH _POSIX_VDISABLE	/* So job control works */
 #endif /* DGUX */
 
+#ifdef sonyrisc
+# include <sys/ttold.h>
+#endif /* sonyrisc */
+
 #ifdef POSIX
 /*
  * We should be using setpgid and setpgid
@@ -221,16 +242,21 @@ extern int setpgrp();
  * redefines malloc(), so we define the following
  * to avoid it.
  */
-# define _GNU_STDLIB_H
-# define malloc __malloc
-# define free __free
-# define calloc __calloc
-# define realloc __realloc
-# include <stdlib.h>
-# undef malloc
-# undef free
-# undef calloc
-# undef realloc
+# ifdef linux
+#  define NO_FIX_MALLOC
+#  include <stdlib.h>
+# else /* linux */
+#  define _GNU_STDLIB_H
+#  define malloc __malloc
+#  define free __free
+#  define calloc __calloc
+#  define realloc __realloc
+#  include <stdlib.h>
+#  undef malloc
+#  undef free
+#  undef calloc
+#  undef realloc
+# endif /* linux */
 # include <limits.h>
 #endif /* POSIX */
 
@@ -243,17 +269,19 @@ extern int setpgrp();
 # endif /* !pyr && !stellar */
 #endif /* SYSVREL > 0 ||  _IBMR2 */
 
-#if !((defined(sun) || defined(_MINIX)) && defined(TERMIO))
-# include <sys/ioctl.h>
+#if !((defined(SUNOS4) || defined(_MINIX)) && defined(TERMIO))
+# if !defined(COHERENT) && !defined(_VMS_POSIX)
+#  include <sys/ioctl.h>
+# endif
 #endif 
 
-#if !defined(FIOCLEX) && defined(sun)
+#if !defined(FIOCLEX) && defined(SUNOS4)
 # include <sys/filio.h>
-#endif /* !FIOCLEX && sun */
+#endif /* !FIOCLEX && SUNOS4 */
 
-#ifndef	_MINIX
-#include <sys/file.h>
-#endif	/* _MINIX */
+#if !defined(_MINIX) && !defined(COHERENT)
+# include <sys/file.h>
+#endif	/* !_MINIX && !COHERENT */
 
 #if !defined(O_RDONLY) || !defined(O_NDELAY)
 # include <fcntl.h>
@@ -283,9 +311,9 @@ extern int setpgrp();
 # endif
 # define dirent direct
 #endif /* DIRENT */
-#if defined(hpux) || defined(sgi) || defined(OREO)
+#if defined(hpux) || defined(sgi) || defined(OREO) || defined(COHERENT)
 # include <stdio.h>	/* So the fgetpwent() prototypes work */
-#endif /* hpux || sgi || OREO */
+#endif /* hpux || sgi || OREO || COHERENT */
 #include <pwd.h>
 #ifdef PW_SHADOW
 # include <shadow.h>
@@ -301,6 +329,13 @@ extern int setpgrp();
 # include <string.h>
 #endif /* BSD */
 
+/*
+ * IRIX-5.0 has <sys/cdefs.h>, but most system include files do not
+ * include it yet, so we include it here
+ */
+#if defined(sgi) && SYSVREL > 3
+# include <sys/cdefs.h>
+#endif /* sgi && SYSVREL > 3 */
 
 /*
  * ANSIisms... These must be *after* the system include and 
@@ -350,18 +385,18 @@ extern void		DebugFree	__P((ptr_t, char *, int));
 # define xrealloc(p, i)((p) ? DebugRealloc(p, i, __FILE__, __LINE__) : \
 			      DebugMalloc(i, __FILE__, __LINE__))
 # define xcalloc(n, s)	DebugCalloc(n, s, __FILE__, __LINE__)
-# define xfree(p)    	if (p) DebugFree(p, __FILE__, __LINE__); else
+# define xfree(p)    	if (p) DebugFree(p, __FILE__, __LINE__)
 #else
 # ifdef SYSMALLOC
-#  define xmalloc(i)  	Malloc(i)
-#  define xrealloc(p, i)Realloc(p, i)
-#  define xcalloc(n, s)	Calloc(n, s)
-#  define xfree(p)    	Free(p)
+#  define xmalloc(i)		smalloc(i)
+#  define xrealloc(p, i)	srealloc(p, i)
+#  define xcalloc(n, s)		scalloc(n, s)
+#  define xfree(p)		sfree(p)
 # else
-# define xmalloc(i)  	malloc(i)
-# define xrealloc(p, i)	realloc(p, i)
-# define xcalloc(n, s)	calloc(n, s)
-# define xfree(p)    	free(p)
+#  define xmalloc(i)  		malloc(i)
+#  define xrealloc(p, i)	realloc(p, i)
+#  define xcalloc(n, s)		calloc(n, s)
+#  define xfree(p)    		free(p)
 # endif /* SYSMALLOC */
 #endif /* MDEBUG */
 #include "sh.char.h"
@@ -404,9 +439,11 @@ extern void		DebugFree	__P((ptr_t, char *, int));
  */
 EXTERN bool    chkstop;		/* Warned of stopped jobs... allow exit */
 
-#ifndef FIOCLEX
+#if (defined(FIOCLEX) && defined(FIONCLEX)) || defined(F_SETFD)
+# define CLOSE_ON_EXEC
+#else
 EXTERN bool    didcch;		/* Have closed unused fd's for child */
-#endif 
+#endif /* (FIOCLEX && FIONCLEX) || F_SETFD */
 
 EXTERN bool    didfds;		/* Have setup i/o fd's for child */
 EXTERN bool    doneinp;		/* EOF indicator after reset from readc */
@@ -435,7 +472,7 @@ EXTERN bool    is2atty;		/* is file descriptor 2 a tty (didfds mode) */
  */
 EXTERN Char   *arginp;		/* Argument input for sh -c and internal `xx` */
 EXTERN int     onelflg;		/* 2 -> need line for -t, 1 -> exit on read */
-EXTERN Char   *ffile;		/* Name of shell file for $0 */
+extern Char   *ffile;		/* Name of shell file for $0 */
 
 extern char *seterr;		/* Error message from scanner/parser */
 extern int errno;		/* Error from C library routines */
@@ -475,7 +512,8 @@ EXTERN int     backpid;		/* pid of the last background job */
  * uid_t and gid_t are not defined in all the systems so I would have to
  * make special cases for them. In the future...
  */
-EXTERN int     uid;		/* Invokers uid */
+EXTERN int     uid, euid, 	/* Invokers real and effective */
+	       gid, egid;	/* User and group ids */
 EXTERN int     opgrp,		/* Initial pgrp and tty pgrp */
                shpgrp,		/* Pgrp of shell */
                tpgrp;		/* Terminal process group */
@@ -508,14 +546,28 @@ EXTERN int   OLDSTD;		/* Old standard input (def for cmds) */
  * Because of source commands and .cshrc we need nested error catches.
  */
 
-extern jmp_buf reslab;
+#ifdef NO_STRUCT_ASSIGNMENT
+
+typedef jmp_buf jmp_buf_t;
 
 /* bugfix by Jak Kirman @ Brown U.: remove the (void) cast here, see sh.c */
-#define	setexit()	(setjmp(reslab))
-#define	reset()		longjmp(reslab, 1)
- /* Should use structure assignment here */
-#define	getexit(a)	copy((char *)(a), (char *)reslab, sizeof reslab)
-#define	resexit(a)	copy((char *)reslab, ((char *)(a)), sizeof reslab)
+# define setexit()  setjmp(reslab)
+# define reset()    longjmp(reslab, 1)
+# define getexit(a) (void) memmove((ptr_t)(a), (ptr_t)reslab, sizeof(reslab))
+# define resexit(a) (void) memmove((ptr_t)reslab, ((ptr_t)(a)), sizeof(reslab))
+
+#else
+
+typedef struct { jmp_buf j; } jmp_buf_t;
+
+# define setexit()  setjmp(reslab.j)
+# define reset()    longjmp(reslab.j, 1)
+# define getexit(a) ((a) = reslab)
+# define resexit(a) (reslab = (a))
+
+#endif	/* NO_STRUCT_ASSIGNMENT */
+
+extern jmp_buf_t reslab;
 
 EXTERN Char   *gointr;		/* Label for an onintr transfer */
 
@@ -669,7 +721,7 @@ struct command {
 #define	F_NICE		(1<<11)	/* t_nice is meaningful 	 */
 #define	F_NOHUP		(1<<12)	/* nohup this command 		 */
 #define	F_TIME		(1<<13)	/* time this command 		 */
-#define F_BACKQ		(1<<14)	/* execute command under SYSTYPE */
+#define F_BACKQ		(1<<14)	/* command is in ``		 */
 #ifdef apollo
 #define F_VER		(1<<15)	/* execute command under SYSTYPE */
 #endif 
@@ -697,25 +749,25 @@ struct command {
 /*
  * The keywords for the parser
  */
-#define	T_BREAK		0
-#define	T_BRKSW		1
-#define	T_CASE		2
-#define	T_DEFAULT 	3
-#define	T_ELSE		4
-#define	T_END		5
-#define	T_ENDIF		6
-#define	T_ENDSW		7
-#define	T_EXIT		8
-#define	T_FOREACH	9
-#define	T_GOTO		10
-#define	T_IF		11
-#define	T_LABEL		12
-#define	T_LET		13
-#define	T_SET		14
-#define	T_SWITCH	15
-#define	T_TEST		16
-#define	T_THEN		17
-#define	T_WHILE		18
+#define	TC_BREAK	0
+#define	TC_BRKSW	1
+#define	TC_CASE		2
+#define	TC_DEFAULT 	3
+#define	TC_ELSE		4
+#define	TC_END		5
+#define	TC_ENDIF	6
+#define	TC_ENDSW	7
+#define	TC_EXIT		8
+#define	TC_FOREACH	9
+#define	TC_GOTO		10
+#define	TC_IF		11
+#define	TC_LABEL	12
+#define	TC_LET		13
+#define	TC_SET		14
+#define	TC_SWITCH	15
+#define	TC_TEST		16
+#define	TC_THEN		17
+#define	TC_WHILE	18
 
 /*
  * These are declared here because they want to be
@@ -768,8 +820,6 @@ EXTERN struct varent {
 #define v_left		v_link[0]
 #define v_right		v_link[1]
 #define v_parent	v_link[2]
-
-extern struct varent *adrof1();
 
 #define adrof(v)	adrof1(v, &shvhed)
 #define value(v)	value1(v, &shvhed)
@@ -853,8 +903,10 @@ EXTERN Char    HISTSUB;		/* auto-substitute character */
 /*
  * To print system call errors...
  */
+#ifndef linux
 extern char *sys_errlist[];
 extern int errno, sys_nerr;
+#endif /* !linux */
 
 /*
  * strings.h:
@@ -932,6 +984,8 @@ EXTERN Char   *STR_BSHELL;
 #endif 
 EXTERN Char   *STR_WORD_CHARS;
 EXTERN Char  **STR_environ;
+
+extern int     dont_free;	/* Tell free that we are in danger if we free */
 
 #include "tc.h"
 #include "sh.decls.h"

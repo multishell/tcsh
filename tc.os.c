@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.02/RCS/tc.os.c,v 3.19 1992/05/15 23:49:22 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.os.c,v 3.27 1992/10/10 18:17:34 christos Exp $ */
 /*
  * tc.os.c: OS Dependent builtin functions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.os.c,v 3.19 1992/05/15 23:49:22 christos Exp $")
+RCSID("$Id: tc.os.c,v 3.27 1992/10/10 18:17:34 christos Exp $")
 
 #include "tw.h"
 #include "ed.h"
@@ -67,8 +67,8 @@ static Char STRMPATH[] = {'M', 'P', 'A', 'T', 'H', '\0'};
 static Char STREPATH[] = {'E', 'P', 'A', 'T', 'H', '\0'};
 # endif
 #endif /* MACH */
+static Char *syspaths[] = {STRKPATH, STRCPATH, STRLPATH, STRMPATH, 
 
-static Char *syspaths[] = {STRPATH, STRCPATH, STRLPATH, STRMPATH, 
 #if EPATH
 	STREPATH,
 #endif
@@ -179,8 +179,9 @@ abortpath:
 	for (val = str2short(cpaths[i]); val && *val && *val != '='; val++);
 	if (val && *val == '=') {
 	    *val++ = '\0';
-	    Setenv(name, val);
-	    if (Strcmp(name, STRPATH) == 0) {
+
+	    tsetenv(name, val);
+	    if (Strcmp(name, STRKPATH) == 0) {
 		importpath(val);
 		if (havhash)
 		    dohash(NULL, NULL);
@@ -350,6 +351,14 @@ dosetspath(v, c)
     sitepath_t p[MAXSITE];
     struct sf *st;
 
+    /*
+     * sfname() on AIX G9.9 at least, mallocs too pointers p, q
+     * then does the equivalent of while (*p++ == *q++) continue;
+     * and then tries to free(p,q) them! Congrats to the wizard who
+     * wrote that one. I bet he tested it really well too.
+     * Sooo, we set dont_free :-)
+     */
+    dont_free = 1;
     for (i = 0, v++; *v && *v[0] != '\0'; v++, i++) {
 	s = short2str(*v);
 	if (Isdigit(*s))
@@ -371,6 +380,7 @@ dosetspath(v, c)
     }
     if (setspath(p, i) == -1)
 	stderror(ERR_SYSTEM, "setspath", strerror(errno));
+    dont_free = 0;
 }
 
 /* sitename():
@@ -452,10 +462,15 @@ domigrate(v, c)
 	 * Do the -site.
 	 */
 	s = short2str(&v[0][1]);
+	/*
+	 * see comment in setspath()
+	 */
+	dont_free = 1;
 	if ((st = sfname(s)) == NULL) {
 	    setname(s);
 	    stderror(ERR_NAME | ERR_STRING, "Site not found");
 	}
+	dont_free = 0;
 	new_site = st->sf_id;
 	++v;
     }
@@ -480,7 +495,7 @@ domigrate(v, c)
 	    if (*cp == '%') {
 		pp = pfind(cp);
 		if (kill3((pid_t) - pp->p_jobid, SIGMIGRATE, new_site) < 0) {
-		    xprintf("%s: %s\n", short2str(cp), strerror(errno));
+		    xprintf("%S: %s\n", cp, strerror(errno));
 		    err1++;
 		}
 	    }
@@ -653,6 +668,39 @@ pr_stat_sub(p2, p1, pr)
 #endif /* _SEQUENT_ */
 
 
+#ifdef NEEDmemmove
+/* memmove():
+ * 	This is the ANSI form of bcopy() with the arguments backwards...
+ *	Unlike memcpy(), it handles overlaps between source and 
+ *	destination memory
+ */
+void*
+xmemmove(vdst, vsrc, len)
+    ptr_t vdst;
+    const ptr_t vsrc;
+    size_t len;
+{
+    const char *src = (char *) vsrc;
+    char *dst = (char *) vdst;
+
+    if (src == dst)
+	return vdst;
+
+    if (src > dst) {
+	while (len--) 
+	    *dst++ = *src++;
+    }
+    else {
+	src += len;
+	dst += len;
+	while (len--) 
+	    *--dst = *--src;
+    }
+    return vdst;
+}
+#endif /* NEEDmemmove */
+
+
 #ifdef tcgetpgrp
 int
 xtcgetpgrp(fd)
@@ -702,12 +750,49 @@ fix_yp_bugs()
 
 #endif /* YPBUGS */
 
+#ifdef STRCOLLBUG
+void
+fix_strcoll_bug()
+{
+#if defined(NLS) && !defined(NOSTRCOLL)
+    /*
+     * SunOS4 checks the file descriptor from openlocale() for <= 0
+     * instead of == -1. Someone should tell sun that file descriptor 0
+     * is valid! Our portable hack: open one so we call it with 0 used...
+     * We have to call this routine every time the locale changes...
+     *
+     * Of course it also tries to free the constant locale "C" it initially
+     * had allocated, with the sequence 
+     * > setenv LANG "fr"
+     * > ls^D
+     * > unsetenv LANG
+     * But we are smarter than that and just print a warning message.
+     */
+    int fd = -1;
+    static char *root = "/";
+
+    if (!didfds)
+	fd = open(root, O_RDONLY);
+
+    (void) strcoll(root, root);
+
+    if (fd != -1)
+	(void) close(fd);
+#endif
+}
+#endif /* STRCOLLBUG */
+
+
+#ifdef OREO
+#include <compat.h>
+#endif /* OREO */
 
 void
 osinit()
 {
 #ifdef OREO
     set42sig();
+    setcompat(getcompat() & ~COMPAT_EXEC);
     sigignore(SIGIO);		/* ignore SIGIO */
 #endif /* OREO */
 
@@ -742,39 +827,43 @@ xstrerror(i)
 #endif /* strerror */
     
 #ifdef gethostname
-# ifndef _MINIX
+# if !defined(_MINIX) && !defined(__EMX__)
 #  include <sys/utsname.h>
-# endif
+# endif /* !_MINIX && !__EMX__ */
 
 int
 xgethostname(name, namlen)
     char   *name;
     int     namlen;
 {
-#ifndef _MINIX
+# if !defined(_MINIX) && !defined(__EMX__)
     int     i, retval;
     struct utsname uts;
 
     retval = uname(&uts);
 
-# ifdef DEBUG
+#  ifdef DEBUG
     xprintf("sysname:  %s\n", uts.sysname);
     xprintf("nodename: %s\n", uts.nodename);
     xprintf("release:  %s\n", uts.release);
     xprintf("version:  %s\n", uts.version);
     xprintf("machine:  %s\n", uts.machine);
-# endif	/* DEBUG */
+#  endif /* DEBUG */
     i = strlen(uts.nodename) + 1;
     (void) strncpy(name, uts.nodename, i < namlen ? i : namlen);
 
     return retval;
-#else /* _MINIX */
+# else /* !_MINIX && !__EMX__ */
     if (namlen > 0) {
+#  ifdef __EMX__
+	(void) strncpy(name, "OS/2", namlen);
+#  else /* _MINIX */
 	(void) strncpy(name, "minix", namlen);
+#  endif /* __EMX__ */
 	name[namlen-1] = '\0';
     }
     return(0);
-#endif /* _MINIX */
+#endif /* _MINIX && !__EMX__ */
 } /* end xgethostname */
 #endif /* gethostname */
 
@@ -784,7 +873,7 @@ xgethostname(name, namlen)
 #  undef _MINIX		/* redefined in <lib.h> */
 #  undef HZ		/* redefined in <minix/const.h> */
 #  include <lib.h>
-# endif /* _MINIX */
+# endif /* _MINIX && NICE */
 int 
 xnice(incr)
     int incr;
@@ -906,6 +995,11 @@ prepend(dirname, pathname)
 }
 
 # else /* ! hp9000s500 */
+
+#if (SYSVREL != 0 && !defined(d_fileno)) || defined(_VMS_POSIX)
+# define d_fileno d_ino
+#endif
+
 char   *
 xgetwd(pathname)
     char   *pathname;
@@ -913,10 +1007,9 @@ xgetwd(pathname)
     DIR    *dp;
     struct dirent *d;
 
-    struct stat st_root, st_cur, st_next, st_dot;
+    struct stat st_root, st_cur, st_next, st_dotdot;
     char    pathbuf[MAXPATHLEN], nextpathbuf[MAXPATHLEN * 2];
-    char   *cur_name_add;
-    char   *pathptr, *nextpathptr;
+    char   *pathptr, *nextpathptr, *cur_name_add;
 
     /* find the inode of root */
     if (stat("/", &st_root) == -1) {
@@ -930,7 +1023,7 @@ xgetwd(pathname)
     cur_name_add = nextpathptr = &nextpathbuf[MAXPATHLEN - 1];
 
     /* find the inode of the current directory */
-    if (lstat("./", &st_cur) == -1) {
+    if (lstat(".", &st_cur) == -1) {
 	(void) xsprintf(pathname,
 			"getwd: Cannot stat \".\" (%s)", strerror(errno));
 	return (NULL);
@@ -948,6 +1041,12 @@ xgetwd(pathname)
 	}
 
 	/* open the parent directory */
+	if (stat(nextpathptr, &st_dotdot) == -1) {
+	    (void) xsprintf(pathname,
+			    "getwd: Cannot stat directory \"%s\" (%s)",
+			    nextpathptr, strerror(errno));
+	    return (NULL);
+	}
 	if ((dp = opendir(nextpathptr)) == NULL) {
 	    (void) xsprintf(pathname,
 			    "getwd: Cannot open directory \"%s\" (%s)",
@@ -956,32 +1055,44 @@ xgetwd(pathname)
 	}
 
 	/* look in the parent for the entry with the same inode */
-	for (d = readdir(dp); d != NULL; d = readdir(dp)) {
-	    (void) strcpy(cur_name_add, d->d_name);
-	    if (lstat(nextpathptr, &st_next) == -1) {
-		(void) xsprintf(pathname, "getwd: Cannot stat \"%s\" (%s)",
-				d->d_name, strerror(errno));
-		return (NULL);
-	    }
-	    if (d->d_name[0] == '.' && d->d_name[1] == '\0')
-		st_dot = st_next;
-
-	    /* check if we found it yet */
-	    if (st_next.st_ino == st_cur.st_ino &&
-	    DEV_DEV_COMPARE(st_next.st_dev, st_cur.st_dev)) {
-		st_cur = st_dot;
-		pathptr = strrcpy(pathptr, d->d_name);
-		pathptr = strrcpy(pathptr, "/");
-		nextpathptr = strrcpy(nextpathptr, "../");
-		*cur_name_add = '\0';
-		(void) closedir(dp);
-		break;
+	if (DEV_DEV_COMPARE(st_dotdot.st_dev, st_cur.st_dev)) {
+	    /* Parent has same device. No need to stat every member */
+	    for (d = readdir(dp); d != NULL; d = readdir(dp)) 
+		if (d->d_fileno == st_cur.st_ino)
+		    break;
+	}
+	else {
+	    /* 
+	     * Parent has a different device. This is a mount point so we 
+	     * need to stat every member 
+	     */
+	    for (d = readdir(dp); d != NULL; d = readdir(dp)) {
+		if (ISDOT(d->d_name) || ISDOTDOT(d->d_name))
+		    continue;
+		(void) strcpy(cur_name_add, d->d_name);
+		if (lstat(nextpathptr, &st_next) == -1) {
+		    (void) xsprintf(pathname, "getwd: Cannot stat \"%s\" (%s)",
+				    d->d_name, strerror(errno));
+		    (void) closedir(dp);
+		    return (NULL);
+		}
+		/* check if we found it yet */
+		if (st_next.st_ino == st_cur.st_ino &&
+		    DEV_DEV_COMPARE(st_next.st_dev, st_cur.st_dev)) 
+		    break;
 	    }
 	}
 	if (d == NULL) {
 	    (void) xsprintf(pathname, "getwd: Cannot find \".\" in \"..\"");
+	    (void) closedir(dp);
 	    return (NULL);
 	}
+	st_cur = st_dotdot;
+	pathptr = strrcpy(pathptr, d->d_name);
+	pathptr = strrcpy(pathptr, "/");
+	nextpathptr = strrcpy(nextpathptr, "../");
+	(void) closedir(dp);
+	*cur_name_add = '\0';
     }
 } /* end getwd */
 
@@ -1090,12 +1201,12 @@ dover(v, c)
 
     setname(short2str(*v++));
     if (!*v) {
-	if (!(p = Getenv(STRSYSTYPE)))
+	if (!(p = tgetenv(STRSYSTYPE)))
 	    stderror(ERR_NAME | ERR_STRING, "System type is not set");
-	xprintf("%s\n", short2str(p));
+	xprintf("%S\n", p);
     }
     else {
-	Setenv(STRSYSTYPE, getv(*v) ? STRbsd43 : STRsys53);
+	tsetenv(STRSYSTYPE, getv(*v) ? STRbsd43 : STRsys53);
 	dohash(NULL, NULL);
     }
 }
