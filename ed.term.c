@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.04/RCS/ed.term.c,v 1.15 1993/07/03 23:47:53 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.05/RCS/ed.term.c,v 1.15 1993/07/03 23:47:53 christos Exp $ */
 /*
  * ed.term.c: Low level terminal interface
  */

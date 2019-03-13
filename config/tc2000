@@ -4,21 +4,23 @@
  * All source files should #include this FIRST.
  *
  * Edit this to match your system type.
+ *
+ * for bbn butterfly tc2000
  */
+
 #ifndef _h_config
 #define _h_config
-
 /****************** System dependant compilation flags ****************/
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
  */
-#define POSIX
+#undef POSIX
 
 /*
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
  *		job control facilities.
  */
-#define POSIXJOBS
+#undef POSIXJOBS
 
 /*
  * POSIXSIGS	Use the POSIX signal facilities to emulate BSD signals.
@@ -77,13 +79,13 @@
  *		BSD uses sgttyb. POSIX systems should define this
  *		anyway, even though they use struct termios.
  */
-#define TERMIO
+#undef TERMIO
 
 /*
  * SYSVREL	Your machine is SYSV based (HPUX, A/UX)
  *		NOTE: don't do this if you are on a Pyramid -- tcsh is
  *		built in a BSD universe.
- *		Set SYSVREL to 1, 2, 3, or 4, depending the version of System V
+ *		Set SYSVREL to 1, 2, 3 or 4, depending the version of System V
  *		you are running. Or set it to 0 if you are not SYSV based
  */
 #define SYSVREL	0
@@ -91,6 +93,7 @@
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
  *		to send command output to /dev/null
+ *		This is fixed in sunos 4.1, broken in 4.0..
  */
 #undef YPBUGS
 
@@ -98,7 +101,7 @@
  * SIGVOID	Define this if your signal handlers return void.  On older
  *		systems, signal returns int, but on newer ones, it returns void.
  */
-#define SIGVOID 
+#undef SIGVOID 
 
 /*
  * HAVEDUP2	Define this if your system supports dup2().
@@ -113,13 +116,12 @@
 /*
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
  */
-#define DIRENT
+#undef DIRENT
 /****************** local defines *********************/
-
-#undef PW_AUTH	/* Define this if you are running the security gunk */
-
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
+
+#undef NLS
 
 #endif /* _h_config */

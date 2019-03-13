@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.char.c,v 3.7 1993/06/05 21:09:15 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.05/RCS/sh.char.c,v 3.7 1993/06/05 21:09:15 christos Exp $ */
 /*
  * sh.char.c: Character classification tables
  */

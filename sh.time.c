@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.time.c,v 3.15 1993/07/03 23:47:53 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.05/RCS/sh.time.c,v 3.15 1993/07/03 23:47:53 christos Exp $ */
 /*
  * sh.time.c: Shell time keeping and printing.
  */

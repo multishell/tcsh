@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.print.c,v 3.7 1993/06/25 21:17:12 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.05/RCS/sh.print.c,v 3.7 1993/06/25 21:17:12 christos Exp $ */
 /*
  * sh.print.c: Primitive Output routines.
  */

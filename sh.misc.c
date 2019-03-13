@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.misc.c,v 3.18 1993/01/08 22:23:12 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.05/RCS/sh.misc.c,v 3.20 1994/05/07 18:51:25 christos Exp $ */
 /*
  * sh.misc.c: Miscelaneous functions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.misc.c,v 3.18 1993/01/08 22:23:12 christos Exp $")
+RCSID("$Id: sh.misc.c,v 3.20 1994/05/07 18:51:25 christos Exp $")
 
 static	int	renum	__P((int, int));
 static  Char  **blkend	__P((Char **));
@@ -81,7 +81,8 @@ strsave(s)
 	s = (const char *) "";
     for (p = (char *) s; *p++ != '\0';)
 	continue;
-    n = p = (char *) xmalloc((size_t) ((p - s) * sizeof(char)));
+    n = p = (char *) xmalloc((size_t)
+			     ((((const char *) p) - s) * sizeof(char)));
     while ((*p++ = *s++) != '\0')
 	continue;
     return (n);
@@ -107,6 +108,19 @@ blkpr(av)
 	xprintf("%S", *av);
 	if (av[1])
 	    xprintf(" ");
+    }
+}
+
+void
+blkexpand(av, str)
+    register Char **av;
+    Char *str;
+{
+    *str = '\0';
+    for (; *av; av++) {
+	(void) Strcat(str, *av);
+	if (av[1])
+	    (void) Strcat(str, STRspace);
     }
 }
 
@@ -168,7 +182,7 @@ saveblk(v)
     return (onewv);
 }
 
-#ifndef POSIX
+#if !defined(SHORT_STRINGS) && !defined(POSIX)
 char   *
 strstr(s, t)
     register const char *s, *t;
@@ -185,7 +199,7 @@ strstr(s, t)
     return (NULL);
 }
 
-#endif /* POSIX */
+#endif /* !SHORT_STRINGS && !POSIX */
 
 #ifndef SHORT_STRINGS
 char   *
@@ -211,7 +225,7 @@ strspl(cp, dp)
     return (ep);
 }
 
-#endif
+#endif /* !SHORT_STRINGS */
 
 Char  **
 blkspl(up, vp)

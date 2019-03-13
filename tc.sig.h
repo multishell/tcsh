@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.04/RCS/tc.sig.h,v 3.16 1993/06/24 15:29:37 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.05/RCS/tc.sig.h,v 3.16 1993/06/24 15:29:37 christos Exp $ */
 /*
  * tc.sig.h: Signal handling
  *

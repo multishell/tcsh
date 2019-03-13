@@ -1,23 +1,13 @@
 /*
- * config.h for 
- *      PFU/Fujitsu A-xx computer
- * running
- *      SX/A Edition 60 or later, without BSD/X option.
- * (for systems with BSD/X, use config.bsd and /usr/bsd/bin/cc)
+ * config.h -- configure various defines for tcsh
+ *
+ * All source files should #include this FIRST.
+ *
+ * Edit this to match your system type.
  */
-/*
+
 #ifndef _h_config
 #define _h_config
- * Use followings in Makefile.
- * w/o BSD/X
- *	CC=	/bin/cc
- * with BSD/X
- *	CC=	/usr/bsd/bin/cc
- *
- * define KANJI in config_f.h if you need it.
- */
-
-
 /****************** System dependant compilation flags ****************/
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
@@ -48,20 +38,22 @@
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
  */
-#undef VFORK
+#if defined(NeXT) && !defined(__STRICT_BSD__)
+# undef VFORK
+#endif
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and
  *		a tty that deals correctly
  */
-#undef BSDJOBS
+#define BSDJOBS
 
 /*
  * BSDSIGS	You have 4.2-style signals, rather than USG style.
  *		Note: POSIX systems should not define this unless they
  *		have sigvec() and friends (ie: 4.3BSD-RENO, HP-UX).
  */
-#undef BSDSIGS
+#define BSDSIGS
 
 /*
  * BSDTIMES	You have BSD-style process time stuff (like rusage)
@@ -79,7 +71,7 @@
  * BSDNICE	Your system uses setpriority() instead of nice, to
  *		change a processes scheduling priority
  */
-#undef BSDNICE
+#define BSDNICE
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
@@ -87,7 +79,7 @@
  *		BSD uses sgttyb. POSIX systems should define this
  *		anyway, even though they use struct termios.
  */
-#define TERMIO
+#undef TERMIO
 
 /*
  * SYSVREL	Your machine is SYSV based (HPUX, A/UX)
@@ -96,7 +88,7 @@
  *		Set SYSVREL to 1, 2, 3, or 4, depending the version of System V
  *		you are running. Or set it to 0 if you are not SYSV based
  */
-#define SYSVREL	3
+#define SYSVREL	0
 
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
@@ -108,28 +100,50 @@
  * SIGVOID	Define this if your signal handlers return void.  On older
  *		systems, signal returns int, but on newer ones, it returns void.
  */
-#define SIGVOID 
+#if !defined(NeXT) && !defined(__STRICT_BSD__)
+# define SIGVOID 
+#else
+# undef SIGVOID 
+#endif
 
 /*
  * HAVEDUP2	Define this if your system supports dup2().
  */
-#undef HAVEDUP2
+#define HAVEDUP2
 
 /*
  * UTHOST	Does the utmp file have a host field?
  */
-#undef UTHOST
+#define UTHOST
 
 /*
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
  */
-#define DIRENT
+#undef DIRENT
 /****************** local defines *********************/
+#ifdef NeXT
+# define environ _environ
+/* strcoll() on the NeXT appears to have 3 args, but only 2 args in tcsh src */
+#define NOSTRCOLL
+#else
+# ifdef notdef
+#  define SETENV_IN_LIB		/* read comment in sh.func.c */
+#  define setenv(x,y) Setenv(x,y)
+# endif
+#endif
+
+/* this define is necessary for NeXT users running 3.1 without  */
+/* POSIX to avoid undefined symbols during final link */
+/* You'll need to define __NeXT31__ */
+#if defined(__NeXT31__) && !defined(POSIX)
+# define _TERMIOS_H_
+#endif /* __NeXT31__  && !POSIX */
+
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
-/*
- * SX/A does not have NLS
- */
+
+#ifndef NeXT
 #undef NLS
+#endif
 #endif /* _h_config */

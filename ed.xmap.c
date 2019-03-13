@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.04/RCS/ed.xmap.c,v 3.10 1993/06/25 21:17:12 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.05/RCS/ed.xmap.c,v 3.10 1993/06/25 21:17:12 christos Exp $ */
 /*
  * ed.xmap.c: This module contains the procedures for maintaining
  *	      the extended-key map.

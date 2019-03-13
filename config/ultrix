@@ -3,7 +3,7 @@
  *
  * All source files should #include this FIRST.
  *
- * This is the config file for Linux systems
+ * Edit this to match your system type.
  */
 
 #ifndef _h_config
@@ -12,13 +12,13 @@
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
  */
-#define POSIX
+#undef POSIX
 
 /*
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
  *		job control facilities.
  */
-#define POSIXJOBS
+#undef POSIXJOBS
 
 /*
  * POSIXSIGS	Use the POSIX signal facilities to emulate BSD signals.
@@ -38,7 +38,7 @@
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
  */
-#undef VFORK
+#define VFORK
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and
@@ -73,11 +73,11 @@
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
- * 		This is usually the case for SVID systems, where
+ * 		This is usually the case for SYSV systems, where
  *		BSD uses sgttyb. POSIX systems should define this
  *		anyway, even though they use struct termios.
  */
-#define TERMIO
+#undef TERMIO
 
 /*
  * SYSVREL	Your machine is SYSV based (HPUX, A/UX)
@@ -85,8 +85,6 @@
  *		built in a BSD universe.
  *		Set SYSVREL to 1, 2, 3, or 4, depending the version of System V
  *		you are running. Or set it to 0 if you are not SYSV based
- *
- *		Note: Linux should work with any SYSVREL < 3.
  */
 #define SYSVREL	0
 
@@ -118,20 +116,11 @@
 #define DIRENT
 /****************** local defines *********************/
 
-#define _PATH_TCSHELL "/bin/tcsh"
-#define ECHO_STYLE      BOTH_ECHO
-#ifdef BSDSIGS
-# define __USE_BSD_SIGNAL
-#endif
+#undef PW_AUTH	/* Define this if you are running the security gunk */
+
+#define NAMEI_BUG
 
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
-
-/* GNU libc 1.03 has a dummy implementation of setlocale() that
-   does more harm than good. Hopefully we can remove this #undef
-   in the future. Meanwhile, the builtin ISO8859-1 support should
-   satisfy most people.
- */
-#undef NLS
 #endif /* _h_config */

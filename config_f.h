@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.04/RCS/config_f.h,v 3.6 1992/10/18 00:43:08 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.05/RCS/config_f.h,v 3.9 1994/04/12 15:46:46 christos Exp $ */
 /*
  * config_f.h -- configure various defines for tcsh
  *
@@ -106,6 +106,11 @@
 #undef KANJI
 
 /*
+ * NEWGRP	Provide a newgrp builtin.
+ */
+#undef NEWGRP
+
+/*
  * SYSMALLOC	Use the system provided version of malloc and friends.
  *		This can be much slower and no memory statistics will be
  *		provided.
@@ -117,10 +122,18 @@
 #endif
 
 /*
+ * REMOTEHOST	Try to determine the remote host that we logged in from
+ *		using first getpeername, and then the utmp file. If
+ *		successful, set $REMOTEHOST to the name or address of the
+ *		host
+ */
+#define REMOTEHOST
+
+/*
  * RCSID	This defines if we want rcs strings in the binary or not
  *
  */
-#if !defined(lint) && !defined(SABER)
+#if !defined(lint) && !defined(SABER) && !defined(__CLCC__)
 # ifndef __GNUC__
 #  define RCSID(id) static char *rcsid = (id);
 # else

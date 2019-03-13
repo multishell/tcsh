@@ -3,7 +3,8 @@
  *
  * All source files should #include this FIRST.
  *
- * Edit this to match your system type.
+ * Configuration file for Harris Tahoe running CX/UX 5.1.
+ * Compile in ucb universe; tested with gcc 1.42 and cc.
  */
 
 #ifndef _h_config
@@ -18,7 +19,7 @@
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
  *		job control facilities.
  */
-#undef POSIXJOBS
+#define POSIXJOBS
 
 /*
  * POSIXSIGS	Use the POSIX signal facilities to emulate BSD signals.
@@ -38,7 +39,7 @@
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
  */
-#define VFORK
+#undef VFORK
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and
@@ -77,7 +78,7 @@
  *		BSD uses sgttyb. POSIX systems should define this
  *		anyway, even though they use struct termios.
  */
-#undef TERMIO
+#define TERMIO
 
 /*
  * SYSVREL	Your machine is SYSV based (HPUX, A/UX)
@@ -108,16 +109,15 @@
 /*
  * UTHOST	Does the utmp file have a host field?
  */
-#undef UTHOST
+#define UTHOST
 
 /*
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
  */
-#undef DIRENT
+#define DIRENT
 /****************** local defines *********************/
+#define NOSTRCOLL
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
-
-#undef NLS
 #endif /* _h_config */

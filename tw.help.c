@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.04/RCS/tw.help.c,v 3.10 1993/06/25 21:17:12 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.05/RCS/tw.help.c,v 3.10 1993/06/25 21:17:12 christos Exp $ */
 /* tw.help.c: actually look up and print documentation on a file.
  *	      Look down the path for an appropriate file, then print it.
  *	      Note that the printing is NOT PAGED.  This is because the

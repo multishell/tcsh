@@ -12,13 +12,13 @@
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
  */
-#define POSIX
+#undef POSIX
 
 /*
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
  *		job control facilities.
  */
-#define POSIXJOBS
+#undef POSIXJOBS
 
 /*
  * POSIXSIGS	Use the POSIX signal facilities to emulate BSD signals.
@@ -38,7 +38,7 @@
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
  */
-#undef VFORK
+#define VFORK
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and
@@ -51,25 +51,25 @@
  *		Note: POSIX systems should not define this unless they
  *		have sigvec() and friends (ie: 4.3BSD-RENO, HP-UX).
  */
-#undef BSDSIGS
+#define BSDSIGS
 
 /*
  * BSDTIMES	You have BSD-style process time stuff (like rusage)
  *		This may or may not be true.  For example, Apple Unix
  *		(OREO) has BSDJOBS and BSDSIGS but not BSDTIMES.
  */
-#undef BSDTIMES
+#define BSDTIMES
 
 /*
  * BSDLIMIT	You have BSD-style resource limit stuff (getrlimit/setrlimit)
  */
-#undef BSDLIMIT
+#define BSDLIMIT
 
 /*
  * BSDNICE	Your system uses setpriority() instead of nice, to
  *		change a processes scheduling priority
  */
-#undef BSDNICE
+#define BSDNICE
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
@@ -77,7 +77,7 @@
  *		BSD uses sgttyb. POSIX systems should define this
  *		anyway, even though they use struct termios.
  */
-#define TERMIO
+#undef TERMIO
 
 /*
  * SYSVREL	Your machine is SYSV based (HPUX, A/UX)
@@ -86,7 +86,7 @@
  *		Set SYSVREL to 1, 2, 3, or 4, depending the version of System V
  *		you are running. Or set it to 0 if you are not SYSV based
  */
-#define SYSVREL	3
+#define SYSVREL	0
 
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
@@ -103,35 +103,22 @@
 /*
  * HAVEDUP2	Define this if your system supports dup2().
  */
-#undef HAVEDUP2
+#define HAVEDUP2
 
 /*
  * UTHOST	Does the utmp file have a host field?
  */
-#undef UTHOST
+#define UTHOST
 
 /*
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
  */
-#define DIRENT
+#undef DIRENT
 /****************** local defines *********************/
-/*
- * ISC		You are running ISC's version of unix
- */
-#define ISC
-#ifdef POSIX
-# ifndef _POSIX_SOURCE
-#  define _POSIX_SOURCE
-# endif /* _POSIX_SOURCE */
-#endif /* POSIX */
-
-/*
- * NOSTRCOLL	We don't have strcoll()
- */
-#define NOSTRCOLL
-
+#define _PID_T
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
-
 #include "config_f.h"
+
+#undef NLS
 #endif /* _h_config */

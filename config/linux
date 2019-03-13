@@ -3,7 +3,7 @@
  *
  * All source files should #include this FIRST.
  *
- * Edit this to match your system type.
+ * This is the config file for Linux systems
  */
 
 #ifndef _h_config
@@ -12,13 +12,13 @@
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
  */
-#undef POSIX
+#define POSIX
 
 /*
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
  *		job control facilities.
  */
-#undef POSIXJOBS
+#define POSIXJOBS
 
 /*
  * POSIXSIGS	Use the POSIX signal facilities to emulate BSD signals.
@@ -38,7 +38,7 @@
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
  */
-#define VFORK
+#undef VFORK
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and
@@ -73,11 +73,11 @@
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
- * 		This is usually the case for SYSV systems, where
+ * 		This is usually the case for SVID systems, where
  *		BSD uses sgttyb. POSIX systems should define this
  *		anyway, even though they use struct termios.
  */
-#undef TERMIO
+#define TERMIO
 
 /*
  * SYSVREL	Your machine is SYSV based (HPUX, A/UX)
@@ -85,6 +85,8 @@
  *		built in a BSD universe.
  *		Set SYSVREL to 1, 2, 3, or 4, depending the version of System V
  *		you are running. Or set it to 0 if you are not SYSV based
+ *
+ *		Note: Linux should work with any SYSVREL < 3.
  */
 #define SYSVREL	0
 
@@ -113,11 +115,24 @@
 /*
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
  */
-#undef DIRENT
+#define DIRENT
 /****************** local defines *********************/
+
+#undef PW_SHADOW
+#define _PATH_TCSHELL "/bin/tcsh"
+#define ECHO_STYLE      BOTH_ECHO
+#ifdef BSDSIGS
+# define __USE_BSD_SIGNAL
+#endif
+
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
 
+/* GNU libc 1.03 has a dummy implementation of setlocale() that
+   does more harm than good. Hopefully we can remove this #undef
+   in the future. Meanwhile, the builtin ISO8859-1 support should
+   satisfy most people.
+ */
 #undef NLS
 #endif /* _h_config */
