@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.func.c,v 3.37 1992/10/27 16:18:15 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/tc.func.c,v 3.42 1993/07/03 23:47:53 christos Exp $ */
 /*
  * tc.func.c: New tcsh builtins.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.func.c,v 3.37 1992/10/27 16:18:15 christos Exp $")
+RCSID("$Id: tc.func.c,v 3.42 1993/07/03 23:47:53 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -47,8 +47,10 @@ RCSID("$Id: tc.func.c,v 3.37 1992/10/27 16:18:15 christos Exp $")
 # include <hesiod.h>
 #endif /* HESIOD */
 
-extern time_t t_period;
+#ifdef TESLA
 extern int do_logout;
+#endif /* TESLA */
+extern time_t t_period;
 extern int just_signaled;
 static bool precmd_active = 0;
 static bool periodic_active = 0;
@@ -174,9 +176,10 @@ static void
 Reverse(s)
     Char   *s;
 {
-    int     c, i, j;
+    Char   c;
+    int     i, j;
 
-    for (i = 0, j = Strlen(s) - 1; i < j; i++, j--) {
+    for (i = 0, j = (int) Strlen(s) - 1; i < j; i++, j--) {
 	c = s[i];
 	s[i] = s[j];
 	s[j] = c;
@@ -193,6 +196,7 @@ dolist(v, c)
     int     i, k;
     struct stat st;
 
+    USE(c);
     if (*++v == NULL) {
 	(void) t_search(STRNULL, NULL, LIST, 0, TW_ZERO, 0, STRNULL, 0);
 	return;
@@ -214,10 +218,11 @@ dolist(v, c)
 	 * We cannot process a flag therefore we let ls do it right.
 	 */
 	static Char STRls[] = {'l', 's', '\0'};
-	static Char STRmCF[] = {'-', 'C', 'F', '\0'};
+	static Char STRmCF[] = {'-', 'C', 'F', '\0', '\0' };
 	struct command *t;
 	struct wordent cmd, *nextword, *lastword;
 	Char   *cp;
+	struct varent *vp;
 
 #ifdef BSDSIGS
 	sigmask_t omask = 0;
@@ -225,12 +230,24 @@ dolist(v, c)
 	if (setintr)
 	    omask = sigblock(sigmask(SIGINT)) & ~sigmask(SIGINT);
 #else /* !BSDSIGS */
-	sighold(SIGINT);
+	(void) sighold(SIGINT);
 #endif /* BSDSIGS */
 	if (seterr) {
 	    xfree((ptr_t) seterr);
 	    seterr = NULL;
 	}
+
+	/* Look at showdots, to add -A to the flags if necessary */
+	if ((vp = adrof(STRshowdots)) != NULL) {
+	    if (vp->vec[0][0] == '-' && vp->vec[0][1] == 'A' &&
+		vp->vec[0][2] == '\0')
+		STRmCF[3] = 'A';
+	    else
+		STRmCF[3] = '\0';
+	}
+	else
+	    STRmCF[3] = '\0';
+
 	cmd.word = STRNULL;
 	lastword = &cmd;
 	nextword = (struct wordent *) xcalloc(1, sizeof cmd);
@@ -335,7 +352,7 @@ dotelltc(v, c)
     register Char **v;
     struct command *c;
 {
-
+    USE(c);
     if (!GotTermCaps)
 	GetTermCaps();
 
@@ -384,20 +401,27 @@ dowhich(v, c)
     register Char **v;
     struct command *c;
 {
-    struct wordent lex[3];
+    struct wordent lexp[3];
     struct varent *vp;
 
-    lex[0].next = &lex[1];
-    lex[1].next = &lex[2];
-    lex[2].next = &lex[0];
+    USE(c);
+    lexp[0].next = &lexp[1];
+    lexp[1].next = &lexp[2];
+    lexp[2].next = &lexp[0];
 
-    lex[0].prev = &lex[2];
-    lex[1].prev = &lex[0];
-    lex[2].prev = &lex[1];
+    lexp[0].prev = &lexp[2];
+    lexp[1].prev = &lexp[0];
+    lexp[2].prev = &lexp[1];
 
-    lex[0].word = STRNULL;
-    lex[2].word = STRret;
+    lexp[0].word = STRNULL;
+    lexp[2].word = STRret;
 
+#ifdef notdef
+    /* 
+     * We don't want to glob dowhich args because we lose quoteing
+     * E.g. which \ls if ls is aliased will not work correctly if
+     * we glob here.
+     */
     gflag = 0, tglob(v);
     if (gflag) {
 	v = globall(v);
@@ -408,6 +432,7 @@ dowhich(v, c)
 	v = gargv = saveblk(v);
 	trim(v);
     }
+#endif
 
     while (*++v) {
 	if ((vp = adrof1(*v, &aliases)) != NULL) {
@@ -416,12 +441,15 @@ dowhich(v, c)
 	    xputchar('\n');
 	}
 	else {
-	    lex[1].word = *v;
-	    tellmewhat(lex);
+	    lexp[1].word = *v;
+	    tellmewhat(lexp);
 	}
     }
+#ifdef notdef
+    /* Again look at the comment above; since we don't glob, we don't free */
     if (gargv)
 	blkfree(gargv), gargv = 0;
+#endif
 }
 
 /* PWP: a hack to start up your stopped editor on a single keystroke */
@@ -448,8 +476,10 @@ find_stop_ed()
     else 
 	vp = "vi";
 
-    vpl = strlen(vp);
-    epl = strlen(ep);
+    for (vpl = 0; vp[vpl] && !Isspace(vp[vpl]); vpl++)
+	continue;
+    for (epl = 0; ep[epl] && !Isspace(ep[epl]); epl++)
+	continue;
 
     if (pcurrent == NULL)	/* see if we have any jobs */
 	return NULL;		/* nope */
@@ -485,7 +515,7 @@ fg_proc_entry(pp)
 #endif
     jmp_buf_t osetexit;
     bool    ohaderr;
-    bool    oGettingInput;
+    Char    oGettingInput;
 
     getexit(osetexit);
 
@@ -502,7 +532,7 @@ fg_proc_entry(pp)
     if (setexit() == 0) {	/* come back here after pjwait */
 	pendjob();
 	pstart(pp, 1);		/* found it. */
-	alarm(0);		/* No autologout */
+	(void) alarm(0);	/* No autologout */
 	pjwait(pp);
     }
     setalarm(1);		/* Autologout back on */
@@ -646,7 +676,7 @@ auto_logout()
     if (editing)
 	(void) Cookedmode();
     (void) close(SHIN);
-    set(STRlogout, Strsave(STRautomatic));
+    set(STRlogout, Strsave(STRautomatic), VAR_READWRITE);
     child = 1;
 #ifdef TESLA
     do_logout = 1;
@@ -830,6 +860,7 @@ aliasrun(cnt, s1, s2)
     struct wordent w, *new1, *new2;	/* for holding alias name */
     struct command *t = NULL;
     jmp_buf_t osetexit;
+    int status;
 
     getexit(osetexit);
     if (seterr) {
@@ -853,6 +884,9 @@ aliasrun(cnt, s1, s2)
 	new1->prev = new2->next = &w;
     }
 
+    /* Save the old status */
+    status = getn(value(STRstatus));
+
     /* expand aliases like process() does. */
     alias(&w);
     /* build a syntax tree for the command. */
@@ -861,6 +895,8 @@ aliasrun(cnt, s1, s2)
 	stderror(ERR_OLD);
 
     psavejob();
+
+
     /* catch any errors here */
     if (setexit() == 0)
 	/* execute the parse tree. */
@@ -900,6 +936,8 @@ aliasrun(cnt, s1, s2)
     resexit(osetexit);
     prestjob();
     pendjob();
+    /* Restore status */
+    set(STRstatus, putn(status), VAR_READWRITE);
 }
 
 void
@@ -913,13 +951,13 @@ setalarm(lck)
 
     if ((vp = adrof(STRautologout)) != NULL) {
 	if ((cp = vp->vec[0]) != 0) {
-	    if ((logout_time = atoi(short2str(cp)) * 60) > 0) {
+	    if ((logout_time = (unsigned) atoi(short2str(cp)) * 60) > 0) {
 		alrm_time = logout_time;
 		alm_fun = auto_logout;
 	    }
 	}
 	if ((cp = vp->vec[1]) != 0) {
-	    if ((lock_time = atoi(short2str(cp)) * 60) > 0) {
+	    if ((lock_time = (unsigned) atoi(short2str(cp)) * 60) > 0) {
 		if (lck) {
 		    if (alrm_time == 0 || lock_time < alrm_time) {
 			alrm_time = lock_time;
@@ -1116,23 +1154,23 @@ continue_jobs(cp)
 /* The actual "aliasing" of for backgrounds() is done here
    with the aid of insert_we().   */
 static void
-insert(plist, file_args)
-    struct wordent *plist;
+insert(pl, file_args)
+    struct wordent *pl;
     bool    file_args;
 {
     struct wordent *now, *last;
     Char   *cmd, *bcmd, *cp1, *cp2;
     int     cmd_len;
     Char   *pause = STRunderpause;
-    int     p_len = Strlen(pause);
+    int     p_len = (int) Strlen(pause);
 
-    cmd_len = Strlen(plist->word);
+    cmd_len = (int) Strlen(pl->word);
     cmd = (Char *) xcalloc(1, (size_t) ((cmd_len + 1) * sizeof(Char)));
-    (void) Strcpy(cmd, plist->word);
+    (void) Strcpy(cmd, pl->word);
 /* Do insertions at beginning, first replace command word */
 
     if (file_args) {
-	now = plist;
+	now = pl;
 	xfree((ptr_t) now->word);
 	now->word = (Char *) xcalloc(1, (size_t) (5 * sizeof(Char)));
 	(void) Strcpy(now->word, STRecho);
@@ -1140,7 +1178,7 @@ insert(plist, file_args)
 	now = (struct wordent *) xcalloc(1, (size_t) sizeof(struct wordent));
 	now->word = (Char *) xcalloc(1, (size_t) (6 * sizeof(Char)));
 	(void) Strcpy(now->word, STRbackqpwd);
-	insert_we(now, plist);
+	insert_we(now, pl);
 
 	for (last = now; *last->word != '\n' && *last->word != ';';
 	     last = last->next)
@@ -1188,7 +1226,7 @@ insert(plist, file_args)
     else {
 	struct wordent *del;
 
-	now = plist;
+	now = pl;
 	xfree((ptr_t) now->word);
 	now->word = (Char *) xcalloc(1, 
 				     (size_t) ((cmd_len + 2) * sizeof(Char)));
@@ -1198,7 +1236,7 @@ insert(plist, file_args)
 	while ((*cp1++ = *cp2++) != '\0')
 	    continue;
 	for (now = now->next;
-	     *now->word != '\n' && *now->word != ';' && now != plist;) {
+	     *now->word != '\n' && *now->word != ';' && now != pl;) {
 	    now->prev->next = now->next;
 	    now->next->prev = now->prev;
 	    xfree((ptr_t) now->word);
@@ -1364,7 +1402,7 @@ gettilde(us)
      */
     tcache[tlength].user = Strsave(us);
     tcache[tlength].home = hd;
-    tcache[tlength++].hlen = Strlen(hd);
+    tcache[tlength++].hlen = (int) Strlen(hd);
 
     qsort((ptr_t) tcache, (size_t) tlength, sizeof(struct tildecache),
 	  (int (*) __P((const void *, const void *))) tildecompare);
@@ -1404,14 +1442,14 @@ getusername(hm)
 	return NULL;
     }
     if (((h = value(STRhome)) != STRNULL) &&
-	(Strncmp(p = *hm, h, j = Strlen(h)) == 0) &&
+	(Strncmp(p = *hm, h, (size_t) (j = (int) Strlen(h))) == 0) &&
 	(p[j] == '/' || p[j] == '\0')) {
 	*hm = &p[j];
 	return STRNULL;
     }
     for (i = 0; i < tlength; i++)
-	if ((Strncmp(p = *hm, tcache[i].home, j = tcache[i].hlen) == 0) &&
-	    (p[j] == '/' || p[j] == '\0')) {
+	if ((Strncmp(p = *hm, tcache[i].home, (size_t)
+	    (j = tcache[i].hlen)) == 0) && (p[j] == '/' || p[j] == '\0')) {
 	    *hm = &p[j];
 	    return tcache[i].user;
 	}
@@ -1437,10 +1475,11 @@ doaliases(v, c)
     char    tbuf[BUFSIZE + 1], *tmp;
     extern bool output_raw;	/* PWP: in sh.print.c */
 
+    USE(c);
     v++;
     if (*v == 0) {
 	output_raw = 1;
-	plist(&aliases);
+	plist(&aliases, VAR_ALL);
 	output_raw = 0;
 	return;
     }
@@ -1472,7 +1511,7 @@ doaliases(v, c)
 		    if ((n = read(fd, tbuf, BUFSIZE)) <= 0)
 			goto eof;
 		    for (i = 0; i < n; i++)
-			buf[i] = tbuf[i];
+  			buf[i] = (Char) tbuf[i];
 		    p = buf;
 		}
 		n--;
@@ -1490,7 +1529,7 @@ doaliases(v, c)
 					    (2 * sizeof(Char **)));
 		    vec[0] = Strsave(lp);
 		    vec[1] = NULL;
-		    setq(strip(line), vec, &aliases);
+		    setq(strip(line), vec, &aliases, VAR_READWRITE);
 		    break;
 		}
 	    }
@@ -1530,12 +1569,12 @@ shlvl(val)
 	    Char    buff[BUFSIZE];
 
 	    Itoa(val, buff);
-	    set(STRshlvl, Strsave(buff));
+	    set(STRshlvl, Strsave(buff), VAR_READWRITE);
 	    tsetenv(STRKSHLVL, buff);
 	}
     }
     else {
-	set(STRshlvl, SAVE("1"));
+	set(STRshlvl, SAVE("1"), VAR_READWRITE);
 	tsetenv(STRKSHLVL, str2short("1"));
     }
 }
@@ -1603,9 +1642,14 @@ collate(a, b)
     const Char *b;
 {
     int rv;
-    /* This actually strips the quote bit */
+#ifdef SHORT_STRINGS
+    /* This strips the quote bit as a side effect */
     char *sa = strsave(short2str(a));
     char *sb = strsave(short2str(b));
+#else
+    char *sa = strip(strsave(a));
+    char *sb = strip(strsave(b));
+#endif /* SHORT_STRINGS */
 
 #if defined(NLS) && !defined(NOSTRCOLL)
     errno = 0;	/* strcoll sets errno, another brain-damage */

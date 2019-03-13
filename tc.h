@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.h,v 3.1 1992/06/16 20:46:26 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/tc.h,v 3.2 1993/02/12 17:22:20 christos Exp $ */
 /*
  * tc.h: Tcsh includes
  */
@@ -37,7 +37,10 @@
 #ifndef _h_tc
 #define _h_tc
 
-#include "tc.const.h"
+#ifndef _h_tc_const
+/* Don't include it while we are making it. */
+# include "tc.const.h"
+#endif /* _h_tc_const */
 #include "tc.os.h"
 #include "tc.sig.h"
 #include "tc.decls.h"

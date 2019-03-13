@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/ed.screen.c,v 3.27 1992/10/27 16:18:15 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/ed.screen.c,v 3.30 1993/07/03 23:47:53 christos Exp $ */
 /*
  * ed.screen.c: Editor/termcap-curses interface
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.screen.c,v 3.27 1992/10/27 16:18:15 christos Exp $")
+RCSID("$Id: ed.screen.c,v 3.30 1993/07/03 23:47:53 christos Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -47,7 +47,7 @@ RCSID("$Id: ed.screen.c,v 3.27 1992/10/27 16:18:15 christos Exp $")
  */
 extern char *tgoto();
 extern char *tgetstr();
-extern char *tputs();
+extern int tputs();
 extern int tgetent();
 extern int tgetflag();
 extern int tgetnum();
@@ -334,6 +334,7 @@ TellTC(what)
 {
     struct termcapstr *t;
 
+    USE(what);
     xprintf("\n\tTcsh thinks your terminal has the\n");
     xprintf("\tfollowing characteristics:\n\n");
     xprintf("\tIt has %d columns and %d lines\n",
@@ -437,18 +438,18 @@ SetTC(what, how)
 		stderror(ERR_SETTCUS, tv->name);
 		return;
 	    }
-	    T_Tabs = Val(T_pt);
-	    T_HasMeta = Val(T_km);
-	    T_Margin = Val(T_am) ? MARGIN_AUTO : 0;
-	    T_Margin |= Val(T_xn) ? MARGIN_MAGIC : 0;
+	    T_Tabs = (Char) Val(T_pt);
+	    T_HasMeta = (Char) Val(T_km);
+	    T_Margin = (Char) Val(T_am) ? MARGIN_AUTO : 0;
+	    T_Margin |= (Char) Val(T_xn) ? MARGIN_MAGIC : 0;
 	    if (tv == &tval[T_am] || tv == &tval[T_xn]) 
 		ChangeSize(Val(T_li), Val(T_co));
 	    return;
 	}
 	else {
 	    tv->val = atoi(how);
-	    T_Cols = Val(T_co);
-	    T_Lines = Val(T_li);
+	    T_Cols = (Char) Val(T_co);
+	    T_Lines = (Char) Val(T_li);
 	    if (tv == &tval[T_co] || tv == &tval[T_li])
 		ChangeSize(Val(T_li), Val(T_co));
 	    return;
@@ -563,7 +564,7 @@ EchoTC(v)
     if (t->name == NULL)
 	scap = tgetstr(cv, &area);
     if (!scap || scap[0] == '\0') {
-	if (tgetflag(cv, &area)) {
+	if (tgetflag(cv)) {
 	    xprintf("yes\n");
 	    return;
 	}
@@ -777,7 +778,7 @@ PrintArrowKeys(name)
     for (i = 0; i < 4; i++)
 	if (name == STRNULL || Strcmp(name, arrow[i].name) == 0)
 	    if (arrow[i].type != XK_NOD)
-		printOne(arrow[i].name, &arrow[i].fun, arrow[i].type);
+		(void) printOne(arrow[i].name, &arrow[i].fun, arrow[i].type);
 }
 
 
@@ -1069,7 +1070,7 @@ so_write(cp, n)
 		if ((c = Display[CursorV][CursorH]) != '\0')
 		    so_write(&c, 1);
 		else
-		    putraw(' ');
+		    (void) putraw(' ');
 		CursorH = 1;
 	    }
 	}
@@ -1280,7 +1281,7 @@ GetTermCaps()
 	ptr = "dumb";
 #endif /* apollo */
 
-    if (!ptr || !ptr[0])
+    if (!ptr || !ptr[0] || !strcmp(ptr, "wm"))
 	ptr = "dumb";
 
     setzero(bp, TC_BUFSIZE);
@@ -1319,13 +1320,13 @@ GetTermCaps()
     if (Val(T_li) < 1)
 	Val(T_li) = 24;
 
-    T_Cols = Val(T_co);
-    T_Lines = Val(T_li);
+    T_Cols = (Char) Val(T_co);
+    T_Lines = (Char) Val(T_li);
     if (T_Tabs)
-	T_Tabs = Val(T_pt);
-    T_HasMeta = Val(T_km);
-    T_Margin = Val(T_am) ? MARGIN_AUTO : 0;
-    T_Margin |= Val(T_xn) ? MARGIN_MAGIC : 0;
+	T_Tabs = (Char) Val(T_pt);
+    T_HasMeta = (Char) Val(T_km);
+    T_Margin = (Char) Val(T_am) ? MARGIN_AUTO : 0;
+    T_Margin |= (Char) Val(T_xn) ? MARGIN_MAGIC : 0;
     T_CanCEOL = GoodStr(T_ce);
     T_CanDel = GoodStr(T_dc) || GoodStr(T_DC);
     T_CanIns = GoodStr(T_im) || GoodStr(T_ic) || GoodStr(T_IC);
@@ -1470,7 +1471,7 @@ ChangeSize(lins, cols)
 	    }
 	    else {
 		i = ptr - termcap + Strlen(buf);
-		(void) Strncpy(backup, termcap, i);
+		(void) Strncpy(backup, termcap, (size_t) i);
 		backup[i] = '\0';
 		Itoa(Val(T_co), buf);
 		(void) Strcat(backup + i, buf);
@@ -1488,7 +1489,7 @@ ChangeSize(lins, cols)
 	    }
 	    else {
 		i = ptr - backup + Strlen(buf);
-		(void) Strncpy(termcap, backup, i);
+		(void) Strncpy(termcap, backup, (size_t) i);
 		termcap[i] = '\0';
 		Itoa(Val(T_li), buf);
 		(void) Strcat(termcap, buf);

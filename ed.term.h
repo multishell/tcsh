@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/ed.term.h,v 1.10 1992/10/14 20:19:19 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/ed.term.h,v 1.10 1992/10/14 20:19:19 christos Exp $ */
 /*
  * ed.term.h: Local terminal header
  */

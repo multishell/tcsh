@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.glob.c,v 3.28 1992/10/27 16:18:15 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.glob.c,v 3.33 1993/06/25 21:17:12 christos Exp $ */
 /*
  * sh.glob.c: Regular expression expansion
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.glob.c,v 3.28 1992/10/27 16:18:15 christos Exp $")
+RCSID("$Id: sh.glob.c,v 3.33 1993/06/25 21:17:12 christos Exp $")
 
 #include "tc.h"
 
@@ -53,6 +53,8 @@ static int pargsiz, gargsiz;
 #define	G_CSH	2		/* string contains ~`{ characters	*/
 
 #define	GLOBSPACE	100	/* Alloc increment			*/
+#define LONGBSIZE	10240	/* Backquote expansion buffer size	*/
+
 
 #define LBRC '{'
 #define RBRC '}'
@@ -61,9 +63,9 @@ static int pargsiz, gargsiz;
 #define EOS '\0'
 
 Char  **gargv = NULL;
-long    gargc = 0;
+int     gargc = 0;
 Char  **pargv = NULL;
-static long    pargc = 0;
+static int pargc = 0;
 
 /*
  * globbing is now done in two stages. In the first pass we expand
@@ -80,7 +82,7 @@ static	Char	**globexpand	__P((Char **));
 static	int	  globbrace	__P((Char *, Char *, Char ***));
 static  void	  expbrace	__P((Char ***, Char ***, int));
 static  int	  pmatch	__P((Char *, Char *, Char **));
-static	void	  pword		__P((void));
+static	void	  pword		__P((int));
 static	void	  psave		__P((int));
 static	void	  backeval	__P((Char *, bool));
 
@@ -102,6 +104,8 @@ globtilde(nv, s)
 	continue;
     *b = EOS;
     if (gethdir(gstart)) {
+	if (adrof(STRnonomatch))
+	    return (--u);
 	blkfree(nv);
 	if (*gstart)
 	    stderror(ERR_UNKUSER, short2str(gstart));
@@ -651,12 +655,21 @@ tglob(t)
 	else if (*p == '{' &&
 		 (p[1] == '\0' || (p[1] == '}' && p[2] == '\0')))
 	    continue;
-	while ( *(c = p++) ) {
-	    /*
-	     * eat everything inside the matching backquotes
-	     */
+	/*
+	 * The following line used to be *(c = p++), but hp broke their
+	 * optimizer in 9.01, so we break the assignment into two pieces
+	 * The careful reader here will note that *most* compiler workarounds
+	 * in tcsh are either for apollo/DomainOS or hpux. Is it a coincidence?
+	 */
+	while ( *(c = p) != '\0') {
+	    p++;
 	    if (*c == '`') {
 		gflag |= G_CSH;
+#ifdef notdef
+		/*
+		 * We do want to expand echo `echo '*'`, so we don't\
+		 * use this piece of code anymore.
+		 */
 		while (*p && *p != '`') 
 		    if (*p++ == '\\') {
 			if (*p)		/* Quoted chars */
@@ -668,6 +681,7 @@ tglob(t)
 		    p++;
 		else
 		    break;
+#endif
 	    }
 	    else if (*c == '{')
 		gflag |= G_CSH;
@@ -691,7 +705,7 @@ dobackp(cp, literal)
     bool    literal;
 {
     register Char *lp, *rp;
-    Char   *ep, word[BUFSIZE];
+    Char   *ep, word[LONGBSIZE];
 
     if (pargv) {
 #ifdef notdef
@@ -704,12 +718,12 @@ dobackp(cp, literal)
     pargv[0] = NULL;
     pargcp = pargs = word;
     pargc = 0;
-    pnleft = BUFSIZE - 4;
+    pnleft = LONGBSIZE - 4;
     for (;;) {
 	for (lp = cp; *lp != '`'; lp++) {
 	    if (*lp == 0) {
 		if (pargcp != pargs)
-		    pword();
+		    pword(LONGBSIZE);
 		return (pargv);
 	    }
 	    psave(*lp);
@@ -772,7 +786,6 @@ backeval(cp, literal)
      */
     mypipe(pvec);
     if (pfork(&faket, -1) == 0) {
-	struct wordent paraml;
 	struct command *t;
 
 	(void) close(pvec[0]);
@@ -867,7 +880,7 @@ backeval(cp, literal)
 	 * would lose blank lines.
 	 */
 	if (c != -1 && (cnt || literal))
-	    pword();
+	    pword(BUFSIZE);
 	hadnl = 0;
     } while (c >= 0);
     (void) close(pvec[0]);
@@ -881,11 +894,12 @@ psave(c)
 {
     if (--pnleft <= 0)
 	stderror(ERR_WTOOLONG);
-    *pargcp++ = c;
+    *pargcp++ = (Char) c;
 }
 
 static void
-pword()
+pword(bufsiz)
+    int    bufsiz;
 {
     psave(0);
     if (pargc == pargsiz - 1) {
@@ -896,7 +910,7 @@ pword()
     pargv[pargc++] = Strsave(pargs);
     pargv[pargc] = NULL;
     pargcp = pargs;
-    pnleft = BUFSIZE - 4;
+    pnleft = bufsiz - 4;
 }
 
 int
@@ -1080,7 +1094,7 @@ sortscmp(a, b)
     if (!*b)
 	return (-1);
 
-    return (int) collate(a, b);
+    return (int) collate(*a, *b);
 }
 
 #endif

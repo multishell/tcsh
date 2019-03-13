@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.sig.c,v 3.13 1992/10/14 20:19:19 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/tc.sig.c,v 3.16 1993/06/25 21:17:12 christos Exp $ */
 /*
  * tc.sig.c: Signal routine emulations
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.sig.c,v 3.13 1992/10/14 20:19:19 christos Exp $")
+RCSID("$Id: tc.sig.c,v 3.16 1993/06/25 21:17:12 christos Exp $")
 
 #include "tc.wait.h"
 
@@ -46,6 +46,8 @@ RCSID("$Id: tc.sig.c,v 3.13 1992/10/14 20:19:19 christos Exp $")
  * we can handle up to MAX_CHLD outstanding children now;
  */
 #define MAX_CHLD 50
+
+# ifdef UNRELSIGS
 static struct mysigstack {
     int     s_w;		/* wait report			 */
     int     s_errno;		/* errno returned;		 */
@@ -54,7 +56,6 @@ static struct mysigstack {
 static int stk_ptr = -1;
 
 
-# ifdef UNRELSIGS
 /* queue child signals
  */
 static sigret_t
@@ -270,6 +271,7 @@ char   *show_sig_mask();
 
 int     debug_signals = 0;
 
+#ifndef __PARAGON__
 /*
  * sigsetmask(mask)
  *
@@ -283,8 +285,8 @@ sigsetmask(mask)
     int     m;
     register int i;
 
-    sigemptyset(&set);
-    sigemptyset(&oset);
+    (void) sigemptyset(&set);
+    (void) sigemptyset(&oset);
 
     for (i = 1; i <= MAXSIG; i++)
 	if (ISSET(mask, i))
@@ -301,6 +303,7 @@ sigsetmask(mask)
 
     return (m);
 }
+#endif /* __PARAGON__ */
 
 /*
  * sigblock(mask)
@@ -316,8 +319,8 @@ sigblock(mask)
     int     m;
     register int i;
 
-    sigemptyset(&set);
-    sigemptyset(&oset);
+    (void) sigemptyset(&set);
+    (void) sigemptyset(&oset);
 
     /* Get present set of signals. */
     if (sigprocmask(SIG_SETMASK, NULL, &set))
@@ -354,7 +357,7 @@ bsd_sigpause(mask)
     sigset_t set;
     register int i;
 
-    sigemptyset(&set);
+    (void) sigemptyset(&set);
 
     for (i = 1; i <= MAXSIG; i++)
 	if (ISSET(mask, i))
@@ -380,7 +383,7 @@ sigret_t (*bsd_signal(sig, func))()
                 return((sigret_t(*)()) SIG_IGN);
         }
 
-        sigemptyset(&set);
+        (void) sigemptyset(&set);
 
         act.sa_handler = (sigret_t(*)()) func;      /* user function */
         act.sa_mask = set;                      /* signal mask */

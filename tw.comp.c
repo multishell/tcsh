@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/tw.comp.c,v 1.20 1992/10/10 18:17:34 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/tw.comp.c,v 1.24 1993/07/03 23:47:53 christos Exp $ */
 /*
  * tw.comp.c: File completion builtin
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tw.comp.c,v 1.20 1992/10/10 18:17:34 christos Exp $")
+RCSID("$Id: tw.comp.c,v 1.24 1993/07/03 23:47:53 christos Exp $")
 
 #include "tw.h"
 #include "ed.h"
@@ -67,6 +67,7 @@ docomplete(v, t)
     register struct varent *vp;
     register Char *p;
 
+    USE(t);
     v++;
     p = *v++;
     if (p == 0)
@@ -77,7 +78,7 @@ docomplete(v, t)
 	    tw_pr(vp->vec), xputchar('\n');
     }
     else
-	set1(strip(p), saveblk(v), &completions);
+	set1(strip(p), saveblk(v), &completions, VAR_READWRITE);
 } /* end docomplete */
 
 
@@ -90,6 +91,7 @@ douncomplete(v, t)
     Char **v;
     struct command *t;
 {
+    USE(t);
     unset1(v, &completions);
 } /* end douncomplete */
 
@@ -237,7 +239,7 @@ tw_tok(str)
 
     for (str = bf; *bf && !Isspace(*bf); bf++) {
 	if (ismeta(*bf))
-	    return (Char *) -1;
+	    return INVPTR;
 	*bf = *bf & ~QUOTE;
     }
     if (*bf != '\0')
@@ -404,12 +406,18 @@ tw_dollar(str, wl, nwl, buffer, sep, msg)
     Char *sp, *bp = buffer, *ebp = &buffer[MAXPATHLEN];
 
     for (sp = str; *sp && *sp != sep && bp < ebp;)
-	if (sp[0] == '$' && sp[1] == ':' && Isdigit(sp[2])) {
-	    int num;
+	if (sp[0] == '$' && sp[1] == ':' && Isdigit(sp[sp[2] == '-' ? 3 : 2])) {
+	    int num, neg = 0;
 	    sp += 2;
+	    if (*sp == '-') {
+		neg = 1;
+		sp++;
+	    }
 	    for (num = *sp++ - '0'; Isdigit(*sp); num += 10 * num + *sp++ - '0')
 		continue;
-	    if (num < nwl) {
+	    if (neg)
+		num = nwl - num - 1;
+	    if (num >= 0 && num < nwl) {
 		Char *ptr;
 		for (ptr = wl[num]; *ptr && bp < ebp - 1; *bp++ = *ptr++)
 		    continue;
@@ -424,7 +432,7 @@ tw_dollar(str, wl, nwl, buffer, sep, msg)
     if (*sp++ == sep)
 	return sp;
 
-    stderror(ERR_COMPILL, msg, short2str(str));
+    stderror(ERR_COMPMIS, sep, msg, short2str(str));
     return --sp;
 } /* end tw_dollar */
 		
@@ -446,13 +454,13 @@ tw_complete(line, word, pat, looking, suf)
 {
     Char buf[MAXPATHLEN + 1], **vec, *ptr; 
     Char *wl[MAXPATHLEN/6];
-    static Char nomatch[2] = { (Char) -1, 0x00 };
+    static Char nomatch[2] = { (Char) ~0, 0x00 };
     int wordno, n;
 
     copyn(buf, line, MAXPATHLEN);
 
     /* find the command */
-    if ((wl[0] = tw_tok(buf)) == NULL || wl[0] == (Char*) -1)
+    if ((wl[0] = tw_tok(buf)) == NULL || wl[0] == INVPTR)
 	return TW_ZERO;
 
     /*
@@ -464,10 +472,10 @@ tw_complete(line, word, pat, looking, suf)
 
     /* tokenize the line one more time :-( */
     for (wordno = 1; (wl[wordno] = tw_tok(NULL)) != NULL &&
-		      wl[wordno] != (Char *) -1; wordno++)
+		      wl[wordno] != INVPTR; wordno++)
 	continue;
 
-    if (wl[wordno] == (Char *) -1)	/* Found a meta character */
+    if (wl[wordno] == INVPTR)		/* Found a meta character */
 	return TW_ZERO;			/* de-activate completions */
 #ifdef TDEBUG
     {
@@ -523,13 +531,13 @@ tw_complete(line, word, pat, looking, suf)
 	case 'p':
 	    break;
 	default:
-	    stderror(ERR_COMPILL, "command", cmd);
+	    stderror(ERR_COMPINV, "command", cmd);
 	    return TW_ZERO;
 	}
 
 	sep = ptr[1];
 	if (!Ispunct(sep)) {
-	    stderror(ERR_COMPILL, "separator", sep);
+	    stderror(ERR_COMPINV, "separator", sep);
 	    return TW_ZERO;
 	}
 
@@ -538,7 +546,7 @@ tw_complete(line, word, pat, looking, suf)
 
 	if (*ptr != '\0') {
 	    if (*ptr == sep)
-		*suf = -1;
+		*suf = ~0;
 	    else
 		*suf = *ptr;
 	}
@@ -554,7 +562,7 @@ tw_complete(line, word, pat, looking, suf)
 	case 0:
 	    xprintf("*auto suffix*\n");
 	    break;
-	case -1:
+	case ~0:
 	    xprintf("*no suffix*\n");
 	    break;
 	default:

@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.decls.h,v 3.15 1992/10/27 16:18:15 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.decls.h,v 3.19 1993/06/25 21:17:12 christos Exp $ */
 /*
  * sh.decls.h	 External declarations from sh*.c
  */
@@ -62,7 +62,7 @@ extern	void		  xexit		__P((int));
 extern	void		  dinit		__P((Char *));
 extern	void		  dodirs	__P((Char **, struct command *));
 extern	Char		 *dcanon	__P((Char *, Char *));
-extern	void		  dtildepr	__P((Char *, Char *));
+extern	void		  dtildepr	__P((Char *));
 extern	void		  dtilde	__P((void));
 extern	void		  dochngd	__P((Char **, struct command *));
 extern	Char		 *dnormalize	__P((Char *, int));
@@ -141,6 +141,7 @@ extern	void		  donewgrp	__P((Char **, struct command *));
 #endif
 extern	void		  donohup	__P((Char **, struct command *));
 extern	void		  doonintr	__P((Char **, struct command *));
+extern	void		  doprintenv	__P((Char **, struct command *));
 extern	void		  dorepeat	__P((Char **, struct command *));
 extern	void		  dosetenv	__P((Char **, struct command *));
 extern	void		  dosuspend	__P((Char **, struct command *));
@@ -183,11 +184,11 @@ extern	int		  sortscmp	__P((Char **, Char **));
  * sh.hist.c
  */
 extern	void	 	  dohist	__P((Char **, struct command *));
-extern  struct Hist 	 *enthist	__P((int, struct wordent *, bool));
-extern	void	 	  savehist	__P((struct wordent *));
+extern  struct Hist 	 *enthist	__P((int, struct wordent *, bool, bool));
+extern	void	 	  savehist	__P((struct wordent *, bool));
 extern	void		  fmthist	__P((int, ptr_t, char *));
 extern	void		  rechist	__P((Char *));
-extern	void		  loadhist	__P((Char *));
+extern	void		  loadhist	__P((Char *, bool));
 
 
 /*
@@ -217,9 +218,6 @@ extern	void		  blkfree	__P((Char **));
 extern	int		  blklen	__P((Char **));
 extern	void		  blkpr		__P((Char **));
 extern	Char		**blkspl	__P((Char **, Char **));
-#ifndef copy
-extern  void		  copy		__P((char *, char *, int));
-#endif
 extern	void		  closem	__P((void));
 #ifndef CLOSE_ON_EXEC
 extern  void 		  closech	__P((void));
@@ -237,14 +235,14 @@ extern	void		  setzero	__P((char *, int));
 extern	Char		 *strip		__P((Char *));
 extern	Char		 *quote		__P((Char *));
 extern	char		 *strsave	__P((const char *));
-extern	char		 *strspl	__P((char *, char *));
+extern	void		  udvar		__P((Char *));
 #ifndef POSIX
 extern  char   	  	 *strstr	__P((const char *, const char *));
-#endif
-extern	void		  udvar		__P((Char *));
+#endif /* !POSIX */
 #ifndef SHORT_STRINGS
+extern	char		 *strspl	__P((char *, char *));
 extern	char		 *strend	__P((char *));
-#endif
+#endif /* SHORT_STRINGS */
 
 /*
  * sh.parse.c
@@ -318,15 +316,17 @@ extern	void		  dolet		__P((Char **, struct command *));
 extern	Char		 *putn		__P((int));
 extern	int		  getn		__P((Char *));
 extern	Char		 *value1	__P((Char *, struct varent *));
-extern	void		  set		__P((Char *, Char *));
-extern	void		  set1		__P((Char *, Char **, struct varent *));
-extern	void		  setq		__P((Char *, Char **, struct varent *));
+extern	void		  set		__P((Char *, Char *, int));
+extern	void		  set1		__P((Char *, Char **, struct varent *,
+					     int));
+extern	void		  setq		__P((Char *, Char **, struct varent *,
+					     int));
 extern	void		  unset		__P((Char **, struct command *));
 extern	void		  unset1	__P((Char *[], struct varent *));
 extern	void		  unsetv	__P((Char *));
 extern	void		  setNS		__P((Char *));
 extern	void		  shift		__P((Char **, struct command *));
-extern	void		  plist		__P((struct varent *));
+extern	void		  plist		__P((struct varent *, int));
 
 /*
  * sh.time.c

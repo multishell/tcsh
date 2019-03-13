@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.set.c,v 3.18 1992/10/05 02:41:30 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.set.c,v 3.23 1993/07/03 23:47:53 christos Exp $ */
 /*
  * sh.set.c: Setting and Clearing of variables
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.set.c,v 3.18 1992/10/05 02:41:30 christos Exp $")
+RCSID("$Id: sh.set.c,v 3.23 1993/07/03 23:47:53 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -119,7 +119,7 @@ update_vars(vp)
 	 */
 	cp = dcanon(cp, cp);
 
-	set(vp, Strsave(cp));	/* have to save the new val */
+	set(vp, Strsave(cp), VAR_READWRITE);	/* have to save the new val */
 
 	/* and now mirror home with HOME */
 	tsetenv(STRKHOME, cp);
@@ -162,11 +162,20 @@ doset(v, c)
     Char  **vecp;
     bool    hadsub;
     int     subscr;
+    int	    flags = VAR_READWRITE;
 
+    USE(c);
     v++;
+    /*
+     * Readonly addition From: Tim P. Starrin <noid@cyborg.larc.nasa.gov>
+     */
+    if (*v && eq(*v, STRmr)) {
+	flags = VAR_READONLY;
+	v++;
+    }
     p = *v++;
     if (p == 0) {
-	prvars();
+	plist(&shvhed, flags);
 	return;
     }
     do {
@@ -212,14 +221,14 @@ doset(v, c)
 	    p = *e;
 	    *e = 0;
 	    vecp = saveblk(v);
-	    set1(vp, vecp, &shvhed);
+	    set1(vp, vecp, &shvhed, flags);
 	    *e = p;
 	    v = e + 1;
 	}
 	else if (hadsub)
 	    asx(vp, subscr, Strsave(p));
 	else
-	    set(vp, Strsave(p));
+	    set(vp, Strsave(p), flags);
 	update_vars(vp);
     } while ((p = *v++) != NULL);
 }
@@ -246,6 +255,8 @@ asx(vp, subscr, p)
 {
     register struct varent *v = getvx(vp, subscr);
 
+    if (v->v_flags & VAR_READONLY)
+	stderror(ERR_READONLY|ERR_NAME, v->v_name);
     xfree((ptr_t) v->vec[subscr - 1]);
     v->vec[subscr - 1] = globone(p, G_APPEND);
 }
@@ -275,6 +286,7 @@ dolet(v, dummy)
     bool    hadsub;
     int     subscr;
 
+    USE(dummy);
     v++;
     p = *v++;
     if (p == 0) {
@@ -337,14 +349,14 @@ dolet(v, dummy)
 	    if (hadsub)
 		asx(vp, subscr, p);
 	    else
-		set(vp, p);
+		set(vp, p, VAR_READWRITE);
 	else if (hadsub) {
 	    struct varent *gv = getvx(vp, subscr);
 
 	    asx(vp, subscr, operate(op, gv->vec[subscr - 1], p));
 	}
 	else
-	    set(vp, operate(op, value(vp), p));
+	    set(vp, operate(op, value(vp), p), VAR_READWRITE);
 	update_vars(vp);
 	xfree((ptr_t) vp);
 	if (c != '=')
@@ -381,7 +393,7 @@ operate(op, vp, p)
     if (op != '=') {
 	if (*vp)
 	    *v++ = vp;
-	opr[0] = op;
+	opr[0] = (Char) op;
 	opr[1] = 0;
 	*v++ = opr;
 	if (op == '<' || op == '>')
@@ -409,7 +421,7 @@ putn(n)
 	*putp++ = '-';
     }
     num = 2;			/* confuse lint */
-    if (sizeof(int) == num && ((unsigned int) n) == 32768) {
+    if (sizeof(int) == num && ((unsigned int) n) == 0x8000) {
 	*putp++ = '3';
 	n = 2768;
 #ifdef pdp11
@@ -418,7 +430,7 @@ putn(n)
     }
     else {
 	num = 4;		/* confuse lint */
-	if (sizeof(int) == num && ((unsigned int) n) == 2147483648) {
+	if (sizeof(int) == num && ((unsigned int) n) == 0x80000000) {
 	    *putp++ = '2';
 	    n = 147483648;
 	}
@@ -516,20 +528,22 @@ adrof1(name, v)
  * The caller is responsible for putting value in a safe place
  */
 void
-set(var, val)
+set(var, val, flags)
     Char   *var, *val;
+    int	   flags;
 {
     register Char **vec = (Char **) xmalloc((size_t) (2 * sizeof(Char **)));
 
     vec[0] = val;
     vec[1] = 0;
-    set1(var, vec, &shvhed);
+    set1(var, vec, &shvhed, flags);
 }
 
 void
-set1(var, vec, head)
+set1(var, vec, head, flags)
     Char   *var, **vec;
     struct varent *head;
+    int flags;
 {
     register Char **oldv = vec;
 
@@ -545,14 +559,15 @@ set1(var, vec, head)
 	blkfree(oldv);
 	gargv = 0;
     }
-    setq(var, vec, head);
+    setq(var, vec, head, flags);
 }
 
 
 void
-setq(name, vec, p)
+setq(name, vec, p, flags)
     Char   *name, **vec;
     register struct varent *p;
+    int flags;
 {
     register struct varent *c;
     register f;
@@ -561,19 +576,23 @@ setq(name, vec, p)
     while ((c = p->v_link[f]) != 0) {
 	if ((f = *name - *c->v_name) == 0 &&
 	    (f = Strcmp(name, c->v_name)) == 0) {
+	    if (c->v_flags & VAR_READONLY)
+		stderror(ERR_READONLY|ERR_NAME, c->v_name);
 	    blkfree(c->vec);
-	    goto found;
+	    c->v_flags = flags;
+	    trim(c->vec = vec);
+	    return;
 	}
 	p = c;
 	f = f > 0;
     }
     p->v_link[f] = c = (struct varent *) xmalloc((size_t)sizeof(struct varent));
     c->v_name = Strsave(name);
+    c->v_flags = flags;
     c->v_bal = 0;
     c->v_left = c->v_right = 0;
     c->v_parent = p;
     balance(p, f, 0);
-found:
     trim(c->vec = vec);
 }
 
@@ -585,6 +604,7 @@ unset(v, c)
 {
     bool did_only;
 
+    USE(c);
     did_only = adrof(STRrecognize_only_executables) != NULL;
     unset1(v, &shvhed);
     if (adrof(STRhistchars) == 0) {
@@ -616,7 +636,10 @@ unset1(v, head)
     while (*++v) {
 	cnt = 0;
 	while ((vp = madrof(*v, head)) != NULL)
-	    unsetv1(vp), cnt++;
+	    if (vp->v_flags & VAR_READONLY)
+		stderror(ERR_READONLY|ERR_NAME, vp->v_name);
+	    else
+		unsetv1(vp), cnt++;
 	if (cnt == 0)
 	    setname(short2str(*v));
     }
@@ -681,7 +704,7 @@ void
 setNS(cp)
     Char   *cp;
 {
-    set(cp, Strsave(STRNULL));
+    set(cp, Strsave(STRNULL), VAR_READWRITE);
 }
 
 /*ARGSUSED*/
@@ -693,6 +716,7 @@ shift(v, c)
     register struct varent *argv;
     register Char *name;
 
+    USE(c);
     v++;
     name = *v;
     if (name == 0)
@@ -878,8 +902,9 @@ balance(p, f, d)
 }
 
 void
-plist(p)
+plist(p, what)
     register struct varent *p;
+    int what;
 {
     register struct varent *c;
     register len;
@@ -897,14 +922,16 @@ plist(p)
 x:
 	if (p->v_parent == 0)	/* is it the header? */
 	    return;
-	len = blklen(p->vec);
-	xprintf("%S\t", p->v_name);
-	if (len != 1)
-	    xputchar('(');
-	blkpr(p->vec);
-	if (len != 1)
-	    xputchar(')');
-	xputchar('\n');
+	if ((p->v_flags & what) != 0) {
+	    len = blklen(p->vec);
+	    xprintf("%S\t", p->v_name);
+	    if (len != 1)
+		xputchar('(');
+	    blkpr(p->vec);
+	    if (len != 1)
+		xputchar(')');
+	    xputchar('\n');
+	}
 	if (p->v_right) {
 	    p = p->v_right;
 	    continue;

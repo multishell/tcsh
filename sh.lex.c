@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.lex.c,v 3.27 1992/11/13 04:19:10 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.lex.c,v 3.34 1993/06/25 21:17:12 christos Exp $ */
 /*
  * sh.lex.c: Lexical analysis into tokens
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.lex.c,v 3.27 1992/11/13 04:19:10 christos Exp $")
+RCSID("$Id: sh.lex.c,v 3.34 1993/06/25 21:17:12 christos Exp $")
 
 #include "ed.h"
 /* #define DEBUG_INP */
@@ -196,7 +196,7 @@ lex(hp)
 
 static time_t
 a2time_t(word)
-    Char * word;
+    Char *word;
 {
     /* Attempt to distinguish timestamps from other possible entries.
      * Format: "+NNNNNNNNNN" (10 digits, left padded with ascii '0') */
@@ -283,7 +283,8 @@ word()
     Char c, c1;
     Char *wp;
     Char    wbuf[BUFSIZE];
-    Char    hbuf[12], h;
+    Char    hbuf[12];
+    int	    h;
     bool dolflg;
     int i;
 
@@ -385,7 +386,7 @@ loop:
 		break;
 	    }
 	}
-	else if (cmap(c, _META | _Q | _Q1 | _ESC)) {
+	else if (cmap(c, _META | _QF | _QB | _ESC)) {
 	    if (c == '\\') {
 		c = getC(0);
 		if (c == '\n') {
@@ -397,7 +398,7 @@ loop:
 		    *wp++ = '\\', --i;
 		c |= QUOTE;
 	    }
-	    else if (cmap(c, _Q | _Q1)) {	/* '"` */
+	    else if (cmap(c, _QF | _QB)) {	/* '"` */
 		c1 = c;
 		dolflg = c == '"' ? DOALL : DOEXCL;
 	    }
@@ -436,7 +437,7 @@ getC1(flag)
 	    if ((c = *lap++) == 0)
 		lap = 0;
 	    else {
-		if (cmap(c, _META | _Q | _Q1))
+		if (cmap(c, _META | _QF | _QB))
 		    c |= QUOTE;
 		return (c);
 	    }
@@ -455,6 +456,9 @@ getC1(flag)
 	    }
 	    exclp = 0;
 	    exclnxt = 0;
+	    /* this will throw away the dummy history entries */
+	    savehist(NULL, 0);
+
 	}
 	if (exclnxt) {
 	    exclnxt = exclnxt->next;
@@ -646,7 +650,7 @@ getdol()
 	    if (c == 's') {
 		int delimcnt = 2;
 		int delim = getC(0);
-		*np++ = delim;
+		*np++ = (Char) delim;
 		
 		if (!delim || letter(delim)
 		    || Isdigit(delim) || any(" \t\n", delim)) {
@@ -1007,7 +1011,7 @@ dosub(sc, en, global)
      * ANSI mode HP/UX compiler chokes on
      * return &enthist(HIST_PURGE, &lexi, 0)->Hlex;
      */
-    hst = enthist(HIST_PURGE, &lexi, 0);
+    hst = enthist(HIST_PURGE, &lexi, 0, 0);
     return &(hst->Hlex);
 }
 
@@ -1301,7 +1305,7 @@ gethent(sc)
 	    }
 	    np = lhsb;
 	    event = 0;
-	    while (!cmap(c, _ESC | _META | _Q | _Q1) && !any("${}:#", c)) {
+	    while (!cmap(c, _ESC | _META | _QF | _QB) && !any("${}:#", c)) {
 		if (event != -1 && Isdigit(c))
 		    event = event * 10 + c - '0';
 		else
@@ -1440,7 +1444,7 @@ void
 unreadc(c)
     int    c;
 {
-    peekread = c;
+    peekread = (Char) c;
 }
 
 int
@@ -1460,6 +1464,7 @@ readc(wanteof)
 top:
     aret = F_SEEK;
     if (alvecp) {
+	arun = 1;
 #ifdef DEBUG_INP
 	xprintf("alvecp %c\n", *alvecp & 0xff);
 #endif
@@ -1477,6 +1482,7 @@ top:
 	}
     }
     if (alvec) {
+	arun = 1;
 	if ((alvecp = *alvec) != 0) {
 	    alvec++;
 	    goto top;
@@ -1484,6 +1490,7 @@ top:
 	/* Infinite source! */
 	return ('\n');
     }
+    arun = 0;
     if (evalp) {
 	aret = E_SEEK;
 	if ((c = *evalp++) != 0)
@@ -1496,7 +1503,7 @@ top:
 	evalp = 0;
     }
     if (evalvec) {
-	if (evalvec == (Char **) 1) {
+	if (evalvec == INVPPTR) {
 	    doneinp = 1;
 	    reset();
 	}
@@ -1504,18 +1511,18 @@ top:
 	    evalvec++;
 	    goto top;
 	}
-	evalvec = (Char **) 1;
+	evalvec = INVPPTR;
 	return ('\n');
     }
     do {
-	if (arginp == (Char *) 1 || onelflg == 1) {
+	if (arginp == INVPTR || onelflg == 1) {
 	    if (wanteof)
 		return (-1);
 	    exitstat();
 	}
 	if (arginp) {
 	    if ((c = *arginp++) == 0) {
-		arginp = (Char *) 1;
+		arginp = INVPTR;
 		return ('\n');
 	    }
 	    return (c);
@@ -1566,7 +1573,14 @@ reread:
 		    if (ctpgrp)
 # endif /* _SEQUENT */
 		    (void) killpg((pid_t) ctpgrp, SIGHUP);
+# ifdef notdef
+		    /*
+		     * With the walking process group fix, this message
+		     * is now obsolete. As the foreground process group
+		     * changes, the shell needs to adjust. Well too bad.
+		     */
 		    xprintf("Reset tty pgrp from %d to %d\n", ctpgrp, tpgrp);
+# endif /* notdef */
 		    goto reread;
 		}
 #endif /* BSDJOBS */
@@ -1666,6 +1680,16 @@ again:
 		     * I have not been able to pin it down!
 		     */
 		    if (buf >= fblocks || off > BUFSIZE) {
+#ifdef I_DEBUG
+			xprintf("buf %lx, fblocks %lx, off %lx, BUFSIZE %lx\n",
+				buf, fblocks, off, BUFSIZE);
+			xprintf("Dumping core...");
+			flush();
+			if (fork() == 0)
+			    (void) kill(0, 6);
+			xprintf("ok.\n");
+			flush();
+#endif
 			/* start with fresh buffer */
 			feobp = fseekp = fblocks * BUFSIZE;
 			numleft = c;
@@ -1729,14 +1753,14 @@ bseek(l)
     switch (aret = l->type) {
     case E_SEEK:
 	evalvec = l->a_seek;
-	evalp = (Char *) l->f_seek;
+	evalp = l->c_seek;
 #ifdef DEBUG_SEEK
 	xprintf("seek to eval %x %x\n", evalvec, evalp);
 #endif
 	return;
     case A_SEEK:
 	alvec = l->a_seek;
-	alvecp = (Char *) l->f_seek;
+	alvecp = l->c_seek;
 #ifdef DEBUG_SEEK
 	xprintf("seek to alias %x %x\n", alvec, alvecp);
 #endif
@@ -1761,14 +1785,14 @@ struct Ain *l;
     switch (l->type = aret) {
     case E_SEEK:
 	l->a_seek = evalvec;
-	l->f_seek = (off_t) evalp;
+	l->c_seek = evalp;
 #ifdef DEBUG_SEEK
 	xprintf("tell eval %x %x\n", evalvec, evalp);
 #endif
 	return;
     case A_SEEK:
 	l->a_seek = alvec;
-	l->f_seek = (off_t) alvecp;
+	l->c_seek = alvecp;
 #ifdef DEBUG_SEEK
 	xprintf("tell alias %x %x\n", alvec, alvecp);
 #endif

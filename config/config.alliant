@@ -5,18 +5,37 @@
  *
  * Edit this to match your system type.
  */
+#ifndef _h_config
+#define _h_config
 
 /****************** System dependant compilation flags ****************/
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
  */
+#ifdef NEW_OS	/* XXX: How to make the ifdef automatic */
+#define POSIX
+#else
 #undef POSIX
+#endif
 
 /*
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
  *		job control facilities.
  */
+#ifdef NEW_OS
+#define POSIXJOBS
+#else
 #undef POSIXJOBS
+#endif
+
+/*
+ * POSIXSIGS	Use the POSIX signal facilities to emulate BSD signals.
+ */
+#ifdef NEW_OS
+#define POSIXSIGS
+#else
+#undef POSIXSIGS
+#endif
 
 /*
  * VFORK	This machine has a vfork().  
@@ -52,6 +71,11 @@
  *		(OREO) has BSDJOBS and BSDSIGS but not BSDTIMES.
  */
 #define BSDTIMES
+
+/*
+ * BSDLIMIT     You have BSD-style resource limit stuff (getrlimit/setrlimit)
+ */
+#define BSDLIMIT
 
 /*
  * BSDNICE	Your system uses setpriority() instead of nice, to
@@ -104,15 +128,19 @@
 
 /*
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
+ *		Note: for Concentrix 6.0.00 and up, define DIRENT
  */
 #ifdef mc68000	
-# undef DIRENT		/* FX-80 */
+# undef DIRENT		/* FX-80, pre-Concentrix 6.0.00 */
 #else
-# define DIRENT		/* FX-2800 */
+# define DIRENT		/* FX-2800, and FX-80 with Concentrix 6.0.00 and up*/
 #endif
 /****************** local defines *********************/
 #ifndef alliant
 # define alliant
+#endif
+#ifdef NEW_OS
+#define BSDWAIT
 #endif
 
 /****************** configurable hacks ****************/
@@ -122,3 +150,4 @@
 #ifdef mc68000
 # undef NLS
 #endif
+#endif /* _h_config */

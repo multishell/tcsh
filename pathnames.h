@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/pathnames.h,v 3.11 1992/11/20 08:56:38 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/pathnames.h,v 3.13 1993/07/08 04:51:54 christos Exp $ */
 /*
  * pathnames.h: Location of things to find
  */
@@ -41,10 +41,6 @@
 # define _PATH_LOCAL		"/usr/cs/bin"
 #endif /* CMUCS && !_PATH_LOCAL */
 
-#if defined(_CRAYCOM) && !defined(_PATH_LOCAL)
-# define _PATH_LOCAL		"/usr/lbin"
-#endif /* _CRAYCOM && !_PATH_LOCAL */
-
 #if defined(convex) || defined(stellar) || defined(INTEL)
 # ifndef _PATH_DOTLOGIN
 #  define _PATH_DOTLOGIN	"/etc/login"
@@ -75,7 +71,7 @@
 # endif /* !_PATH_DOTLOGIN */
 #endif /* sgi || OREO || cray || AMIX || CDC */
 
-#if defined(_CRAYCOM) && !defined(_PATH_TCSHELL)
+#if (defined(_CRAYCOM) || defined(Lynx)) && !defined(_PATH_TCSHELL)
 # define _PATH_TCSHELL		"/bin/tcsh"		/* 1st class shell */
 #endif /* _CRAYCOM && !_PATH_TCSHELL */
 

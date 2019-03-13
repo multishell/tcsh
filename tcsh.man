@@ -29,8 +29,8 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $Id: tcsh.man,v 3.53 1992/11/20 08:56:38 christos Exp $
-.TH TCSH 1 "20 November 1992" "Cornell 6.03.00"
+.\" $Id: tcsh.man,v 3.61 1993/07/03 23:47:53 christos Exp $
+.TH TCSH 1 "3 July 1993" "Cornell 6.04.00"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
@@ -177,6 +177,9 @@ directory is changed.
 .sp
 .ti -4
 34) Enhanced file inquiry operator.
+.sp
+.ti -4
+35) Readonly variables.
 .RE
 .sp
 For a description of standard C-shell features, see the
@@ -1307,6 +1310,8 @@ The available sequences are:
 %t or %@	Current time of day, in 12-hour, am/pm format.
 %T	Current time of day, in 24-hour format. 
 	(But see the \fIampm\fP shell variable below.)
+%p	Current time in 12-hour format, am/pm format with seconds.
+%P	Current time in 24-hour format, with seconds.
 \ec	`c' is parsed the same way as in bindkey.
 ^c	`c' is parsed the same way as in bindkey.
 %%	A single %.
@@ -1995,6 +2000,13 @@ The current possible values are:
 \fIiris3d\fR		a Silicon Graphics Iris 3000
 \fIiris4d\fR		a Silicon Graphics Iris 4D
 \fIisc386\fR		an Intel 386, running ISC
+\fIlynxos-i386			An Intel 386 running Lynx/OS-2.1
+\fIlynxos-i860			An Intel 860 running Lynx/OS-2.1
+\fIlynxos-m68k			A Motorola 68K  running Lynx/OS-2.1
+\fIlynxos-m88k			A Motorola 88K running Lynx/OS-2.1
+\fIlynxos-sparc			A sparc running Lynx/OS-2.1
+\fIlynxos-mips			A mips running Lynx/OS-2.1
+\fIlynxos-unknown		Something running Lynx/OS-2.1
 \fIm88k\fR			an mc88000 CPU machine
 \fImac2\fR			an Apple Computer Macintosh II, running AUX
 \fImasscomp\fR			a Concurrent (Masscomp), running RTU
@@ -2007,6 +2019,7 @@ The current possible values are:
 \fInd500\fR		a Norsk Data ND 500/5000 running Ndix
 \fIns32000\fR		an NS32000 CPU machine
 \fInext\fR			a NeXT computer
+\fIparagon\fR			an intel paragon running osf1
 \fIpfa50\fR			a PFU/Fujitsu A-xx computer
 \fIps2\fR			an IBM PS/2, running aix
 \fIptx\fR			a Sequent Symmetry running DYNIX/ptx (386/486 based)
@@ -3119,8 +3132,9 @@ p	named pipe (fifo) *
 u	set-user-ID bit is set	
 g	set-group-ID bit is set	
 k	sticky bit is set
-s	socket special file *
+s	the file is non-zero size.
 t	open file descriptor for terminal device [a number]
+S	socket special file *
 X	executable in the path or shell builtin
 .fi
 .RE
@@ -3129,13 +3143,42 @@ X	executable in the path or shell builtin
 .PP
 Notes: On systems without the file types indicated by
 .I *
-the file inquiry operands return false. In the version of 
-.I csh 
-appearing on the Silicon Graphics IRIX, -s is true when the file is not
-zero size.
-.I Tcsh
-is *not* compatible with that. 
+the file inquiry operands return false. 
+.PP
+If tcsh is compiled for POSIX [i.e. POSIX is defined
+in config.h], then the result of test is based on the permission
+bits of the file and not on the result of the 
+.I access(2)
+system call. I.e. if you mount a file system read-only, and test
+-w a file, then the test will succeed in POSIX mode, if the permissions
+of the file allow writing.
 
+.SH READONLY VARIABLES
+.I Tcsh
+allows defining variables as readonly. Such variables cannot be cleared or
+modified. E.g.
+.sp
+.RS +.6i
+> set -r x=(1 2 3)
+.br
+> unset x
+.br
+unset: $x is read-only.
+.br
+> set x=5
+.br
+set: $x is read-only.
+.br
+> set -r x=5
+.br
+set: $x is read-only.
+.br
+> echo $x
+.br
+1 2 3
+.RE
+.sp
+In addition 'set -r' will list only the readonly variables.
 .PP
 .SH ENVIRONMENT
 HPATH -- path to look for command documentation
@@ -3280,6 +3323,10 @@ is shown.
 .TP 10
 .B listmax 
 maximum number of items to list without asking first.
+.TP 10
+.B listmaxrows 
+maximum number of rows of items to list without asking first.
+(local AFEB hack at University of Twente)
 .TP 10
 .B matchbeep
 control beeping on completion.  With matchbeep=nomatch, completion
@@ -3464,7 +3511,7 @@ I am certain that there are bugs.  Bugs (preferably with fixes)
 should be sent to Christos Zoulas (christos@ee.cornell.edu).
 .PP
 .SH VERSION
-This man page documents tcsh 6.03.00 (Cornell) 92/11/20.
+This man page documents tcsh 6.04.00 (Cornell) 93/07/03.
 .PP
 .SH AUTHORS
 Ken Greer, HP Labs, 1981
@@ -3517,6 +3564,14 @@ Re-ported tcsh to A/UX.
 .sp
 .SH "BUGFIXES AND ENHANCEMENTS"
 .sp
+Tim P. Starrin, National Aeronautics and Space Administration, Langley Research Center Operations, 1993
+.br
+Readonly variable additions.
+.sp
+Jeff Fink, 1992
+.br
+Added complete-word-fwd, and complete-word-back editor functions
+.sp
 Harry C. Pulley, 1992
 .br
 Coherent port
@@ -3540,7 +3595,8 @@ Fixes and Ports for Tek, m88k, Titan, Masscomp.
 .sp
 Mark Linderman, Cornell University, 1992
 .br
-OS/2 Port
+OS/2 Port, (he does not run OS/2 anymore so he cannot help you
+porting tcsh on it)
 .sp
 Mika Liljeberg, liljeber@kruuna.Helsinki.FI, 1992
 .br

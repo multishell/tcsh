@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.printf.c,v 3.10 1992/10/14 20:19:19 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/tc.printf.c,v 3.13 1993/06/25 21:17:12 christos Exp $ */
 /*
  * tc.printf.c: A public-domain, minimal printf/sprintf routine that prints
  *	       through the putchar() routine.  Feel free to use for
@@ -38,7 +38,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.printf.c,v 3.10 1992/10/14 20:19:19 christos Exp $")
+RCSID("$Id: tc.printf.c,v 3.13 1993/06/25 21:17:12 christos Exp $")
 
 #ifdef lint
 #undef va_arg
@@ -60,7 +60,9 @@ doprnt(addchar, sfmt, ap)
 {
     register char *bp;
     register const char *f;
+#ifdef SHORT_STRINGS
     register Char *Bp;
+#endif /* SHORT_STRINGS */
     register long l;
     register unsigned long u;
     register int i;
@@ -139,7 +141,7 @@ doprnt(addchar, sfmt, ap)
 		    l = -l;
 		}
 		do {
-		    *bp++ = l % 10 + '0';
+		    *bp++ = (char) (l % 10) + '0';
 		} while ((l /= 10) > 0);
 		if (sign)
 		    *bp++ = '-';
@@ -163,12 +165,12 @@ doprnt(addchar, sfmt, ap)
 		    u = (unsigned long) (va_arg(ap, unsigned int));
 		if (fmt == 'u') {	/* unsigned decimal */
 		    do {
-			*bp++ = u % 10 + '0';
+			*bp++ = (char) (u % 10) + '0';
 		    } while ((u /= 10) > 0);
 		}
 		else if (fmt == 'o') {	/* octal */
 		    do {
-			*bp++ = u % 8 + '0';
+			*bp++ = (char) (u % 8) + '0';
 		    } while ((u /= 8) > 0);
 		    if (hash)
 			*bp++ = '0';
@@ -276,10 +278,10 @@ xaddchar(c)
 }
 
 
-void
+pret_t
 /*VARARGS*/
 #if __STDC__
-xsprintf(char *str, char *fmt, ...)
+xsprintf(char *str, const char *fmt, ...)
 #else
 xsprintf(va_alist)
     va_dcl
@@ -300,13 +302,16 @@ xsprintf(va_alist)
     doprnt(xaddchar, fmt, va);
     va_end(va);
     *xstring++ = '\0';
+#ifdef PURIFY
+    return 1;
+#endif
 }
 
 
-void
+pret_t
 /*VARARGS*/
 #if __STDC__
-xprintf(char *fmt, ...)
+xprintf(const char *fmt, ...)
 #else
 xprintf(va_alist)
     va_dcl
@@ -323,26 +328,35 @@ xprintf(va_alist)
 #endif
     doprnt(xputchar, fmt, va);
     va_end(va);
+#ifdef PURIFY
+    return 1;
+#endif
 }
 
 
-void
+pret_t
 xvprintf(fmt, va)
-    char   *fmt;
+    const char   *fmt;
     va_list va;
 {
     doprnt(xputchar, fmt, va);
+#ifdef PURIFY
+    return 1;
+#endif
 }
 
-void
+pret_t
 xvsprintf(str, fmt, va)
     char   *str;
-    char   *fmt;
+    const char   *fmt;
     va_list va;
 {
     xstring = (char *) str;
     doprnt(xaddchar, fmt, va);
     *xstring++ = '\0';
+#ifdef PURIFY
+    return 1;
+#endif
 }
 
 
@@ -355,7 +369,9 @@ xvsprintf(str, fmt, va)
  * ones that do tcsh output directly - see dumb hook in doreaddirs()
  * (sh.dir.c) -sg
  */
+#ifndef FILE
 #define FILE int
+#endif
 int 
 #if __STDC__
 fprintf(FILE *fp, const char* fmt, ...)

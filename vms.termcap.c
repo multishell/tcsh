@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/vms.termcap.c,v 1.1 1992/10/05 02:39:59 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/vms.termcap.c,v 1.1 1992/10/05 02:39:59 christos Exp $ */
 /*
  *	termcap.c	1.1	20/7/87		agc	Joypace Ltd
  *

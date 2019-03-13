@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.vers.c,v 3.25 1992/10/14 20:19:19 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/tc.vers.c,v 3.31 1993/06/25 21:17:12 christos Exp $ */
 /*
  * tc.vers.c: Version dependent stuff
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.vers.c,v 3.25 1992/10/14 20:19:19 christos Exp $")
+RCSID("$Id: tc.vers.c,v 3.31 1993/06/25 21:17:12 christos Exp $")
 
 #include "patchlevel.h"
 
@@ -50,10 +50,20 @@ gethosttype()
     hosttype = HOSTTYPE;
 #else
 
+# ifdef __PARAGON__ /* Intel Paragon */
+#  define _havehosttype_
+    hosttype = "paragon";
+# endif /* __PARAGON__ */
+
 # ifdef AMIX /* Amiga UNIX */
 #  define _havehosttype_
     hosttype = "amiga";
 # endif /* AMIX */
+
+# ifdef accel /* Celerity Accel */
+#  define _havehosttype_
+    hosttype = "celerityACCEL";
+# endif /* Celerity Accel */
 
 # ifdef _VMS_POSIX
 #  define _havehosttype_
@@ -64,6 +74,18 @@ gethosttype()
 #  define _havehosttype_
     hosttype = "vax";
 # endif /* vax || __vax && !_havehosttype_ */
+
+# ifdef __hp_osf				/* HP running OSF/1 */
+#  ifdef __pa_risc
+#   define _havehosttype_
+    hosttype = str2short("hp9000s700-osf1");	/* Snake */
+#  endif
+#  ifndef _havehosttype_
+#   define _havehosttype_
+    hosttype = str2short("hp-osf1");
+#  endif
+# endif  /* __hp_osf */
+
 
 # ifdef hp9000 /* hp9000 running MORE/bsd */
 #  ifdef hp300
@@ -421,6 +443,16 @@ gethosttype()
 #  endif
 # endif /* sgi */
 
+# if defined(sysV68)
+#  define _havehosttype_
+    hosttype = "sysV68";
+# endif /* sysV68 */
+
+# if defined(sysV88)
+#  define _havehosttype_
+    hosttype = "sysV88";
+# endif /* sysV88 */
+
 # ifdef uts
 #  define _havehosttype_
     hosttype = "amdahl";
@@ -431,7 +463,7 @@ gethosttype()
     hosttype = "tek4300";
 # endif /* UTek */
 
-# ifdef UTekV
+# ifdef UTekV /* Must appear after sysV88 & m88k or conflicts can occur. */
 #  define _havehosttype_
     hosttype = "tekXD88";
 # endif /* UTekV */
@@ -443,7 +475,7 @@ gethosttype()
 
 # ifdef eta10
 #  define _havehosttype_
-   /* Bruce Woodcock <woodcock@mentor.cc.purdue.edu> */
+   /* Bruce Sterling Woodcock <sterling@oldcolo.com> */
    hosttype = "eta10";
 # endif /* eta10 */
 
@@ -458,15 +490,40 @@ gethosttype()
    hosttype = "nd500";
 # endif /* NDIX */
 
-# if defined(sysV68)
-#  define _havehosttype_
-    hosttype = "sysV68";
-# endif /* sysV68 */
-
-# if defined(sysV88)
-#  define _havehosttype_
-    hosttype = "sysV88";
-# endif /* sysV88 */
+# if defined(Lynx)
+#  if defined(i386)
+#   define _havehosttype_
+    hosttype = "lynxos-i386";
+#  endif
+#  if defined(i860)
+#   define _havehosttype_
+    hosttype = "lynxos-i860";
+#  endif
+#  if defined(m68k)
+#   define _havehosttype_
+    hosttype = "lynxos-m68k";
+#  endif
+#  if defined(m88k)
+#   ifndef _havehosttype_
+#    define _havehosttype_
+#   endif
+    hosttype = "lynxos-m88k";
+#  endif
+#  if defined(sparc)
+#   define _havehosttype_
+    hosttype = "lynxos-sparc";
+#  endif
+#  if defined(mips)
+#   ifndef _havehosttype_
+#    define _havehosttype_
+#   endif
+    hosttype = "lynxos-mips";
+#  endif
+#  ifndef _havehosttype_
+#   define _havehosttype_
+    hosttype = "lynxos-unknown";
+#  endif
+# endif /* Lynx */
 
 # if defined(i860) && !defined(_havehosttype_)
 #  define _havehosttype_
@@ -561,12 +618,12 @@ fix_version()
 # define LOCALSTR ""
 #endif /* LOCALSTR */
 
-    xsprintf(version,
+    (void) xsprintf(version,
 	     "tcsh %d.%.2d.%.2d (%s) %s (%s) options %s%s%s%s%s%s%s%s%s%s%s%s",
 	     REV, VERS, PATCHLEVEL, ORIGIN, DATE, gethosttype(),
 	     SSSTR, NLSSTR, LFSTR, DLSTR, VISTR, DTRSTR,
 	     BYESTR, ALSTR, KANSTR, SMSTR, HBSTR, LOCALSTR);
-    set(STRversion, SAVE(version));
-    xsprintf(version, "%d.%.2d.%.2d", REV, VERS, PATCHLEVEL);
-    set(STRtcsh, SAVE(version));
+    set(STRversion, SAVE(version), VAR_READWRITE);
+    (void) xsprintf(version, "%d.%.2d.%.2d", REV, VERS, PATCHLEVEL);
+    set(STRtcsh, SAVE(version), VAR_READWRITE);
 }

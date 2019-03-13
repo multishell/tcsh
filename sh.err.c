@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.err.c,v 3.15 1992/10/14 20:19:19 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.err.c,v 3.20 1993/06/25 21:17:12 christos Exp $ */
 /*
  * sh.err.c: Error printing routines. 
  */
@@ -37,7 +37,7 @@
 #define _h_sh_err		/* Don't redefine the errors	 */
 #include "sh.h"
 
-RCSID("$Id: sh.err.c,v 3.15 1992/10/14 20:19:19 christos Exp $")
+RCSID("$Id: sh.err.c,v 3.20 1993/06/25 21:17:12 christos Exp $")
 
 /*
  * C Shell
@@ -320,12 +320,20 @@ static char *errorlist[] =
 # endif /* convex */
 #endif /* apollo */
 #define ERR_COMPCOM	125
-    "Illegal completion: \"%s\"",
-#define ERR_COMPILL	126
-    "Illegal %s: '%c'",
-#define ERR_COMPINC	127
-    "Incomplete %s: \"%s\"",
-#define ERR_INVALID	128
+    "\nInvalid completion: \"%s\"",
+#define ERR_COMPINV	126
+    "\nInvalid %s: '%c'",
+#define ERR_COMPMIS	127
+    "\nMissing separator '%c' after %s \"%s\"",
+#define ERR_COMPINC	128
+    "\nIncomplete %s: \"%s\"",
+#define ERR_MFLAG	129
+    "No operand for -m flag",
+#define ERR_ULIMUS	130
+    "Usage: unlimit [-fh] [limits]",
+#define ERR_READONLY	131
+    "$%S is read-only",
+#define ERR_INVALID	132
     "Invalid Error"
 };
 
@@ -393,7 +401,8 @@ stderror(va_alist)
 {
     va_list va;
     register Char **v;
-    int     flags;
+    int flags;
+    int vareturn;
 
 #if __STDC__
     va_start(va, id);
@@ -409,40 +418,45 @@ stderror(va_alist)
      */
     dont_free = 0;
 
-    flags = id & ERR_FLAGS;
+    flags = (int) id & ERR_FLAGS;
     id &= ~ERR_FLAGS;
 
-    if ((flags & ERR_OLD) && seterr == NULL) {
-	va_end(va);
-	return;
-    }
-
-    if (id >= sizeof(errorlist) / sizeof(errorlist[0]))
-	id = ERR_INVALID;
-
-    /*
-     * Must flush before we print as we wish output before the error to go on
-     * (some form of) standard output, while output after goes on (some form
-     * of) diagnostic output. If didfds then output will go to 1/2 else to
-     * FSHOUT/FSHDIAG. See flush in sh.print.c.
+    /* Pyramid's OS/x has a subtle bug in <varargs.h> which prevents calling
+     * va_end more than once in the same function. -- sterling@oldcolo.com
      */
-    flush();
-    haderr = 1;			/* Now to diagnostic output */
-    timflg = 0;			/* This isn't otherwise reset */
+    if (!((flags & ERR_OLD) && seterr == NULL)) {
+	vareturn = 0;	/* Don't return immediately after va_end */
+	if (id >= sizeof(errorlist) / sizeof(errorlist[0]))
+	    id = ERR_INVALID;
+
+	/*
+	 * Must flush before we print as we wish output before the error to go
+	 * on (some form of) standard output, while output after goes on (some
+	 * form of) diagnostic output. If didfds then output will go to 1/2
+	 * else to FSHOUT/FSHDIAG. See flush in sh.print.c.
+	 */
+	flush();
+	haderr = 1;			/* Now to diagnostic output */
+	timflg = 0;			/* This isn't otherwise reset */
 
 
-    if (!(flags & ERR_SILENT)) {
-	if (flags & ERR_NAME)
-	    xprintf("%s: ", bname);
-	if ((flags & ERR_OLD))
-	    /* Old error. */
-	    xprintf("%s.\n", seterr);
-	else {
-	    xvprintf(errorlist[id], va);
-	    xprintf(".\n");
+	if (!(flags & ERR_SILENT)) {
+	    if (flags & ERR_NAME)
+		xprintf("%s: ", bname);
+	    if ((flags & ERR_OLD)) {
+		/* Old error. */
+		xprintf("%s.\n", seterr);
+		} else {
+		   xvprintf(errorlist[id], va);
+		    xprintf(".\n");
+		}
 	}
+    } else {
+	vareturn = 1;	/* Return immediately after va_end */
     }
     va_end(va);
+    if (vareturn)
+	return;
 
     if (seterr) {
 	xfree((ptr_t) seterr);
@@ -467,7 +481,7 @@ stderror(va_alist)
      */
     btoeof();
 
-    set(STRstatus, Strsave(STR1));
+    set(STRstatus, Strsave(STR1), VAR_READWRITE);
 #ifdef BSDJOBS
     if (tpgrp > 0)
 	(void) tcsetpgrp(FSHTTY, tpgrp);

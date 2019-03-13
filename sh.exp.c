@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.exp.c,v 3.16 1992/11/14 20:40:02 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.exp.c,v 3.19 1993/05/17 00:11:09 christos Exp $ */
 /*
  * sh.exp.c: Expression evaluations
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.exp.c,v 3.16 1992/11/14 20:40:02 christos Exp $")
+RCSID("$Id: sh.exp.c,v 3.19 1993/05/17 00:11:09 christos Exp $")
 
 /*
  * C shell
@@ -603,7 +603,7 @@ exp6(vp, ignore)
     if (isa(**vp, ANYOP))
 	return (Strsave(STRNULL));
     cp = *(*vp)++;
-#define FILETESTS "erwxfdzoplstX"
+#define FILETESTS "erwxfdzoplstSX"
     if (*cp == '-' && any(FILETESTS, cp[1])) {
 	struct stat stb;
 	Char *ft;
@@ -694,11 +694,7 @@ exp6(vp, ignore)
 #endif
 		    break;
 
-		/* 
-		 * ARGH!!! sgi defines (-s == ! -z) Why? Can you change it? 
-		 * Here I am not going to be compatible; they should fix it!
-		 */
-		case 's':
+		case 'S':
 # ifdef S_ISSOCK
 		    i = S_ISSOCK(stb.st_mode);
 # else
@@ -750,6 +746,10 @@ exp6(vp, ignore)
 		    i = stb.st_size == 0;
 		    break;
 
+		case 's':
+		    i = stb.st_size != 0;
+		    break;
+
 		case 'e':
 		    i = 1;
 		    break;
@@ -781,7 +781,7 @@ evalav(v)
     struct command *t;
     register struct wordent *wdp = hp;
 
-    set(STRstatus, Strsave(STR0));
+    set(STRstatus, Strsave(STR0), VAR_READWRITE);
     hp->prev = hp->next = hp;
     hp->word = STRNULL;
     while (*v) {

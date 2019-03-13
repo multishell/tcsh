@@ -6,6 +6,8 @@
  * This is the config file for VMS-POSIX systems
  */
 
+#ifndef _h_config
+#define _h_config
 /****************** System dependant compilation flags ****************/
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
@@ -144,3 +146,4 @@
 #define SYSMALLOC
 
 #undef AUTOLOGOUT
+#endif /* _h_config */

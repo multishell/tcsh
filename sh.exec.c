@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.exec.c,v 3.21 1992/10/27 16:18:15 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.exec.c,v 3.24 1993/07/07 19:16:17 christos Exp $ */
 /*
  * sh.exec.c: Search, find, and execute a command!
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.exec.c,v 3.21 1992/10/27 16:18:15 christos Exp $")
+RCSID("$Id: sh.exec.c,v 3.24 1993/07/07 19:16:17 christos Exp $")
 
 #include "tc.h"
 #include "tw.h"
@@ -94,21 +94,26 @@ static int hashdebug = 0;
 # define hash(a, b)	(((a) * HSHMUL + (b)) % (hashlength))
 # define widthof(t)	(sizeof(t) * BITS_PER_BYTE)
 # define tbit(f, i, t)	(((t *) xhash)[(f)] &  \
-			 1 << (i & (widthof(t) - 1)))
+			 (1L << (i & (widthof(t) - 1))))
 # define tbis(f, i, t)	(((t *) xhash)[(f)] |= \
-			 1 << (i & (widthof(t) - 1)))
+			 (1L << (i & (widthof(t) - 1))))
 # define cbit(f, i)	tbit(f, i, unsigned char)
 # define cbis(f, i)	tbis(f, i, unsigned char)
 # define sbit(f, i)	tbit(f, i, unsigned short)
 # define sbis(f, i)	tbis(f, i, unsigned short)
+# define ibit(f, i)	tbit(f, i, unsigned int)
+# define ibis(f, i)	tbis(f, i, unsigned int)
 # define lbit(f, i)	tbit(f, i, unsigned long)
 # define lbis(f, i)	tbis(f, i, unsigned long)
 
 # define bit(f, i) (hashwidth==sizeof(unsigned char)  ? cbit(f,i) : \
- 		   (hashwidth==sizeof(unsigned short) ? sbit(f,i) : lbit(f,i)))
+ 		    ((hashwidth==sizeof(unsigned short) ? sbit(f,i) : \
+		     ((hashwidth==sizeof(unsigned int)   ? ibit(f,i) : \
+		     lbit(f,i))))))
 # define bis(f, i) (hashwidth==sizeof(unsigned char)  ? cbis(f,i) : \
-		   (hashwidth==sizeof(unsigned short) ? sbis(f,i) : lbis(f,i)))
-
+ 		    ((hashwidth==sizeof(unsigned short) ? sbis(f,i) : \
+		     ((hashwidth==sizeof(unsigned int)   ? ibis(f,i) : \
+		     lbis(f,i))))))
 #else /* OLDHASH */
 /*
  * Xhash is an array of HSHSIZ bits (HSHSIZ / 8 chars), which are used
@@ -534,6 +539,7 @@ execash(t, kp)
 #endif /* CLOSE_ON_EXEC */
     sigret_t (*osigint)(), (*osigquit)(), (*osigterm)();
 
+    USE(t);
     if (chkstop == 0 && setintr)
 	panystop(0);
     /*
@@ -638,6 +644,7 @@ dohash(vv, c)
     Char  **pv;
     int hashval;
 
+     USE(c);
 #ifdef FASTHASH
     if (vv && vv[1]) {
         hashlength = atoi(short2str(vv[1]));
@@ -659,6 +666,8 @@ dohash(vv, c)
 	    hashwidth = sizeof(unsigned char);
         else if (hashwidth <= widthof(unsigned short))
 	    hashwidth = sizeof(unsigned short);
+        else if (hashwidth <= widthof(unsigned int))
+	    hashwidth = sizeof(unsigned int);
 	else
 	    hashwidth = sizeof(unsigned long);
     }
@@ -718,6 +727,8 @@ dounhash(v, c)
     Char **v;
     struct command *c;
 {
+    USE(c);
+    USE(v);
     havhash = 0;
 #ifdef FASTHASH
     if (xhash) {
@@ -734,6 +745,8 @@ hashstat(v, c)
     Char **v;
     struct command *c;
 {
+    USE(c);
+    USE(v);
 #ifdef FASTHASH 
    if (havhash && hashlength && hashwidth)
       xprintf("%d hash buckets of %d bits each\n",
@@ -853,19 +866,19 @@ executable(dir, name, dir_ok)
 }
 
 void
-tellmewhat(lex)
-    struct wordent *lex;
+tellmewhat(lexp)
+    struct wordent *lexp;
 {
     register int i;
     register struct biltins *bptr;
-    register struct wordent *sp = lex->next;
+    register struct wordent *sp = lexp->next;
     bool    aliased = 0;
     Char   *s0, *s1, *s2;
     Char    qc;
 
     if (adrof1(sp->word, &aliases)) {
-	alias(lex);
-	sp = lex->next;
+	alias(lexp);
+	sp = lexp->next;
 	aliased = 1;
     }
 
@@ -899,7 +912,7 @@ tellmewhat(lex)
     for (bptr = bfunc; bptr < &bfunc[nbfunc]; bptr++) {
 	if (eq(sp->word, str2short(bptr->bname))) {
 	    if (aliased)
-		prlex(lex);
+		prlex(lexp);
 	    xprintf("%S: shell built-in command.\n", sp->word);
 	    flush();
 	    sp->word = s0;	/* we save and then restore this */
@@ -923,23 +936,23 @@ tellmewhat(lex)
 	if (pv[0][0] == 0 || eq(pv[0], STRdot)) {
 	    if (!slash) {
 		sp->word = Strspl(STRdotsl, sp->word);
-		prlex(lex);
+		prlex(lexp);
 		xfree((ptr_t) sp->word);
 	    }
 	    else
-		prlex(lex);
+		prlex(lexp);
 	    sp->word = s0;	/* we save and then restore this */
 	    return;
 	}
 	s1 = Strspl(*pv, STRslash);
 	sp->word = Strspl(s1, sp->word);
 	xfree((ptr_t) s1);
-	prlex(lex);
+	prlex(lexp);
 	xfree((ptr_t) sp->word);
     }
     else {
 	if (aliased)
-	    prlex(lex);
+	    prlex(lexp);
 	xprintf("%S: Command not found.\n", sp->word);
 	flush();
     }
@@ -960,6 +973,7 @@ dowhere(v, c)
     register Char **v;
     struct command *c;
 {
+    USE(c);
     for (v++; *v; v++)
 	(void) find_cmd(*v, 1);
 }

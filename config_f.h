@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/config_f.h,v 3.6 1992/10/18 00:43:08 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/config_f.h,v 3.6 1992/10/18 00:43:08 christos Exp $ */
 /*
  * config_f.h -- configure various defines for tcsh
  *

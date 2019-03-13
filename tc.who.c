@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.who.c,v 3.16 1992/10/05 02:41:30 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/tc.who.c,v 3.19 1993/07/03 23:47:53 christos Exp $ */
 /*
  * tc.who.c: Watch logins and logouts...
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.who.c,v 3.16 1992/10/05 02:41:30 christos Exp $")
+RCSID("$Id: tc.who.c,v 3.19 1993/07/03 23:47:53 christos Exp $")
 
 #include "tc.h"
 
@@ -110,10 +110,8 @@ struct who {
 };
 
 static struct who whohead, whotail;
-static int watch_period = 0;
+static time_t watch_period = 0;
 static time_t stlast = 0;
-extern char *month_list[];
-extern char *day_list[];
 #ifdef WHODEBUG
 static	void	debugwholist	__P((struct who *, struct who *));
 #endif
@@ -188,9 +186,9 @@ watch_login()
     }
     trim(vp = v->vec);
     if (blklen(vp) % 2)		/* odd # args: 1st == # minutes. */
-	interval = (number(*vp)) ? getn(*vp++) : MAILINTVL;
+	interval = (number(*vp)) ? (getn(*vp++) * 60) : MAILINTVL;
     (void) time(&t);
-    if (t - watch_period < interval * 60) {
+    if (t - watch_period < interval) {
 #ifdef BSDSIGS
 	(void) sigsetmask(omask);
 #else
@@ -489,7 +487,7 @@ who_info(ptr, c, wbuf)
 	case OFFLINE:
 	    return "logged off";
 	case CHANGED:
-	    xsprintf(wbuf, "replaced %s on", wp->who_name);
+	    (void) xsprintf(wbuf, "replaced %s on", wp->who_name);
 	    return wbuf;
 	default:
 	    break;
@@ -530,7 +528,7 @@ who_info(ptr, c, wbuf)
 
     default:
 	wbuf[0] = '%';
-	wbuf[1] = c;
+	wbuf[1] = (char) c;
 	wbuf[2] = '\0';
 	return wbuf;
     }
@@ -546,6 +544,8 @@ struct command *c;
     struct who *wp;
     struct varent *vp;
 
+    USE(v);
+    USE(c);
     if ((vp = adrof(STRwatch)) == NULL)
 	stderror(ERR_NOWATCH);
     blkpr(vp->vec);

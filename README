@@ -1,4 +1,4 @@
-This is tcsh version 6.03.  Tcsh is a version of the Berkeley
+This is tcsh version 6.04.  Tcsh is a version of the Berkeley
 C-Shell, with the addition of: a command line editor, command and file
 name completion, listing, etc. and a bunch of small additions to the
 shell itself.
@@ -21,6 +21,9 @@ claim that you wrote portions that you haven't, and don't delete the
 names of the authors from the source code or documentation).  
 
 To install tcsh:
+
+0)  If you are using imake, try xmkmf. Otherwise copy Makefile.std to
+    Makefile.
 
 1)  Look at the Makefile and make sure that you are using the right
     compilation flags.
@@ -123,6 +126,8 @@ Or: Compile -DSYSMALLOC
 
 ***************************************************************************
 
+From: Scott Krotz <krotz@honey.rtsg.mot.com>
+
 Tcsh has been ported to minix by  Scott Krotz (krotz@honey.rtsg.mot.com).
 Unfortunately the minix sed is broken, so you'll have to find a way to
 make tc.const.h, sh.err.h, ed.defns.h which are automatically generated.
@@ -152,11 +157,11 @@ my attention also.
 
 Have fun!
 
-Scott Krotz
-
 ps.  The termios functions are provided by Magnus Doell and Bruce Evans.
      Thanks, guys!
 
+
+From: Bob Byrnes <byrnes@ee.cornell.edu>
 
 This is for minix 1.5 (straight out of the box from P-H) plus the i386
 patches from Bruce Evans.
@@ -181,4 +186,11 @@ I can make the binary available to anyone who wants it (for example people
 who can't get access to a cross-compiling environment, and who don't yet
 have gcc running under minix).
 
-Bob Byrnes (byrnes@ee.cornell.edu)
+
+***************************************************************************
+
+If your compiler cannot handle long symbol names, add 
+
+#include "snames.h" 
+
+to your config.h file

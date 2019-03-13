@@ -5,6 +5,9 @@
  *
  * Edit this to match your system type.
  */
+#ifndef _h_config
+#define _h_config
+
 #ifdef PL8CC
 /* for an RT running the IBM Sys. V version of AIX. -- tells the compiler
    reasonable things. MUST BE the fist thing the compiler sees */
@@ -220,3 +223,5 @@
 #if defined(_AIXPS2) || defined(aiws)
 # undef NLS
 #endif
+
+#endif /* _h_config */

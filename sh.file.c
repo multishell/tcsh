@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.file.c,v 3.6 1992/10/05 02:41:30 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.file.c,v 3.8 1993/06/25 21:17:12 christos Exp $ */
 /*
  * sh.file.c: File completion for csh. This file is not used in tcsh.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.file.c,v 3.6 1992/10/05 02:41:30 christos Exp $")
+RCSID("$Id: sh.file.c,v 3.8 1993/06/25 21:17:12 christos Exp $")
 
 #ifdef FILEC
 
@@ -74,7 +74,7 @@ static	void	 retype			__P((void));
 static	void	 beep			__P((void));
 static	void 	 print_recognized_stuff	__P((Char *));
 static	void	 extract_dir_and_name	__P((Char *, Char *, Char *));
-static	Char	*getentry		__P((DIR *, int));
+static	Char	*getitem		__P((DIR *, int));
 static	void	 free_items		__P((Char **));
 static	int	 tsearch		__P((Char *, COMMAND, int));
 static	int	 recognize		__P((Char *, Char *, int, int));
@@ -181,7 +181,7 @@ back_to_col_1()
 # ifdef BSDSIGS
     sigmask_t omask = sigblock(sigmask(SIGINT));
 # else
-    sighold(SIGINT);
+    (void) sighold(SIGINT);
 # endif /* BSDSIGS */
 
 #ifdef TERMIO
@@ -242,7 +242,7 @@ pushback(string)
 #ifdef BSDSIGS
     sigmask_t omask = sigblock(sigmask(SIGINT));
 #else
-    sighold(SIGINT);
+    (void) sighold(SIGINT);
 #endif /* BSDSIGS */
 
 #ifdef TERMIO
@@ -468,21 +468,21 @@ print_recognized_stuff(recognized_part)
     Char   *recognized_part;
 {
     /* An optimized erasing of that silly ^[ */
-    putraw('\b');
-    putraw('\b');
+    (void) putraw('\b');
+    (void) putraw('\b');
     switch (Strlen(recognized_part)) {
 
     case 0:			/* erase two Characters: ^[ */
-	putraw(' ');
-	putraw(' ');
-	putraw('\b');
-	putraw('\b');
+	(void) putraw(' ');
+	(void) putraw(' ');
+	(void) putraw('\b');
+	(void) putraw('\b');
 	break;
 
     case 1:			/* overstrike the ^, erase the [ */
 	xprintf("%S", recognized_part);
-	putraw(' ');
-	putraw('\b');
+	(void) putraw(' ');
+	(void) putraw('\b');
 	break;
 
     default:			/* overstrike both Characters ^[ */
@@ -518,7 +518,7 @@ extract_dir_and_name(path, dir, name)
  *		  pw->passwd in VMS - a secure system benefit :-| )
  */
 static Char *
-getentry(dir_fd, looking_for_lognames)
+getitem(dir_fd, looking_for_lognames)
     DIR    *dir_fd;
     int     looking_for_lognames;
 {
@@ -583,7 +583,7 @@ tsearch(word, command, max_word_length)
     register name_length, looking_for_lognames;
     Char    tilded_dir[MAXPATHLEN + 1], dir[MAXPATHLEN + 1];
     Char    name[MAXNAMLEN + 1], extended_name[MAXNAMLEN + 1];
-    Char   *entry;
+    Char   *item;
 
 #define MAXITEMS 1024
 
@@ -609,11 +609,11 @@ tsearch(word, command, max_word_length)
 
 again:				/* search for matches */
     name_length = Strlen(name);
-    for (numitems = 0; entry = getentry(dir_fd, looking_for_lognames);) {
-	if (!is_prefix(name, entry))
+    for (numitems = 0; item = getitem(dir_fd, looking_for_lognames);) {
+	if (!is_prefix(name, item))
 	    continue;
 	/* Don't match . files on null prefix match */
-	if (name_length == 0 && entry[0] == '.' &&
+	if (name_length == 0 && item[0] == '.' &&
 	    !looking_for_lognames)
 	    continue;
 	if (command == LIST) {
@@ -635,16 +635,16 @@ again:				/* search for matches */
 	     */
 	    if (items == NULL)
 		items = (Char **) xcalloc(sizeof(items[0]), MAXITEMS + 1);
-	    items[numitems] = (Char *) xmalloc((size_t) (Strlen(entry) + 1) *
+	    items[numitems] = (Char *) xmalloc((size_t) (Strlen(item) + 1) *
 					       sizeof(Char));
-	    copyn(items[numitems], entry, MAXNAMLEN);
+	    copyn(items[numitems], item, MAXNAMLEN);
 	    numitems++;
 	}
 	else {			/* RECOGNIZE command */
-	    if (ignoring && ignored(entry))
+	    if (ignoring && ignored(item))
 		nignored++;
 	    else if (recognize(extended_name,
-			       entry, name_length, ++numitems))
+			       item, name_length, ++numitems))
 		break;
 	}
     }
@@ -679,7 +679,7 @@ again:				/* search for matches */
 	return (numitems);
     }
     else {			/* LIST */
-	qsort((ptr_t) items, numitems, sizeof(items[0]), sortscmp);
+	qsort((ptr_t) items, (size_t) numitems, sizeof(items[0]), sortscmp);
 	print_by_column(looking_for_lognames ? NULL : tilded_dir,
 			items, numitems);
 	if (items != NULL)
@@ -691,24 +691,24 @@ again:				/* search for matches */
 /*
  * Object: extend what user typed up to an ambiguity.
  * Algorithm:
- * On first match, copy full entry (assume it'll be the only match)
+ * On first match, copy full item (assume it'll be the only match)
  * On subsequent matches, shorten extended_name to the first
- * Character mismatch between extended_name and entry.
+ * Character mismatch between extended_name and item.
  * If we shorten it back to the prefix length, stop searching.
  */
 static int
-recognize(extended_name, entry, name_length, numitems)
-    Char   *extended_name, *entry;
+recognize(extended_name, item, name_length, numitems)
+    Char   *extended_name, *item;
     int     name_length, numitems;
 {
     if (numitems == 1)		/* 1st match */
-	copyn(extended_name, entry, MAXNAMLEN);
+	copyn(extended_name, item, MAXNAMLEN);
     else {			/* 2nd & subsequent matches */
 	register Char *x, *ent;
 	register int len = 0;
 
 	x = extended_name;
-	for (ent = entry; *x && *x == *ent++; x++, len++);
+	for (ent = item; *x && *x == *ent++; x++, len++);
 	*x = '\0';		/* Shorten at 1st Char diff */
 	if (len == name_length)	/* Ambiguous to prefix? */
 	    return (-1);	/* So stop now and save time */
@@ -824,8 +824,8 @@ tenex(inputline, inputline_size)
 }
 
 static int
-ignored(entry)
-    register Char *entry;
+ignored(item)
+    register Char *item;
 {
     struct varent *vp;
     register Char **cp;
@@ -833,7 +833,7 @@ ignored(entry)
     if ((vp = adrof(STRfignore)) == NULL || (cp = vp->vec) == NULL)
 	return (FALSE);
     for (; *cp != NULL; cp++)
-	if (is_suffix(entry, *cp))
+	if (is_suffix(item, *cp))
 	    return (TRUE);
     return (FALSE);
 }

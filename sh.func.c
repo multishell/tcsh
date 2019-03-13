@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.func.c,v 3.42 1992/11/13 04:19:10 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.func.c,v 3.49 1993/07/03 23:47:53 christos Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.func.c,v 3.42 1992/11/13 04:19:10 christos Exp $")
+RCSID("$Id: sh.func.c,v 3.49 1993/07/03 23:47:53 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -145,6 +145,7 @@ doonintr(v, c)
     register Char *cp;
     register Char *vv = v[1];
 
+    USE(c);
     if (parintr == SIG_IGN)
 	return;
     if (setintr && intty)
@@ -194,6 +195,8 @@ donohup(v, c)
     Char **v;
     struct command *c;
 {
+    USE(c);
+    USE(v);
     if (intty)
 	stderror(ERR_NAME | ERR_TERMINAL);
     if (setintr == 0) {
@@ -210,13 +213,14 @@ dozip(v, c)
     Char **v;
     struct command *c;
 {
-    ;
+    USE(c);
+    USE(v);
 }
 
 void
 prvars()
 {
-    plist(&shvhed);
+    plist(&shvhed, VAR_ALL);
 }
 
 /*ARGSUSED*/
@@ -228,10 +232,11 @@ doalias(v, c)
     register struct varent *vp;
     register Char *p;
 
+    USE(c);
     v++;
     p = *v++;
     if (p == 0)
-	plist(&aliases);
+	plist(&aliases, VAR_ALL);
     else if (*v == 0) {
 	vp = adrof1(strip(p), &aliases);
 	if (vp)
@@ -242,7 +247,7 @@ doalias(v, c)
 	    setname(short2str(p));
 	    stderror(ERR_NAME | ERR_DANGER);
 	}
-	set1(strip(p), saveblk(v), &aliases);
+	set1(strip(p), saveblk(v), &aliases, VAR_READWRITE);
 	tw_cmd_free();
     }
 }
@@ -253,6 +258,7 @@ unalias(v, c)
     Char  **v;
     struct command *c;
 {
+    USE(c);
     unset1(v, &aliases);
     tw_cmd_free();
 }
@@ -263,6 +269,8 @@ dologout(v, c)
     Char **v;
     struct command *c;
 {
+    USE(c);
+    USE(v);
     islogin();
     goodbye(NULL, NULL);
 }
@@ -273,6 +281,7 @@ dologin(v, c)
     Char  **v;
     struct command *c;
 {
+    USE(c);
     islogin();
     rechist(NULL);
     (void) signal(SIGTERM, parterm);
@@ -376,6 +385,8 @@ doelse (v, c)
     Char **v;
     struct command *c;
 {
+    USE(c);
+    USE(v);
     search(TC_ELSE, 0, NULL);
 }
 
@@ -387,6 +398,7 @@ dogoto(v, c)
 {
     Char   *lp;
 
+    USE(c);
     gotolab(lp = globone(v[1], G_ERROR));
     xfree((ptr_t) lp);
 }
@@ -424,6 +436,7 @@ doswitch(v, c)
 {
     register Char *cp, *lp;
 
+    USE(c);
     v++;
     if (!*v || *(*v++) != '(')
 	stderror(ERR_SYNTAX);
@@ -442,6 +455,8 @@ dobreak(v, c)
     Char **v;
     struct command *c;
 {
+    USE(v);
+    USE(c);
     if (whyles)
 	toend();
     else
@@ -454,6 +469,7 @@ doexit(v, c)
     Char  **v;
     struct command *c;
 {
+    USE(c);
     if (chkstop == 0 && (intty || intact) && evalvec == 0)
 	panystop(0);
     /*
@@ -461,7 +477,7 @@ doexit(v, c)
      */
     v++;
     if (*v) {
-	set(STRstatus, putn(expr(&v)));
+	set(STRstatus, putn(expr(&v)), VAR_READWRITE);
 	if (*v)
 	    stderror(ERR_NAME | ERR_EXPRESSION);
     }
@@ -479,6 +495,7 @@ doforeach(v, c)
     register Char *cp, *sp;
     register struct whyle *nwp;
 
+    USE(c);
     v++;
     sp = cp = strip(*v);
     if (!letter(*sp))
@@ -494,9 +511,15 @@ doforeach(v, c)
 	stderror(ERR_NAME | ERR_NOPAREN);
     v++;
     gflag = 0, tglob(v);
-    v = globall(v);
-    if (v == 0)
-	stderror(ERR_NAME | ERR_NOMATCH);
+    if (gflag) {
+	v = globall(v);
+	if (v == 0)
+	    stderror(ERR_NAME | ERR_NOMATCH);
+    }
+    else {
+	v = gargv = saveblk(v);
+	trim(v);
+    }
     nwp = (struct whyle *) xcalloc(1, sizeof *nwp);
     nwp->w_fe = nwp->w_fe0 = v;
     gargv = 0;
@@ -521,9 +544,11 @@ dowhile(v, c)
     struct command *c;
 {
     register int status;
-    register bool again = whyles != 0 && SEEKEQ(&whyles->w_start, &lineloc) &&
-    whyles->w_fename == 0;
+    register bool again = whyles != 0 && 
+			  SEEKEQ(&whyles->w_start, &lineloc) &&
+			  whyles->w_fename == 0;
 
+    USE(c);
     v++;
     /*
      * Implement prereading here also, taking care not to evaluate the
@@ -585,6 +610,8 @@ doend(v, c)
     Char **v;
     struct command *c;
 {
+    USE(v);
+    USE(c);
     if (!whyles)
 	stderror(ERR_NAME | ERR_NOTWHILE);
     btell(&whyles->w_end);
@@ -597,6 +624,8 @@ docontin(v, c)
     Char **v;
     struct command *c;
 {
+    USE(v);
+    USE(c);
     if (!whyles)
 	stderror(ERR_NAME | ERR_NOTWHILE);
     doagain();
@@ -619,7 +648,7 @@ doagain()
 	dobreak(NULL, NULL);
 	return;
     }
-    set(whyles->w_fename, Strsave(*whyles->w_fe++));
+    set(whyles->w_fename, quote(Strsave(*whyles->w_fe++)), VAR_READWRITE);
     bseek(&whyles->w_start);
 }
 
@@ -668,6 +697,8 @@ doswbrk(v, c)
     Char **v;
     struct command *c;
 {
+    USE(v);
+    USE(c);
     search(TC_BRKSW, 0, NULL);
 }
 
@@ -721,7 +752,7 @@ search(type, level, goal)
     register Char *aword = wordbuf;
     register Char *cp;
 
-    Stype = type;
+    Stype = (Char) type;
     Sgoal = goal;
     if (type == TC_GOTO) {
 	struct Ain a;
@@ -1007,6 +1038,7 @@ doecho(v, c)
     Char  **v;
     struct command *c;
 {
+    USE(c);
     xecho(' ', v);
 }
 
@@ -1016,6 +1048,7 @@ doglob(v, c)
     Char  **v;
     struct command *c;
 {
+    USE(c);
     xecho(0, v);
     flush();
 }
@@ -1157,6 +1190,40 @@ register Char *var;
     return 0;
 }
 
+/*ARGSUSED*/
+void
+doprintenv(v, c)
+    register Char **v;
+    struct command *c;
+{
+    Char   *e;
+    extern bool output_raw;
+    extern bool xlate_cr;
+
+    USE(c);
+    if (setintr)
+#ifdef BSDSIGS
+	(void) sigsetmask(sigblock((sigmask_t) 0) & ~sigmask(SIGINT));
+#else /* !BSDSIGS */
+	(void) sigrelse (SIGINT);
+#endif /* BSDSIGS */
+
+    v++;
+    if (*v == 0) {
+	register Char **ep;
+
+	xlate_cr = 1;
+	for (ep = STR_environ; *ep; ep++)
+	    xprintf("%S\n", *ep);
+	xlate_cr = 0;
+    }
+    else if ((e = tgetenv(*v)) != NULL) {
+	output_raw = 1;
+	xprintf("%S\n", e);
+	output_raw = 0;
+    }
+}
+
 /* from "Karl Berry." <karl%mote.umb.edu@relay.cs.net> -- for NeXT things
    (and anything else with a modern compiler) */
 
@@ -1168,20 +1235,14 @@ dosetenv(v, c)
 {
     Char   *vp, *lp;
 
-    v++;
-    if ((vp = *v++) == 0) {
-	register Char **ep;
-
-	if (setintr)
-#ifdef BSDSIGS
-	    (void) sigsetmask(sigblock((sigmask_t) 0) & ~sigmask(SIGINT));
-#else /* !BSDSIGS */
-	    (void) sigrelse (SIGINT);
-#endif /* BSDSIGS */
-	for (ep = STR_environ; *ep; ep++)
-	    xprintf("%S\n", *ep);
+    USE(c);
+    if (*++v == 0) {
+	doprintenv(--v, 0);
 	return;
     }
+
+    vp = *v++;
+
     if ((lp = *v++) == 0)
 	lp = STRNULL;
 
@@ -1189,12 +1250,19 @@ dosetenv(v, c)
     if (eq(vp, STRKPATH)) {
 	importpath(lp);
 	dohash(NULL, NULL);
+	xfree((ptr_t) lp);
+	return;
     }
+
 #ifdef apollo
-    else if (eq(vp, STRSYSTYPE))
+    if (eq(vp, STRSYSTYPE)) {
 	dohash(NULL, NULL);
+	xfree((ptr_t) lp);
+	return;
+    }
 #endif /* apollo */
-    else if (islocale_var(vp)) {
+
+    if (islocale_var(vp)) {
 #ifdef NLS
 	int     k;
 
@@ -1222,51 +1290,67 @@ dosetenv(v, c)
 	ed_Init();
 	if (MapsAreInited && !NLSMapsAreInited)
 	    ed_InitNLSMaps();
+	xfree((ptr_t) lp);
+	return;
     }
-    else if (eq(vp, STRNOREBIND)) {
+
+    if (eq(vp, STRNOREBIND)) {
 	NoNLSRebind = 1;
+	xfree((ptr_t) lp);
+	return;
     }
-    else if (eq(vp, STRKTERM)) {
-	set(STRterm, Strsave(lp));
+
+    if (eq(vp, STRKTERM)) {
+	set(STRterm, quote(lp), VAR_READWRITE);	/* lp memory used here */
 	GotTermCaps = 0;
 	ed_Init();
+	return;
     }
-    else if (eq(vp, STRKHOME)) {
- 	Char *cp = Strsave(value(vp));	/* get the old value back */
 
+    if (eq(vp, STRKHOME)) {
 	/*
 	 * convert to canonical pathname (possibly resolving symlinks)
 	 */
-	cp = dcanon(cp, cp);
-
-	set(STRhome, Strsave(cp));	/* have to save the new val */
+	lp = dcanon(lp, lp);
+	set(STRhome, quote(lp), VAR_READWRITE);	/* cp memory used here */
 
 	/* fix directory stack for new tilde home */
 	dtilde();
-	xfree((ptr_t) cp);
+	return;
     }
-    else if (eq(vp, STRKSHLVL)) 
-	set(STRshlvl, Strsave(lp));
-    else if (eq(vp, STRKUSER))
-	set(STRuser, Strsave(lp));
+
+    if (eq(vp, STRKSHLVL)) {
+	/* lp memory used here */
+	set(STRshlvl, quote(lp), VAR_READWRITE);
+	return;
+    }
+
+    if (eq(vp, STRKUSER)) {
+	set(STRuser, quote(lp), VAR_READWRITE);	/* lp memory used here */
+	return;
+    }
+
 #ifdef SIG_WINDOW
     /*
      * Load/Update $LINES $COLUMNS
      */
-    else if ((eq(lp, STRNULL) &&
-	      (eq(vp, STRLINES) || eq(vp, STRCOLUMNS))) ||
-	     eq(vp, STRTERMCAP)) {
+    if ((eq(lp, STRNULL) && (eq(vp, STRLINES) || eq(vp, STRCOLUMNS))) ||
+	eq(vp, STRTERMCAP)) {
+	xfree((ptr_t) lp);
 	check_window_size(1);
+	return;
     }
+
     /*
      * Change the size to the one directed by $LINES and $COLUMNS
      */
-    else if (eq(vp, STRLINES) || eq(vp, STRCOLUMNS)) {
+    if (eq(vp, STRLINES) || eq(vp, STRCOLUMNS)) {
 	GotTermCaps = 0;
+	xfree((ptr_t) lp);
 	ed_Init();
+	return;
     }
 #endif /* SIG_WINDOW */
-    xfree((ptr_t) lp);
 }
 
 /*ARGSUSED*/
@@ -1279,6 +1363,7 @@ dounsetenv(v, c)
     int     i, maxi;
     static Char *name = NULL;
 
+    USE(c);
     if (name)
 	xfree((ptr_t) name);
     /*
@@ -1381,9 +1466,8 @@ tsetenv(name, val)
     Char   *blk[2];
     Char  **oep = ep;
 
-
     for (; *ep; ep++) {
-	for (cp = name, dp = *ep; *cp && *cp == *dp; cp++, dp++)
+	for (cp = name, dp = *ep; *cp && (*cp & TRIM) == *dp; cp++, dp++)
 	    continue;
 	if (*cp != 0 || *dp != '=')
 	    continue;
@@ -1439,6 +1523,7 @@ doumask(v, c)
     register Char *cp = v[1];
     register int i;
 
+    USE(c);
     if (cp == 0) {
 	i = umask(0);
 	(void) umask(i);
@@ -1471,11 +1556,11 @@ doumask(v, c)
 #   define toset(a) ((a) + 1)
 #  endif /* aiws */
 # else /* BSDLIMIT */
-#  if defined(BSD4_4) && !defined(__386BSD__)
+#  if defined(BSD4_4) && !defined(__386BSD__) && !defined(bsdi)
     typedef quad_t RLIM_TYPE;
 #  else
-    typedef int RLIM_TYPE;
-#  endif /* BSD4_4 && !__386BSD__ */
+    typedef unsigned long RLIM_TYPE;
+#  endif /* BSD4_4 && !__386BSD__ && !defined(bsdi) */
 # endif /* BSDLIMIT */
 
 # if defined(hpux) && defined(BSDLIMIT)
@@ -1495,61 +1580,77 @@ doumask(v, c)
 #  endif /* RLIM_INFINITY */
 # endif /* hpux && BSDLIMIT */
 
+# if SYSVREL > 3 && defined(BSDLIMIT)
+/* In order to use rusage, we included "/usr/ucbinclude/sys/resource.h" in */
+/* sh.h.  However, some SVR4 limits are defined in <sys/resource.h>.  Rather */
+/* than include both and get warnings, we define the extra SVR4 limits here. */
+#  ifndef RLIMIT_VMEM
+#   define RLIMIT_VMEM	6
+#  endif
+#  ifndef RLIMIT_AS
+#   define RLIMIT_AS	RLIMIT_VMEM
+#  endif
+# endif /* SYSVREL > 3 && BSDLIMIT */
+
 struct limits limits[] = 
 {
 # ifdef RLIMIT_CPU
-    RLIMIT_CPU, 	"cputime",	1,	"seconds",
+    { RLIMIT_CPU, 	"cputime",	1,	"seconds"	},
 # endif /* RLIMIT_CPU */
 
 # ifdef RLIMIT_FSIZE
 #  ifndef aiws
-    RLIMIT_FSIZE, 	"filesize",	1024,	"kbytes",
+    { RLIMIT_FSIZE, 	"filesize",	1024,	"kbytes"	},
 #  else
-    RLIMIT_FSIZE, 	"filesize",	512,	"blocks",
+    { RLIMIT_FSIZE, 	"filesize",	512,	"blocks"	},
 #  endif /* aiws */
 # endif /* RLIMIT_FSIZE */
 
 # ifdef RLIMIT_DATA
-    RLIMIT_DATA, 	"datasize",	1024,	"kbytes",
+    { RLIMIT_DATA, 	"datasize",	1024,	"kbytes"	},
 # endif /* RLIMIT_DATA */
 
 # ifdef RLIMIT_STACK
 #  ifndef aiws
-    RLIMIT_STACK, 	"stacksize",	1024,	"kbytes",
+    { RLIMIT_STACK, 	"stacksize",	1024,	"kbytes"	},
 #  else
-    RLIMIT_STACK, 	"stacksize",	1024 * 1024,	"kbytes",
+    { RLIMIT_STACK, 	"stacksize",	1024 * 1024,	"kbytes"},
 #  endif /* aiws */
 # endif /* RLIMIT_STACK */
 
 # ifdef RLIMIT_CORE
-    RLIMIT_CORE, 	"coredumpsize",	1024,	"kbytes",
+    { RLIMIT_CORE, 	"coredumpsize",	1024,	"kbytes"	},
 # endif /* RLIMIT_CORE */
 
 # ifdef RLIMIT_RSS
-    RLIMIT_RSS, 	"memoryuse",	1024,	"kbytes",
+    { RLIMIT_RSS, 	"memoryuse",	1024,	"kbytes"	},
 # endif /* RLIMIT_RSS */
 
+# ifdef RLIMIT_VMEM
+    { RLIMIT_VMEM, 	"vmemoryuse",	1024,	"kbytes"	},
+# endif /* RLIMIT_VMEM */
+
 # ifdef RLIMIT_NOFILE
-    RLIMIT_NOFILE, 	"descriptors", 1,	"",
+    { RLIMIT_NOFILE, 	"descriptors", 1,	""		},
 # endif /* RLIMIT_NOFILE */
 
 # ifdef RLIMIT_CONCUR
-    RLIMIT_CONCUR, 	"concurrency", 1,	"thread(s)",
+    { RLIMIT_CONCUR, 	"concurrency", 1,	"thread(s)"	},
 # endif /* RLIMIT_CONCUR */
 
 # ifdef RLIMIT_MEMLOCK
-    RLIMIT_MEMLOCK,	"memorylocked",	1024,	"kbytes",
+    { RLIMIT_MEMLOCK,	"memorylocked",	1024,	"kbytes"	},
 # endif /* RLIMIT_MEMLOCK */
 
 # ifdef RLIMIT_NPROC
-    RLIMIT_NPROC,	"maxproc",	1,	"",
+    { RLIMIT_NPROC,	"maxproc",	1,	""		},
 # endif /* RLIMIT_NPROC */
 
 # ifdef RLIMIT_OFILE
-    RLIMIT_OFILE,	"openfiles",	1,	"",
+    { RLIMIT_OFILE,	"openfiles",	1,	""		},
 # endif /* RLIMIT_OFILE */
 
-    -1, 		NULL, 		0, 	NULL
+    { -1, 		NULL, 		0, 	NULL		}
 };
 
 static struct limits *findlim	__P((Char *));
@@ -1608,6 +1709,7 @@ dolimit(v, c)
     register RLIM_TYPE limit;
     int    hard = 0;
 
+    USE(c);
     v++;
     if (*v && eq(*v, STRmh)) {
 	hard = 1;
@@ -1800,25 +1902,38 @@ dounlimit(v, c)
     struct command *c;
 {
     register struct limits *lp;
-    int     lerr = 0;
+    int    lerr = 0;
     int    hard = 0;
+    int	   force = 0;
 
-    v++;
-    if (*v && eq(*v, STRmh)) {
-	hard = 1;
-	v++;
+    USE(c);
+    while (*++v && **v == '-') {
+	Char   *vp = *v;
+	while (*++vp)
+	    switch (*vp) {
+	    case 'f':
+		force = 1;
+		break;
+	    case 'h':
+		hard = 1;
+		break;
+	    default:
+		stderror(ERR_ULIMUS);
+		break;
+	    }
     }
+
     if (*v == 0) {
 	for (lp = limits; lp->limconst >= 0; lp++)
 	    if (setlim(lp, hard, (RLIM_TYPE) RLIM_INFINITY) < 0)
 		lerr++;
-	if (lerr)
+	if (!force && lerr)
 	    stderror(ERR_SILENT);
 	return;
     }
     while (*v) {
 	lp = findlim(*v++);
-	if (setlim(lp, hard, (RLIM_TYPE) RLIM_INFINITY) < 0)
+	if (setlim(lp, hard, (RLIM_TYPE) RLIM_INFINITY) < 0 && !force)
 	    stderror(ERR_SILENT);
     }
 }
@@ -1875,8 +1990,11 @@ dosuspend(v, c)
 #ifdef BSDJOBS
     int     ctpgrp;
 
-    sigret_t(*old) ();
+    sigret_t (*old) ();
 #endif /* BSDJOBS */
+    
+    USE(c);
+    USE(v);
 
     if (loginsh)
 	stderror(ERR_SUSPLOG);
@@ -1941,6 +2059,7 @@ doeval(v, c)
     int     saveIN, saveOUT, saveDIAG;
     int     oSHIN, oSHOUT, oSHDIAG;
 
+    USE(c);
     oevalvec = evalvec;
     oevalp = evalp;
     odidfds = didfds;
@@ -2040,6 +2159,8 @@ struct command *c;
     register int row, col, columns, rows;
     unsigned int w, maxwidth;
 
+    USE(c);
+    USE(v);
     lbuffed = 0;		/* turn off line buffering */
 
     /* find widest string */

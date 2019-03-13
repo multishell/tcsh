@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.hist.c,v 3.6 1992/10/05 02:41:30 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.hist.c,v 3.10 1993/07/03 23:47:53 christos Exp $ */
 /*
  * sh.hist.c: Shell history expansions and substitutions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.hist.c,v 3.6 1992/10/05 02:41:30 christos Exp $")
+RCSID("$Id: sh.hist.c,v 3.10 1993/07/03 23:47:53 christos Exp $")
 
 #include "tc.h"
 
@@ -53,21 +53,23 @@ static	void	phist	__P((struct Hist *, int));
 #define HIST_LOAD	0x04
 #define HIST_REV	0x08
 #define HIST_CLEAR	0x10
+#define HIST_MERGE	0x20
 
 /*
  * C shell
  */
 
 void
-savehist(sp)
+savehist(sp, mflg)
     struct wordent *sp;
+    bool mflg;
 {
     register struct Hist *hp, *np;
     register int histlen = 0;
     Char   *cp;
 
     /* throw away null lines */
-    if (sp->next->word[0] == '\n')
+    if (sp && sp->next->word[0] == '\n')
 	return;
     cp = value(STRhistory);
     if (*cp) {
@@ -86,16 +88,38 @@ savehist(sp)
 	    hp->Hnext = np->Hnext, hfree(np);
 	else
 	    hp = np;
-    (void) enthist(++eventno, sp, 1);
+    if (sp)
+	(void) enthist(++eventno, sp, 1, mflg);
+}
+
+static bool
+heq(a0, b0)
+struct wordent *a0, *b0;
+{
+  register struct wordent *a = a0->next, *b = b0->next;
+
+  for (;;)
+    {
+      if (Strcmp(a->word, b->word))
+        return 0;
+      a = a->next; b = b->next;
+      if (a == a0)
+	return (b == b0) ? 1 : 0;
+      if (b == b0)
+        return 0;
+    } 
 }
 
 struct Hist *
-enthist(event, lp, docopy)
+enthist(event, lp, docopy, mflg)
     int     event;
     register struct wordent *lp;
     bool    docopy;
+    bool    mflg;
 {
     extern time_t Htime;
+    struct Hist *p, *pp = &Histlist;
+    int n, r;
     register struct Hist *np = (struct Hist *) xmalloc((size_t) sizeof(*np));
 
     /* Pick up timestamp set by lex() in Htime if reading saved history */
@@ -121,8 +145,30 @@ enthist(event, lp, docopy)
 	lp->prev->next = &np->Hlex;
 	np->histline = NULL;
     }
-    np->Hnext = Histlist.Hnext;
-    Histlist.Hnext = np;
+    if (mflg)
+      {
+        while ((p = pp->Hnext) && (p->Htime > np->Htime))
+	  pp = p;
+	while (p && p->Htime == np->Htime)
+	  {
+	    if (heq(&p->Hlex, &np->Hlex))
+	      {
+	        eventno--;
+		hfree(np);
+	        return (p);
+	      }
+	    pp = p;
+	    p = p->Hnext;
+	  }
+	for (p = Histlist.Hnext; p != pp->Hnext; p = p->Hnext)
+	  {
+	    n = p->Hnum; r = p->Href;
+	    p->Hnum = np->Hnum; p->Href = np->Href;
+	    np->Hnum = n; np->Href = r;
+	  }
+      }
+    np->Hnext = pp->Hnext;
+    pp->Hnext = np;
     return (np);
 }
 
@@ -146,6 +192,7 @@ dohist(vp, c)
 {
     int     n, hflg = 0;
 
+    USE(c);
     if (getn(value(STRhistory)) == 0)
 	return;
     if (setintr)
@@ -174,8 +221,11 @@ dohist(vp, c)
 	    case 'L':
 		hflg |= HIST_LOAD;
 		break;
+	    case 'M':
+	    	hflg |= HIST_MERGE;
+		break;
 	    default:
-		stderror(ERR_HISTUS, "chrSL");
+		stderror(ERR_HISTUS, "chrSLM");
 		break;
 	    }
     }
@@ -186,8 +236,8 @@ dohist(vp, c)
 	    hp->Hnext = np->Hnext, hfree(np);
     }
 
-    if (hflg & HIST_LOAD) {
-	loadhist(*vp);
+    if (hflg & (HIST_LOAD | HIST_MERGE)) {
+	loadhist(*vp, (hflg & HIST_MERGE) ? 1 : 0);
 	return;
     }
     else if (hflg & HIST_SAVE) {
@@ -265,11 +315,11 @@ fmthist(fmt, ptr, buf)
     struct Hist *hp = (struct Hist *) ptr;
     switch (fmt) {
     case 'h':
-	xsprintf(buf, "%6d", hp->Hnum);
+	(void) xsprintf(buf, "%6d", hp->Hnum);
 	break;
     case 'R':
 	if (HistLit && hp->histline)
-	    xsprintf(buf, "%S", hp->histline);
+	    (void) xsprintf(buf, "%S", hp->histline);
 	else {
 	    Char ibuf[BUFSIZE], *ip;
 	    char *p;
@@ -318,6 +368,22 @@ rechist(fname)
 		(void) Strcat(buf, &STRtildothist[1]);
 	    }
 
+	/*
+	 * The 'savehist merge' feature is intended for an environment
+	 * with numerous shells beeing in simultaneous use. Imagine
+	 * any kind of window system. All these shells 'share' the same 
+	 * ~/.history file for recording their command line history. 
+	 * Currently the automatic merge can only succeed when the shells
+	 * nicely quit one after another. 
+	 *
+	 * Users that like to nuke their environment require here an atomic
+	 * 	loadhist-creat-dohist(dumphist)-close
+	 * sequence.
+	 *
+	 * jw.
+	 */ 
+	if (shist->vec[1] && eq(shist->vec[1], STRmerge))
+	  loadhist(fname, 1);
 	fp = creat(short2str(fname), 0600);
 	if (fp == -1) 
 	    return;
@@ -335,10 +401,12 @@ rechist(fname)
 
 
 void
-loadhist(fname)
+loadhist(fname, mflg)
     Char *fname;
+    bool mflg;
 {
-    static Char   *loadhist_cmd[] = {STRsource, STRmh, NULL, NULL};
+    static Char   *loadhist_cmd[] = {STRsource, NULL, NULL, NULL};
+    loadhist_cmd[1] = mflg ? STRmm : STRmh;
 
     if (fname != NULL)
 	loadhist_cmd[2] = fname;

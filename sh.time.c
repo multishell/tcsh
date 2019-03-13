@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.time.c,v 3.13 1992/11/13 04:19:10 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.time.c,v 3.15 1993/07/03 23:47:53 christos Exp $ */
 /*
  * sh.time.c: Shell time keeping and printing.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.time.c,v 3.13 1992/11/13 04:19:10 christos Exp $")
+RCSID("$Id: sh.time.c,v 3.15 1993/07/03 23:47:53 christos Exp $")
 
 #ifdef SUNOS4
 # include <machine/param.h>
@@ -145,6 +145,8 @@ dotime(v, c)
     prusage(&times0, &times_dol, timedol, time0);
 # endif	/* _SEQUENT_ */
 #endif /* BSDTIMES */
+    USE(c);
+    USE(v);
 }
 
 /*
@@ -159,6 +161,7 @@ donice(v, c)
     register Char *cp;
     int     nval = 0;
 
+    USE(c);
     v++, cp = *v++;
     if (cp == 0)
 	nval = 4;
@@ -322,17 +325,17 @@ prusage(bs, es, e, b)
     register struct varent *vp = adrof(STRtime);
 
 #ifdef BSDTIMES
-    int     ms =
-    (e->tv_sec - b->tv_sec) * 100 + (e->tv_usec - b->tv_usec) / 10000;
+    int     ms = (int)
+    ((e->tv_sec - b->tv_sec) * 100 + (e->tv_usec - b->tv_usec) / 10000);
 
     cp = "%Uu %Ss %E %P %X+%Dk %I+%Oio %Fpf+%Ww";
-#else
+#else /* !BSDTIMES */
 # ifdef _SEQUENT_
-    int     ms =
-    (e->tv_sec - b->tv_sec) * 100 + (e->tv_usec - b->tv_usec) / 10000;
+    int     ms = (int)
+    ((e->tv_sec - b->tv_sec) * 100 + (e->tv_usec - b->tv_usec) / 10000);
 
     cp = "%Uu %Ss %E %P %I+%Oio %Fpf+%Ww";
-# else /* _SEQUENT_ */
+# else /* !_SEQUENT_ */
 #  ifndef POSIX
     time_t  ms = (e - b) * 100 / HZ;
 
@@ -351,8 +354,8 @@ prusage(bs, es, e, b)
      */
     if (ms < t && ms != 0)
 	ms = t;
-# endif /* _SEQUENT_ */
-#endif /* BSDTIMES */
+# endif /*! _SEQUENT_ */
+#endif /* !BSDTIMES */
 #ifdef TDEBUG
     xprintf("es->tms_utime %lu bs->tms_utime %lu\n",
 	    es->tms_utime, bs->tms_utime);

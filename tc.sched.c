@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.sched.c,v 3.8 1992/03/27 01:59:46 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/tc.sched.c,v 3.9 1993/07/03 23:47:53 christos Exp $ */
 /*
  * tc.sched.c: Scheduled command execution
  *
@@ -38,7 +38,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.sched.c,v 3.8 1992/03/27 01:59:46 christos Exp $")
+RCSID("$Id: tc.sched.c,v 3.9 1993/07/03 23:47:53 christos Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -75,6 +75,7 @@ dosched(v, c)
     struct tm *ltp;
     char   *timeline;
 
+    USE(c);
 /* This is a major kludge because of a gcc linker  */
 /* Problem.  It may or may not be needed for you   */
 #ifdef _MINIX

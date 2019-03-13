@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.prompt.c,v 3.16 1992/10/14 20:19:19 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/tc.prompt.c,v 3.18 1993/06/25 21:17:12 christos Exp $ */
 /*
  * tc.prompt.c: Prompt printing stuff
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.prompt.c,v 3.16 1992/10/14 20:19:19 christos Exp $")
+RCSID("$Id: tc.prompt.c,v 3.18 1993/06/25 21:17:12 christos Exp $")
 
 #include "ed.h"
 
@@ -48,9 +48,9 @@ RCSID("$Id: tc.prompt.c,v 3.16 1992/10/14 20:19:19 christos Exp $")
  * Luke Mewburn, s902113@minyos.xx.rmit.OZ.AU 6-Sep-91 - changed date format
  */
 
-char   *month_list[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+static char   *month_list[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
 			"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-char   *day_list[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+static char   *day_list[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
 void
 printprompt(promptno, str)
     int     promptno;
@@ -142,7 +142,7 @@ tprintf(what, buf, fmt, siz, str, tim, info)
 		if (what == FMT_HISTORY)  
 		    fmthist('h', info, cbuff);
 		else 
-		    xsprintf(cbuff, "%d", eventno + 1);
+		    (void) xsprintf(cbuff, "%d", eventno + 1);
 		for (cz = cbuff; *cz; cz++) {
 		    *p++ = attributes | *cz;
 		    if (p >= ep) break;
@@ -151,6 +151,8 @@ tprintf(what, buf, fmt, siz, str, tim, info)
 	    case 'T':		/* 24 hour format	 */
 	    case '@':
 	    case 't':		/* 12 hour am/pm format */
+	    case 'p':		/* With seconds	*/
+	    case 'P':
 		{
 		    char    ampm = 'a';
 		    int     hr = t->tm_hour;
@@ -159,7 +161,7 @@ tprintf(what, buf, fmt, siz, str, tim, info)
 
 		    /* addition by Hans J. Albertsson */
 		    /* and another adapted from Justin Bur */
-		    if (adrof(STRampm) || *cp != 'T') {
+		    if (adrof(STRampm) || (*cp != 'T' && *cp != 'P')) {
 			if (hr >= 12) {
 			    if (hr > 12)
 				hr -= 12;
@@ -188,7 +190,19 @@ tprintf(what, buf, fmt, siz, str, tim, info)
 			    *p++ = attributes | '0';
 			    *p++ = attributes | buff[0];
 			}
-			if (adrof(STRampm) || *cp != 'T') {
+			if (*cp == 'p' || *cp == 'P') {
+			    *p++ = attributes | ':';
+			    Itoa(t->tm_sec, buff);
+			    if (buff[1]) {
+				*p++ = attributes | buff[0];
+				*p++ = attributes | buff[1];
+			    }
+			    else {
+				*p++ = attributes | '0';
+				*p++ = attributes | buff[0];
+			    }
+			}
+			if (adrof(STRampm) || (*cp != 'T' && *cp != 'P')) {
 			    *p++ = attributes | ampm;
 			    *p++ = attributes | 'm';
 			}
@@ -302,7 +316,7 @@ tprintf(what, buf, fmt, siz, str, tim, info)
 			*p++ = attributes | buff[0];
 		    else {
 			if ((scp != 'C') && (q = value(STRhome)) != STRNULL &&
-			    Strncmp(buff, q, (k = Strlen(q))) == 0 &&
+			    Strncmp(buff, q, (size_t) (k = Strlen(q))) == 0 &&
 			    (buff[k] == '/' || buff[k] == '\0')) {
 			    buff[--k] = '~';
 			    q = &buff[k];
@@ -520,7 +534,7 @@ tprintf(what, buf, fmt, siz, str, tim, info)
 	    if (what == FMT_HISTORY) 
 		fmthist('h', info, cbuff);
 	    else
-		xsprintf(cbuff, "%d", eventno + 1);
+		(void) xsprintf(cbuff, "%d", eventno + 1);
 	    for (cz = cbuff; *cz; cz++) {
 		*p++ = attributes | *cz;
 		if (p >= ep) break;

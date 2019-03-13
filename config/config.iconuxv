@@ -6,6 +6,8 @@
  * Edit this to match your system type.
  */
 
+#ifndef _h_config
+#define _h_config
 /****************** System dependant compilation flags ****************/
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
@@ -117,3 +119,4 @@
 /* have been moved to config_f.h */
 
 #include "config_f.h"
+#endif /* _h_config */

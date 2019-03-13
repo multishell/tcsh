@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.decls.h,v 3.21 1992/10/14 20:19:19 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/tc.decls.h,v 3.23 1993/06/24 15:29:37 christos Exp $ */
 /*
  * tc.decls.h: Function declarations from all the tcsh modules
  */
@@ -192,10 +192,10 @@ extern	int		  getv		__P((Char *));
 /*
  * tc.printf.h
  */
-extern	void		  xprintf	__P((char *, ...));
-extern	void		  xsprintf	__P((char *, char *, ...));
-extern	void		  xvprintf	__P((char *, va_list));
-extern	void		  xvsprintf	__P((char *, char *, va_list));
+extern	pret_t		  xprintf	__P((const char *, ...));
+extern	pret_t		  xsprintf	__P((char *, const char *, ...));
+extern	pret_t		  xvprintf	__P((const char *, va_list));
+extern	pret_t		  xvsprintf	__P((char *, const char *, va_list));
 
 /*
  * tc.prompt.c
@@ -241,7 +241,7 @@ extern	void 		  sigpause	__P((int));
 extern	sigret_t	(*xsignal	__P((int, sigret_t (*)(int)))) ();
 # define signal(a, b)	  xsignal(a, b)
 #endif /* NEEDsignal */
-#ifdef _SEQUENT_
+#if defined(_SEQUENT_) || (SYSVREL > 3 && defined(POSIXSIGS))
 extern	sigmask_t	  sigsetmask	__P((sigmask_t));
 extern	sigmask_t	  sigblock	__P((sigmask_t));
 extern	void		  bsd_sigpause	__P((sigmask_t));

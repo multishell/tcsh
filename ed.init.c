@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/ed.init.c,v 3.33 1992/10/05 02:41:30 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/ed.init.c,v 3.36 1993/06/25 21:17:12 christos Exp $ */
 /*
  * ed.init.c: Editor initializations
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.init.c,v 3.33 1992/10/05 02:41:30 christos Exp $")
+RCSID("$Id: ed.init.c,v 3.36 1993/06/25 21:17:12 christos Exp $")
 
 #include "ed.h"
 #include "ed.term.h"
@@ -568,7 +568,30 @@ Cookedmode()
 #ifdef BSDSIGS
     orig_intr = (sigret_t (*)()) signal(SIGINT, SIG_IGN);
 #else
+# ifdef SIG_HOLD
+    /*
+     * sigset doesn't return the previous handler if the signal is held,
+     * it will return SIG_HOLD instead. So instead of restoring the
+     * the signal we would end up installing a blocked SIGINT with a
+     * SIG_IGN signal handler. This is what happened when Cookedmode
+     * was called from sched_run, disabling interrupt for the rest
+     * of your session.
+     *
+     * This is what we do:
+     * - if the signal is blocked, keep it that way
+     * - else set it to SIG_IGN
+     *
+     * Casper Dik (casper@fwi.uva.nl)
+     */
+    orig_intr = (sigret_t (*)()) sigset(SIGINT, SIG_HOLD);
+    if (orig_intr != SIG_HOLD)
+	(void) sigset(SIGINT, SIG_IGN); /* returns SIG_HOLD */
+# else /* !SIG_HOLD */
+    /*
+     * No SIG_HOLD; probably no reliable signals as well.
+     */
     orig_intr = (sigret_t (*)()) sigset(SIGINT, SIG_IGN);
+# endif /* SIG_HOLD */
 #endif /* BSDSIGS */
     if (tty_setty(SHTTY, &extty) == -1) {
 #ifdef DEBUG_TTY
@@ -611,7 +634,15 @@ static Char *Input_Line = NULL;
 int
 Load_input_line()
 {
-    long    chrs = 0;
+#ifdef SUNOS4
+    long chrs = 0;
+#else /* !SUNOS4 */
+    /* 
+     * *Everyone* else has an int, but SunOS wants long!
+     * This breaks where int != long (alpha)
+     */
+    int chrs = 0;
+#endif /* SUNOS4 */
 
     if (Input_Line)
 	xfree((ptr_t) Input_Line);
@@ -621,7 +652,7 @@ Load_input_line()
 	return 0;
 
 #if defined(FIONREAD) && !defined(OREO)
-    (void) ioctl(SHIN, FIONREAD, &chrs);
+    (void) ioctl(SHIN, FIONREAD, (ioctl_t) &chrs);
     if (chrs > 0) {
 	char    buf[BUFSIZE];
 

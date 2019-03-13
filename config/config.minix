@@ -6,6 +6,8 @@
  * This is the config file for minix-386 systems
  */
 
+#ifndef _h_config
+#define _h_config
 /****************** System dependant compilation flags ****************/
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
@@ -134,3 +136,4 @@
 #include "config_f.h"
 
 #undef NLS
+#endif /* _h_config */

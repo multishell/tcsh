@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.sem.c,v 3.24 1992/10/14 20:19:19 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.sem.c,v 3.32 1993/07/03 23:47:53 christos Exp $ */
 /*
  * sh.sem.c: I/O redirections and job forking. A touchy issue!
  *	     Most stuff with builtins is incorrect
@@ -37,7 +37,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.sem.c,v 3.24 1992/10/14 20:19:19 christos Exp $")
+RCSID("$Id: sh.sem.c,v 3.32 1993/07/03 23:47:53 christos Exp $")
 
 #include "tc.h"
 
@@ -50,7 +50,7 @@ RCSID("$Id: sh.sem.c,v 3.24 1992/10/14 20:19:19 christos Exp $")
 #endif /* CLOSE_ON_EXEC */
 
 #if defined(__sparc__) || defined(sparc)
-# if !defined(MACH) && SYSVREL == 0
+# if !defined(MACH) && SYSVREL == 0 && !defined(Lynx)
 #  include <vfork.h>
 # endif /* !MACH && SYSVREL == 0 */
 #endif /* __sparc__ || sparc */
@@ -95,6 +95,7 @@ static struct {
 			_gv.forked = forked, \
 			_gv.wanttty = owanttty )
 
+
 /*VARARGS 1*/
 void
 execute(t, wanttty, pipein, pipeout)
@@ -102,9 +103,9 @@ execute(t, wanttty, pipein, pipeout)
     int     wanttty;
     int *pipein, *pipeout;
 {
-#ifdef convex
+#ifdef VFORK
     extern bool use_fork;	/* use fork() instead of vfork()? */
-#endif /* convex */
+#endif
 
     bool    forked;
     struct biltins *bifunc;
@@ -112,9 +113,6 @@ execute(t, wanttty, pipein, pipeout)
     int     pv[2];
 #ifdef BSDSIGS
     static sigmask_t csigmask;
-# ifdef VFORK
-    static sigmask_t ocsigmask;
-# endif /* VFORK */
 #endif /* BSDSIGS */
 #ifdef VFORK
     static int onosigchld = 0;
@@ -167,7 +165,7 @@ execute(t, wanttty, pipein, pipeout)
 		(void) close(0);
 	}
 
-	set(STRstatus, Strsave(STR0));
+	set(STRstatus, Strsave(STR0), VAR_READWRITE);
 
 	/*
 	 * This mess is the necessary kludge to handle the prefix builtins:
@@ -229,7 +227,7 @@ execute(t, wanttty, pipein, pipeout)
 	     * Check if we have a builtin function and remember which one.
 	     */
 	    _gv.bifunc = isbfunc(t);
- 	    if (noexec) {
+ 	    if (noexec && _gv.bifunc) {
 		/*
 		 * Continue for builtins that are part of the scripting language
 		 */
@@ -299,7 +297,7 @@ execute(t, wanttty, pipein, pipeout)
 #ifdef BSDSIGS
 		    csigmask = sigblock(sigmask(SIGCHLD));
 #else /* !BSDSIGS */
-		    sighold(SIGCHLD);
+		    (void) sighold(SIGCHLD);
 #endif /* BSDSIGS */
 
 		    nosigchld = 1;
@@ -328,7 +326,7 @@ execute(t, wanttty, pipein, pipeout)
 		int     odidcch;
 # endif  /* !CLOSE_ON_EXEC */
 # ifdef BSDSIGS
-		sigmask_t omask;
+		sigmask_t omask, ocsigmask;
 # endif /* BSDSIGS */
 
 		/*
@@ -339,26 +337,30 @@ execute(t, wanttty, pipein, pipeout)
 		 * the current sigvec's for the signals the child touches
 		 * before it exec's.
 		 */
-# ifdef BSDSIGS
 
 		/*
 		 * Sooooo true... If this is a Sun, save the sigvec's. (Skip
 		 * Gilbrech - 11/22/87)
 		 */
-#  ifdef SAVESIGVEC
+# ifdef SAVESIGVEC
 		sigvec_t savesv[NSIGSAVED];
 		sigmask_t savesm;
 
-#  endif /* SAVESIGVEC */
+# endif /* SAVESIGVEC */
 		if (_gv.wanttty >= 0 && !nosigchld && !noexec) {
+# ifdef BSDSIGS
 		    csigmask = sigblock(sigmask(SIGCHLD));
+# else /* !BSDSIGS */
+		    (void) sighold(SIGCHLD);
+# endif  /* BSDSIGS */
 		    nosigchld = 1;
 		}
-		omask = sigblock(sigmask(SIGCHLD) | sigmask(SIGINT));
+# ifdef BSDSIGS
+		omask = sigblock(sigmask(SIGCHLD)|sigmask(SIGINT));
 # else /* !BSDSIGS */
 		(void) sighold(SIGCHLD);
 		(void) sighold(SIGINT);
-# endif  /* !BSDSIGS */
+# endif  /* BSDSIGS */
 		ochild = child;
 		osetintr = setintr;
 		ohaderr = haderr;
@@ -383,14 +385,10 @@ execute(t, wanttty, pipein, pipeout)
 # ifdef SAVESIGVEC
 		savesm = savesigvec(savesv);
 # endif /* SAVESIGVEC */
-# ifdef convex
 		if (use_fork)
 		    pid = fork();
 		else
 		    pid = vfork();
-# else /* !convex */
-		pid = vfork();
-# endif /* convex */
 
 		if (pid < 0) {
 # ifdef BSDSIGS
@@ -401,16 +399,14 @@ execute(t, wanttty, pipein, pipeout)
 # else /* !BSDSIGS */
 		    (void) sigrelse(SIGCHLD);
 		    (void) sigrelse(SIGINT);
-#endif  /* BSDSIGS */
+# endif  /* BSDSIGS */
 		    stderror(ERR_NOPROC);
 		}
 		_gv.forked++;
 		if (pid) {	/* parent */
-# ifdef BSDSIGS
-#  ifdef SAVESIGVEC
+# ifdef SAVESIGVEC
 		    restoresigvec(savesv, savesm);
-#  endif /* SAVESIGVEC */
-# endif /* BSDSIGS */
+# endif /* SAVESIGVEC */
 		    child = ochild;
 		    setintr = osetintr;
 		    haderr = ohaderr;
@@ -451,7 +447,6 @@ execute(t, wanttty, pipein, pipeout)
 		    /* this is from pfork() */
 		    int     pgrp;
 		    bool    ignint = 0;
-
 		    if (nosigchld) {
 # ifdef BSDSIGS
 			(void) sigsetmask(csigmask);
@@ -468,9 +463,6 @@ execute(t, wanttty, pipein, pipeout)
 		    child++;
 		    if (setintr) {
 			setintr = 0;
-# ifdef notdef
-			(void) signal(SIGCHLD, SIG_DFL);
-# endif 
 /*
  * casts made right for SunOS 4.0 by Douglas C. Schmidt
  * <schmidt%sunshine.ics.uci.edu@ROME.ICS.UCI.EDU>
@@ -509,8 +501,7 @@ execute(t, wanttty, pipein, pipeout)
 			(void) signal(SIGHUP, SIG_IGN);
 		    if (t->t_dflg & F_NICE)
 # ifdef BSDNICE
-			(void) setpriority(PRIO_PROCESS,
-					   0, t->t_nice);
+			(void) setpriority(PRIO_PROCESS, 0, t->t_nice);
 # else /* !BSDNICE */
 			(void) nice(t->t_nice);
 # endif /* BSDNICE */
@@ -612,8 +603,6 @@ execute(t, wanttty, pipein, pipeout)
 	execute(t->t_dcdr, _gv.wanttty, pv, pipeout);
 	t->t_dcar->t_dflg |= F_PIPEOUT |
 	    (t->t_dflg & (F_PIPEIN | F_AMPERSAND | F_STDERR | F_NOINTERRUPT));
-	if (_gv.wanttty > 0)
-	    _gv.wanttty = 0;	/* got tty already */
 	execute(t->t_dcar, _gv.wanttty, pipein, pv);
 #else /* !BACKPIPE */
 	t->t_dcar->t_dflg |= F_PIPEOUT |
@@ -621,8 +610,6 @@ execute(t, wanttty, pipein, pipeout)
 	execute(t->t_dcar, _gv.wanttty, pipein, pv);
 	t->t_dcdr->t_dflg |= F_PIPEIN | (t->t_dflg &
 			(F_PIPEOUT | F_AMPERSAND | F_NOFORK | F_NOINTERRUPT));
-	if (_gv.wanttty > 0)
-	    _gv.wanttty = 0;	/* got tty already */
 	execute(t->t_dcdr, _gv.wanttty, pv, pipeout);
 #endif /* BACKPIPE */
 	break;
@@ -686,6 +673,7 @@ int snum;
 {
     register Char **v;
 
+    USE(snum);
     if ((v = gargv) != 0) {
 	gargv = 0;
 	xfree((ptr_t) v);

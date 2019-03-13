@@ -6,6 +6,8 @@
  * Edit this to match your system type.
  */
 
+#ifndef _h_config
+#define _h_config
 /****************** System dependant compilation flags ****************/
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
@@ -21,7 +23,7 @@
 /*
  * POSIXSIGS	Use the POSIX signal facilities to emulate BSD signals.
  */
-#undef POSIXSIGS
+#define POSIXSIGS
 
 /*
  * VFORK	This machine has a vfork().  
@@ -36,7 +38,7 @@
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
  */
-#undef VFORK
+#define VFORK
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and
@@ -49,14 +51,15 @@
  *		Note: POSIX systems should not define this unless they
  *		have sigvec() and friends (ie: 4.3BSD-RENO, HP-UX).
  */
-#undef BSDSIGS
+#define BSDSIGS
 
 /*
  * BSDTIMES	You have BSD-style process time stuff (like rusage)
  *		This may or may not be true.  For example, Apple Unix
  *		(OREO) has BSDJOBS and BSDSIGS but not BSDTIMES.
+ *		SVR4 has a dummy rusage structure, so we don't use it.
  */
-#define BSDTIMES
+#undef BSDTIMES
 
 /*
  * BSDLIMIT	You have BSD-style resource limit stuff (getrlimit/setrlimit)
@@ -81,8 +84,8 @@
  * SYSVREL	Your machine is SYSV based (HPUX, A/UX)
  *		NOTE: don't do this if you are on a Pyramid -- tcsh is
  *		built in a BSD universe.
- *		Set SYSVREL to 1, 2, or 3, depending the version of System V
- *		you are running. Or set it to 0 if you are not SYSV based
+ *		Set SYSVREL to 1, 2, 3, or 4, depending on the version of SYSV
+ *		you are running, or set it to 0 if you are not SYSV based.
  */
 #define SYSVREL	4
 
@@ -147,3 +150,4 @@
 /* have been moved to config_f.h */
 #include "config_f.h"
 
+#endif /* _h_config */

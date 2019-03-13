@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.dol.c,v 3.18 1992/10/14 20:19:19 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.dol.c,v 3.24 1993/06/25 21:17:12 christos Exp $ */
 /*
  * sh.dol.c: Variable substitutions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.dol.c,v 3.18 1992/10/14 20:19:19 christos Exp $")
+RCSID("$Id: sh.dol.c,v 3.24 1993/06/25 21:17:12 christos Exp $")
 
 /*
  * C shell
@@ -58,7 +58,7 @@ static Char *Dcp, **Dvp;	/* Input vector for Dreadc */
 
 #define	unDgetC(c)	Dpeekc = c
 
-#define QUOTES		(_Q|_Q1|_ESC)	/* \ ' " ` */
+#define QUOTES		(_QF|_QB|_ESC)	/* \ ' " ` */
 
 /*
  * The following variables give the information about the current
@@ -193,7 +193,7 @@ Dpack(wbuf, wp)
 	    Gcat(STRNULL, wbuf);
 	    return (NULL);
 	}
-	if (cmap(c, _SP | _NL | _Q | _Q1)) {	/* sp \t\n'"` */
+	if (cmap(c, _SP | _NL | _QF | _QB)) {	/* sp \t\n'"` */
 	    unDgetC(c);
 	    if (cmap(c, QUOTES))
 		return (wp);
@@ -402,8 +402,9 @@ quotspec:
     return (c);
 }
 
-static Char *nulvec[] = {0};
-static struct varent nulargv = {nulvec, STRargv, 0};
+static Char *nulvec[] = { NULL };
+static struct varent nulargv = {nulvec, STRargv, VAR_READWRITE, 
+				{ NULL, NULL, NULL }, 0 };
 
 static void
 dolerror(s)
@@ -541,7 +542,7 @@ Dgetdol()
 	    }
 	    if (subscr == 0) {
 		if (bitset) {
-		    dolp = ffile ? STR1 : STR0;
+		    dolp = dolzero ? STR1 : STR0;
 		    goto eatbrac;
 		}
 		if (ffile == 0)
@@ -575,7 +576,7 @@ Dgetdol()
 		stderror(ERR_VARALNUM);
 	}
 	for (;;) {
-	    *np++ = c;
+	    *np++ = (Char) c;
 	    c = DgetC(0);
 	    if (!alnum(c))
 		break;
@@ -612,7 +613,7 @@ Dgetdol()
 		stderror(ERR_INCBR);
 	    if (np >= &name[sizeof(name) / sizeof(Char) - 2])
 		stderror(ERR_VARTOOLONG);
-	    *np++ = c;
+	    *np++ = (Char) c;
 	}
 	*np = 0, np = name;
 	if (dolp || dolcnt)	/* $ exp must end before ] */
@@ -732,7 +733,7 @@ fixDolMod()
 		int delimcnt = 2;
 		int delim = DgetC(0);
 		dolmod[dolnmod++] = (Char) c;
-		dolmod[dolnmod++] = delim;
+		dolmod[dolnmod++] = (Char) delim;
 		
 		if (!delim || letter(delim)
 		    || Isdigit(delim) || any(" \t\n", delim)) {
@@ -821,7 +822,7 @@ setDolp(cp)
 		    np = (Char *) xmalloc((size_t)
 					  ((Strlen(cp) + 1 - lhlen + rhlen) *
 					  sizeof(Char)));
-		    (void) Strncpy(np, cp, dp - cp);
+		    (void) Strncpy(np, cp, (size_t) (dp - cp));
 		    (void) Strcpy(np + (dp - cp), rhsub);
 		    (void) Strcpy(np + (dp - cp) + rhlen, dp + lhlen);
 
@@ -837,11 +838,13 @@ setDolp(cp)
 	    /*
 	     * restore dolmod for additional words
 	     */
-	    dolmod[i] = rhsub[-1] = delim;
+	    dolmod[i] = rhsub[-1] = (Char) delim;
 	    if (didmod)
 		dolmcnt--;
+#ifdef notdef
 	    else
 		break;
+#endif
         } else {
 	    int didmod = 0;
 
@@ -865,8 +868,10 @@ setDolp(cp)
 	    dp = cp;
 	    if (didmod)
 		dolmcnt--;
+#ifdef notdef
 	    else
 		break;
+#endif
 	}
     }
 #endif /* COMPAT */
@@ -971,7 +976,7 @@ heredoc(term)
 	    c = readc(1);	/* 1 -> Want EOF returns */
 	    if (c < 0 || c == '\n')
 		break;
-	    if (c &= TRIM) {
+	    if ((c &= TRIM) != 0) {
 		*lbp++ = (Char) c;
 		if (--lcnt < 0) {
 		    setname("<<");

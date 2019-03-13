@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.h,v 3.47 1992/11/13 08:47:03 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.h,v 3.55 1993/07/03 23:47:53 christos Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -42,6 +42,7 @@
 #ifndef EXTERN
 # define EXTERN extern
 #endif /* EXTERN */
+
 /*
  * Sanity
  */
@@ -65,15 +66,8 @@ typedef char Char;
 # define SAVE(a) (strsave(a))
 #endif 
 
-#ifdef PURIFY
-/* Re-define those, cause purify might use them */
-# define xprintf 	printf
-# define xsprintf	sprintf
-# define xvprintf	vprintf
-/* exit normally, allowing purify to trace leaks */
-# define _exit		exit
-#endif /* PURIFY */
-
+/* Elide unused argument warnings */
+#define USE(a)	((void) (a))
 /*
  * If your compiler complains, then you can either
  * throw it away and get gcc or, use the following define
@@ -192,7 +186,7 @@ typedef int sigret_t;
 
 #if defined(BSDTIMES) || defined(BSDLIMIT)
 # include <sys/time.h>
-# if SYSVREL>3 && !defined(sgi)
+# if SYSVREL>3 && !defined(sgi) && !defined(sun)
 #  include "/usr/ucbinclude/sys/resource.h"
 # else
 #  include <sys/resource.h>
@@ -214,10 +208,6 @@ typedef int sigret_t;
 #  define CSWTCH _POSIX_VDISABLE	/* So job control works */
 # endif /* SYSVREL > 3 */
 #endif /* POSIX */
-#ifdef DGUX
-#  undef CSWTCH
-#  define CSWTCH _POSIX_VDISABLE	/* So job control works */
-#endif /* DGUX */
 
 #ifdef sonyrisc
 # include <sys/ttold.h>
@@ -274,6 +264,11 @@ extern int setpgrp();
 #  include <sys/ioctl.h>
 # endif
 #endif 
+
+#if (defined(__DGUX__) && defined(POSIX)) || defined(DGUX)
+#undef CSWTCH
+#define CSWTCH _POSIX_VDISABLE
+#endif
 
 #if !defined(FIOCLEX) && defined(SUNOS4)
 # include <sys/filio.h>
@@ -341,8 +336,9 @@ extern int setpgrp();
  * ANSIisms... These must be *after* the system include and 
  * *before* our includes, so that BSDreno has time to define __P
  */
+#undef __P
 #ifndef __P
-# if __STDC__
+# if __STDC__ || defined(FUNCPROTO)
 #  define __P(a) a
 # else
 #  define __P(a) ()
@@ -353,6 +349,19 @@ extern int setpgrp();
 # endif 
 #endif 
 
+
+#ifdef PURIFY
+/* Re-define those, cause purify might use them */
+# define xprintf 	printf
+# define xsprintf	sprintf
+# define xvprintf	vprintf
+# define xvsprintf	vsprintf
+/* exit normally, allowing purify to trace leaks */
+# define _exit		exit
+typedef  int		pret_t;
+#else
+typedef void		pret_t;
+#endif /* PURIFY */
 
 typedef int bool;
 
@@ -466,6 +475,7 @@ EXTERN bool    isoutatty;	/* is SHOUT a tty */
 EXTERN bool    isdiagatty;	/* is SHDIAG a tty */
 EXTERN bool    is1atty;		/* is file descriptor 1 a tty (didfds mode) */
 EXTERN bool    is2atty;		/* is file descriptor 2 a tty (didfds mode) */
+EXTERN bool    arun;		/* Currently running multi-line-aliases */
 
 /*
  * Global i/o info
@@ -473,6 +483,7 @@ EXTERN bool    is2atty;		/* is file descriptor 2 a tty (didfds mode) */
 EXTERN Char   *arginp;		/* Argument input for sh -c and internal `xx` */
 EXTERN int     onelflg;		/* 2 -> need line for -t, 1 -> exit on read */
 extern Char   *ffile;		/* Name of shell file for $0 */
+extern bool    dolzero;		/* if $?0 should return true... */
 
 extern char *seterr;		/* Error message from scanner/parser */
 extern int errno;		/* Error from C library routines */
@@ -538,6 +549,15 @@ EXTERN int   SHOUT;		/* Shell output */
 EXTERN int   SHDIAG;		/* Diagnostic output... shell errs go here */
 EXTERN int   OLDSTD;		/* Old standard input (def for cmds) */
 
+
+#if SYSVREL == 4 && defined(_UTS)
+/* 
+ * From: fadden@uts.amdahl.com (Andy McFadden)
+ * we need sigsetjmp for UTS4, but not UTS2.1
+ */
+# define SIGSETJMP
+#endif
+
 /*
  * Error control
  *
@@ -548,20 +568,32 @@ EXTERN int   OLDSTD;		/* Old standard input (def for cmds) */
 
 #ifdef NO_STRUCT_ASSIGNMENT
 
-typedef jmp_buf jmp_buf_t;
-
-/* bugfix by Jak Kirman @ Brown U.: remove the (void) cast here, see sh.c */
-# define setexit()  setjmp(reslab)
-# define reset()    longjmp(reslab, 1)
+# ifdef SIGSETJMP
+   typedef sigjmp_buf jmp_buf_t;
+   /* bugfix by Jak Kirman @ Brown U.: remove the (void) cast here, see sh.c */
+#  define setexit()  sigsetjmp(reslab)
+#  define reset()    siglongjmp(reslab, 1)
+# else
+   typedef jmp_buf jmp_buf_t;
+   /* bugfix by Jak Kirman @ Brown U.: remove the (void) cast here, see sh.c */
+#  define setexit()  setjmp(reslab)
+#  define reset()    longjmp(reslab, 1)
+# endif
 # define getexit(a) (void) memmove((ptr_t)(a), (ptr_t)reslab, sizeof(reslab))
 # define resexit(a) (void) memmove((ptr_t)reslab, ((ptr_t)(a)), sizeof(reslab))
 
 #else
 
-typedef struct { jmp_buf j; } jmp_buf_t;
+# ifdef SIGSETJMP
+   typedef struct { sigjmp_buf j; } jmp_buf_t;
+#  define setexit()  sigsetjmp(reslab.j)
+#  define reset()    siglongjmp(reslab.j, 1)
+# else
+   typedef struct { jmp_buf j; } jmp_buf_t;
+#  define setexit()  setjmp(reslab.j)
+#  define reset()    longjmp(reslab.j, 1)
+# endif
 
-# define setexit()  setjmp(reslab.j)
-# define reset()    longjmp(reslab.j, 1)
 # define getexit(a) ((a) = reslab)
 # define resexit(a) (reslab = (a))
 
@@ -571,8 +603,8 @@ extern jmp_buf_t reslab;
 
 EXTERN Char   *gointr;		/* Label for an onintr transfer */
 
-EXTERN sigret_t (*parintr) ();	/* Parents interrupt catch */
-EXTERN sigret_t (*parterm) ();	/* Parents terminate catch */
+extern sigret_t (*parintr) ();	/* Parents interrupt catch */
+extern sigret_t (*parterm) ();	/* Parents terminate catch */
 
 /*
  * Lexical definitions.
@@ -629,7 +661,12 @@ struct Ain {
 #define A_SEEK	0		/* Alias seek */
 #define F_SEEK	1		/* File seek */
 #define E_SEEK	2		/* Eval seek */
-    off_t f_seek;
+    union {
+	off_t _f_seek;
+	Char* _c_seek;
+    } fc;
+#define f_seek fc._f_seek
+#define c_seek fc._c_seek
     Char **a_seek;
 } ;
 
@@ -813,6 +850,10 @@ EXTERN struct whyle {
 EXTERN struct varent {
     Char  **vec;		/* Array of words which is the value */
     Char   *v_name;		/* Name of variable/alias */
+    int	    v_flags;		/* Flags */
+#define VAR_ALL		-1
+#define VAR_READONLY	1
+#define VAR_READWRITE	2
     struct varent *v_link[3];	/* The links, see below */
     int     v_bal;		/* Balance factor */
 }       shvhed, aliases;
@@ -863,15 +904,15 @@ extern struct limits {
  * Variables for filename expansion
  */
 extern Char **gargv;		/* Pointer to the (stack) arglist */
-extern long gargc;		/* Number args in gargv */
+extern int    gargc;		/* Number args in gargv */
 
 /*
  * Variables for command expansion.
  */
 extern Char **pargv;		/* Pointer to the argv list space */
-EXTERN Char   *pargs;		/* Pointer to start current word */
-EXTERN long    pnleft;		/* Number of chars left in pargs */
-EXTERN Char   *pargcp;		/* Current index into pargs */
+EXTERN Char  *pargs;		/* Pointer to start current word */
+EXTERN long   pnleft;		/* Number of chars left in pargs */
+EXTERN Char  *pargcp;		/* Current index into pargs */
 
 /*
  * History list
@@ -909,6 +950,16 @@ extern int errno, sys_nerr;
 #endif /* !linux */
 
 /*
+ * For operating systems with single case filenames (OS/2)
+ */
+#ifdef CASE_INSENSITIVE
+# define samecase(x) (isupper((unsigned char)(x)) ? \
+		      tolower((unsigned char)(x)) : (x))
+#else
+# define samecase(x) (x)
+#endif /* CASE_INSENSITIVE */
+
+/*
  * strings.h:
  */
 #ifndef SHORT_STRINGS
@@ -932,7 +983,7 @@ extern int errno, sys_nerr;
 #define short2blk(a) 		saveblk(a)
 #define short2str(a) 		strip(a)
 #else
-#define Strchr(a, b)   	s_strchr(a, b)
+#define Strchr(a, b)		s_strchr(a, b)
 #define Strrchr(a, b) 		s_strrchr(a, b)
 #define Strcat(a, b)  		s_strcat(a, b)
 #define Strncat(a, b, c) 	s_strncat(a, b, c)
@@ -986,6 +1037,9 @@ EXTERN Char   *STR_WORD_CHARS;
 EXTERN Char  **STR_environ;
 
 extern int     dont_free;	/* Tell free that we are in danger if we free */
+
+extern Char    *INVPTR;
+extern Char    **INVPPTR;
 
 #include "tc.h"
 #include "sh.decls.h"

@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/tw.spell.c,v 3.8 1992/06/16 20:46:26 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/tw.spell.c,v 3.10 1993/06/25 21:17:12 christos Exp $ */
 /*
  * tw.spell.c: Spell check words
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tw.spell.c,v 3.8 1992/06/16 20:46:26 christos Exp $")
+RCSID("$Id: tw.spell.c,v 3.10 1993/06/25 21:17:12 christos Exp $")
 
 #include "tw.h"
 
@@ -135,28 +135,28 @@ spdist(s, t)
 }
 
 int
-spdir(extended_name, tilded_dir, entry, name)
+spdir(extended_name, tilded_dir, item, name)
     Char   *extended_name;
     Char   *tilded_dir;
-    Char   *entry;
+    Char   *item;
     Char   *name;
 {
     Char    path[MAXPATHLEN + 1];
     Char   *s;
     Char    oldch;
 
-    if (ISDOT(entry) || ISDOTDOT(entry))
+    if (ISDOT(item) || ISDOTDOT(item))
 	return 0;
 
-    for (s = name; *s != 0 && (*s & TRIM) == (*entry & TRIM); s++, entry++)
+    for (s = name; *s != 0 && (*s & TRIM) == (*item & TRIM); s++, item++)
 	continue;
-    if (*s == 0 || s[1] == 0 || *entry != 0)
+    if (*s == 0 || s[1] == 0 || *item != 0)
 	return 0;
 
     (void) Strcpy(path, tilded_dir);
     oldch = *s;
     *s = '/';
-    catn(path, name, sizeof(path) / sizeof(Char));
+    catn(path, name, (int) (sizeof(path) / sizeof(Char)));
     if (access(short2str(path), F_OK) == 0) {
 	(void) Strcpy(extended_name, name);
 	return 1;

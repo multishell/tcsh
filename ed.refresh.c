@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/ed.refresh.c,v 3.12 1992/10/27 16:18:15 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/ed.refresh.c,v 3.14 1993/06/25 21:17:12 christos Exp $ */
 /*
  * ed.refresh.c: Lower level screen refreshing functions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.refresh.c,v 3.12 1992/10/27 16:18:15 christos Exp $")
+RCSID("$Id: ed.refresh.c,v 3.14 1993/06/25 21:17:12 christos Exp $")
 
 #include "ed.h"
 /* #define DEBUG_UPDATE */
@@ -175,7 +175,7 @@ Vdraw(c)			/* draw char c onto V lines */
 # endif /* SHORT_STRNGS */
 #endif  /* DEBUG_REFRESH */
 
-    Vdisplay[vcursor_v][vcursor_h] = c;
+    Vdisplay[vcursor_v][vcursor_h] = (Char) c;
     vcursor_h++;		/* advance to next place */
     if (vcursor_h >= TermH) {
 	Vdisplay[vcursor_v][TermH] = '\0';	/* assure end of line */
@@ -283,7 +283,7 @@ Refresh()
 	 */
 	cpy_pad_spaces(Display[cur_line], Vdisplay[cur_line], TermH);
 #ifdef notdef
-	(void) Strncpy(Display[cur_line], Vdisplay[cur_line], TermH);
+	(void) Strncpy(Display[cur_line], Vdisplay[cur_line], (size_t) TermH);
 	Display[cur_line][TermH] = '\0';	/* just in case */
 #endif
     }
@@ -850,14 +850,17 @@ update_line(old, new, cur_line)
 	    so_write(nse, (nls - nse));
 	}
 	else {
+	    int olen = oe - old + fx;
+	    if (olen > TermH)
+		olen = TermH;
 #ifdef DEBUG_UPDATE
 	    dprintf("but with nothing left to save\r\n");
 #endif /* DEBUG_UPDATE */
 	    so_write(nse, (nls - nse));
 #ifdef DEBUG_REFRESH
-	    dprintf("cleareol %d\n", (oe - old) + fx - (ne - new));
+	    dprintf("cleareol %d\n", olen - (ne - new));
 #endif /* DEBUG_UPDATE */
-	    ClearEOL((oe - old) + fx - (ne - new));
+	    ClearEOL(olen - (ne - new));
 	}
     }
 
@@ -1074,7 +1077,7 @@ PutPlusOne(c)
     int    c;
 {
     (void) putraw(c);
-    Display[CursorV][CursorH++] = c;
+    Display[CursorV][CursorH++] = (Char) c;
     if (CursorH >= TermH) {	/* if we must overflow */
 	CursorH = 0;
 	CursorV++;

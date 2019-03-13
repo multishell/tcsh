@@ -6,6 +6,8 @@
  * Edit this to match your system type.
  */
 
+#ifndef _h_config
+#define _h_config
 /****************** System dependant compilation flags ****************/
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
@@ -121,8 +123,14 @@
 
 /****************** local defines *********************/
 #define DNIX
+#define NOSTRCOLL
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
-#undef NLS
 
+/*
+ * NLS		Dnix 5.3 2.2 supports NLS, but no dnix 5.3 1.x.x
+ *		so undefine NLS if you are runnig dnix 5.3 1.x.x.
+ */
+/*#undef NLS*/
+#endif /* _h_config */

@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.disc.c,v 3.6 1992/10/10 18:17:34 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/tc.disc.c,v 3.6 1992/10/10 18:17:34 christos Exp $ */
 /*
  * tc.disc.c: Functions to set/clear line disciplines
  *

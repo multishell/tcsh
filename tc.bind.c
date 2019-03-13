@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.bind.c,v 3.11 1992/09/18 20:56:35 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/tc.bind.c,v 3.15 1993/07/03 23:47:53 christos Exp $ */
 /*
  * tc.bind.c: Key binding functions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.bind.c,v 3.11 1992/09/18 20:56:35 christos Exp $")
+RCSID("$Id: tc.bind.c,v 3.15 1993/07/03 23:47:53 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"
@@ -106,7 +106,7 @@ unparsekey(c)			/* 'c' -> "c", '^C' -> "^" + "C" */
 	c &= ASCII;
     }
     if (Isprint(c)) {
-	*cp++ = c;
+	*cp++ = (char) c;
 	*cp = '\0';
 	return (tmp);
     }
@@ -315,7 +315,7 @@ parsekey(sp)
 	    else if (!strcmp(ts, "delete"))
 		c = '\177';
 	    else {
-		xprintf("bad key specification -- unknown name \"%s\"\n", s);
+		xprintf("bad key specification -- unknown name \"%S\"\n", s);
 		return -1;	/* error */
 	    }
 	}
@@ -349,6 +349,7 @@ dobindkey(v, c)
     Char   *out;
     KEYCMD  cmd;
 
+    USE(c);
     if (!MapsAreInited)
 	ed_InitMaps();
 
@@ -443,7 +444,7 @@ dobindkey(v, c)
 	if ((out = parsestring(v[no], outbuf)) == NULL)
 	    return;
 	if (key)
-	    SetArrowKeys(in, XmapStr(out), ntype);
+	    (void) SetArrowKeys(in, XmapStr(out), ntype);
 	else
 	    AddXkey(in, XmapStr(out), ntype);
 	map[(unsigned char) *in] = F_XKEY;
@@ -452,7 +453,7 @@ dobindkey(v, c)
 	if ((cmd = parsecmd(v[no])) == 0)
 	    return;
 	if (key)
-	    SetArrowKeys(in, XmapCmd((int) cmd), ntype);
+	    (void) SetArrowKeys(in, XmapCmd((int) cmd), ntype);
 	else {
 	    if (in[1]) {
 		AddXkey(in, XmapCmd((int) cmd), ntype);
@@ -500,7 +501,7 @@ parsecmd(str)
 
     for (fp = FuncNames; fp->name; fp++) {
 	if (strcmp(short2str(str), fp->name) == 0) {
-	    return fp->func;
+	    return (KEYCMD) fp->func;
 	}
     }
     xprintf("Bad command name: %S\n", str);
@@ -517,7 +518,7 @@ parseescape(ptr)
 
     if ((p[1] & CHAR) == 0) {
 	xprintf("Something must follow: %c\n", *p);
-	return 0;
+	return -1;
     }
     if ((*p & CHAR) == '\\') {
 	p++;
@@ -596,6 +597,7 @@ parsestring(str, buf)
 {
     Char   *b;
     Char   *p;
+    int    es;
 
     b = buf;
     if (*str == 0) {
@@ -605,12 +607,13 @@ parsestring(str, buf)
 
     for (p = str; *p != 0; p++) {
 	if ((*p & CHAR) == '\\' || (*p & CHAR) == '^') {
-	    if ((*b++ = parseescape(&p)) == 0)
+	    if ((es = parseescape(&p)) == -1)
 		return 0;
+	    else
+		*b++ = (Char) es;
 	}
-	else {
+	else
 	    *b++ = *p & CHAR;
-	}
     }
     *b = 0;
     return buf;
@@ -701,9 +704,9 @@ printkeys(map, first, last)
     Char    firstbuf[2], lastbuf[2];
     unsigned char unparsbuf[10], extrabuf[10];
 
-    firstbuf[0] = first;
+    firstbuf[0] = (Char) first;
     firstbuf[1] = 0;
-    lastbuf[0] = last;
+    lastbuf[0] = (Char) last;
     lastbuf[1] = 0;
     if (map[first] == F_UNASSIGNED) {
 	if (first == last)
@@ -779,6 +782,7 @@ dobind(v, dummy)
     Char   *p, *l;
     Char    buf[1000];
 
+    USE(dummy);
     /*
      * Assume at this point that i'm given 2 or 3 args - 'bind', the f-name,
      * and the key; or 'bind' key to print the func for that key.

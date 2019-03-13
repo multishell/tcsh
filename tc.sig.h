@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/tc.sig.h,v 3.14 1992/10/14 20:19:19 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/tc.sig.h,v 3.16 1993/06/24 15:29:37 christos Exp $ */
 /*
  * tc.sig.h: Signal handling
  *
@@ -47,9 +47,9 @@
 # include <sys/signal.h>
 #endif /* SYSVREL > 0 */
 
-#if defined(SUNOS4) || defined(DGUX) || defined(hp800)
+#if defined(SUNOS4) || defined(DGUX) || defined(hp800) || (SYSVREL > 3 && defined(POSIXSIGS) && defined(VFORK))
 # define SAVESIGVEC
-#endif /* SUNOS4 || DGUX || hp800 */
+#endif /* SUNOS4 || DGUX || hp800 || SVR4 & POSIXSIGS & VFORK */
 
 #if (SYSVREL > 0 && SYSVREL < 3 && !defined(BSDSIGS)) || defined(_MINIX) || defined(COHERENT)
 /*
@@ -78,8 +78,15 @@ typedef struct sigvec sigvec_t;
 # endif /* hpux */
 
 # ifndef HAVE_SIGVEC
+#  ifdef POSIXSIGS
+#  define mysigvec(a, b, c)	sigaction(a, b, c)
+typedef struct sigaction sigvec_t;
+#   define sv_handler sa_handler
+#   define sv_flags sa_flags
+#  else /* BSDSIGS */
 #  define mysigvec(a, b, c)	sigvec(a, b, c)
 typedef struct sigvec sigvec_t;
+#  endif /* POSIXSIGS */
 # endif /* HAVE_SIGVEC */
 
 # undef HAVE_SIGVEC

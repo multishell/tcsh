@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.c,v 3.41 1992/11/13 04:19:10 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.c,v 3.53 1993/07/03 23:47:53 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -41,9 +41,9 @@
 char    copyright[] =
 "@(#) Copyright (c) 1991 The Regents of the University of California.\n\
  All rights reserved.\n";
-#endif				/* not lint */
+#endif /* not lint */
 
-RCSID("$Id: sh.c,v 3.41 1992/11/13 04:19:10 christos Exp $")
+RCSID("$Id: sh.c,v 3.53 1993/07/03 23:47:53 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -84,14 +84,23 @@ extern bool NoNLSRebind;
 
 jmp_buf_t reslab;
 
+sigret_t (*parintr) () = 0;	/* Parents interrupt catch */
+sigret_t (*parterm) () = 0;	/* Parents terminate catch */
+
 #ifdef TESLA
 int do_logout;
-#endif				/* TESLA */
+#endif /* TESLA */
 
 
-#ifdef convex
 bool    use_fork = 0;		/* use fork() instead of vfork()? */
-#endif /* convex */
+
+/*
+ * Magic pointer values. Used to specify other invalid conditions aside
+ * from null.
+ */
+static Char	INVCHAR;
+Char    *INVPTR = &INVCHAR;
+Char    **INVPPTR = &INVPTR;
 
 static int     nofile = 0;
 static bool    reenter = 0;
@@ -103,18 +112,19 @@ bool    fast = 0;
 static bool    batch = 0;
 static bool    mflag = 0;
 static bool    prompt = 1;
-static bool    enterhist = 0;
+static int     enterhist = 0;
 bool    tellwhat = 0;
 time_t  t_period;
 Char  *ffile = NULL;
+bool	dolzero = 0;
 static time_t  chktim;		/* Time mail last checked */
 
 extern char **environ;
 
 static	int		  srccat	__P((Char *, Char *));
-static	int		  srcfile	__P((char *, bool, bool, Char **));
+static	int		  srcfile	__P((char *, bool, int, Char **));
 static	sigret_t	  phup		__P((int));
-static	void		  srcunit	__P((int, bool, bool, Char **));
+static	void		  srcunit	__P((int, bool, int, Char **));
 static	void		  mailchk	__P((void));
 static	Char	 	**defaultpath	__P((void));
 
@@ -195,10 +205,12 @@ main(argc, argv)
     word_chars = STR_WORD_CHARS;
     bslash_quote = 0;		/* PWP: do tcsh-style backslash quoting? */
 
-    set(STRhistory, SAVE("100"));	/* Default history size to 100 */
+    /* Default history size to 100 */
+    set(STRhistory, SAVE("100"), VAR_READWRITE);
 
     tempv = argv;
     ffile = SAVE(tempv[0]);
+    dolzero = 0;
     if (eq(ffile, STRaout))	/* A.out's are quittable */
 	quitit = 1;
     uid = getuid();
@@ -225,8 +237,10 @@ main(argc, argv)
 
 #ifdef _VMS_POSIX
     /* No better way to find if we are a login shell */
-    if (!loginsh) 
+    if (!loginsh) {
 	loginsh = (argc == 1 && getppid() == 1);
+	**tempv = '-';	/* Avoid giving VMS an acidic stomach */
+    }
 #endif /* _VMS_POSIX */
 
     if (loginsh && **tempv != '-') {
@@ -245,7 +259,7 @@ main(argc, argv)
     }
     if (loginsh) {
 	(void) time(&chktim);
-	set(STRloginsh, Strsave(STRNULL));
+	set(STRloginsh, Strsave(STRNULL), VAR_READWRITE);
     }
 
     AsciiOnly = 1;
@@ -310,7 +324,7 @@ main(argc, argv)
 	 (void) close(SHIN);
 	 SHIN = open(ttyn, O_RDWR);
 	 shpgrp = getpid();
-	 (void) ioctl (SHIN, TIOCSPGRP, (ptr_t) &shpgrp);
+	 (void) ioctl (SHIN, TIOCSPGRP, (ioctl_t) &shpgrp);
 	 (void) setpgid(0, shpgrp);
      }
 #endif /* alliant */
@@ -332,12 +346,12 @@ main(argc, argv)
 	 * utmp, so we keep it too.
 	 */
 	if (strncmp(ttyn, "/dev/", 5) == 0)
-	    set(STRtty, cp = SAVE(ttyn + 5));
+	    set(STRtty, cp = SAVE(ttyn + 5), VAR_READWRITE);
 	else
-	    set(STRtty, cp = SAVE(ttyn));
+	    set(STRtty, cp = SAVE(ttyn), VAR_READWRITE);
     }
     else
-	set(STRtty, cp = SAVE(""));
+	set(STRtty, cp = SAVE(""), VAR_READWRITE);
     /*
      * Initialize the shell variables. ARGV and PROMPT are initialized later.
      * STATUS is also munged in several places. CHILD is munged when
@@ -380,7 +394,8 @@ main(argc, argv)
 		  (cp[3] >= 'p' && cp[3] <= 'u'))) {
 		if (getenv("DISPLAY") == NULL) {
 		    /* NOT on X window shells */
-		    set(STRautologout, Strsave(STRdefautologout));
+		    set(STRautologout, Strsave(STRdefautologout), 
+			VAR_READWRITE);
 		}
 	    }
 	}
@@ -389,23 +404,23 @@ main(argc, argv)
 
     (void) sigset(SIGALRM, alrmcatch);
 
-    set(STRstatus, Strsave(STR0));
+    set(STRstatus, Strsave(STR0), VAR_READWRITE);
     fix_version();		/* publish the shell version */
 
     /*
      * Publish the selected echo style
      */
 #if ECHO_STYLE == NONE_ECHO
-    set(STRecho_style, Strsave(STRnone));
+    set(STRecho_style, Strsave(STRnone), VAR_READWRITE);
 #endif /* ECHO_STYLE == NONE_ECHO */
 #if ECHO_STYLE == BSD_ECHO
-    set(STRecho_style, Strsave(STRbsd));
+    set(STRecho_style, Strsave(STRbsd), VAR_READWRITE);
 #endif /* ECHO_STYLE == BSD_ECHO */
 #if ECHO_STYLE == SYSV_ECHO
-    set(STRecho_style, Strsave(STRsysv));
+    set(STRecho_style, Strsave(STRsysv), VAR_READWRITE);
 #endif /* ECHO_STYLE == SYSV_ECHO */
 #if ECHO_STYLE == BOTH_ECHO
-    set(STRecho_style, Strsave(STRboth));
+    set(STRecho_style, Strsave(STRboth), VAR_READWRITE);
 #endif /* ECHO_STYLE == BOTH_ECHO */
 
     /*
@@ -420,7 +435,7 @@ main(argc, argv)
     if (cp == NULL)
 	fast = 1;		/* No home -> can't read scripts */
     else
-	set(STRhome, cp);
+	set(STRhome, cp, VAR_READWRITE);
     dinit(cp);			/* dinit thinks that HOME == cwd in a login
 				 * shell */
     /*
@@ -441,21 +456,21 @@ main(argc, argv)
 #endif /* apollo */
 
 	Itoa(uid, buff);
-	set(STRuid, Strsave(buff));
+	set(STRuid, Strsave(buff), VAR_READWRITE);
 
 	Itoa(gid, buff);
-	set(STRgid, Strsave(buff));
+	set(STRgid, Strsave(buff), VAR_READWRITE);
 
 	cln = getenv("LOGNAME");
 	cus = getenv("USER");
 	if (cus != NULL)
-	    set(STRuser, quote(SAVE(cus)));
+	    set(STRuser, quote(SAVE(cus)), VAR_READWRITE);
 	else if (cln != NULL)
-	    set(STRuser, quote(SAVE(cln)));
+	    set(STRuser, quote(SAVE(cln)), VAR_READWRITE);
 	else if ((pw = getpwuid(uid)) == NULL)
-	    set(STRuser, SAVE("unknown"));
+	    set(STRuser, SAVE("unknown"), VAR_READWRITE);
 	else
-	    set(STRuser, SAVE(pw->pw_name));
+	    set(STRuser, SAVE(pw->pw_name), VAR_READWRITE);
 	if (cln == NULL)
 	    tsetenv(STRLOGNAME, value(STRuser));
 	if (cus == NULL)
@@ -485,7 +500,7 @@ main(argc, argv)
 #ifdef apollo
     if ((tcp = getenv("SYSTYPE")) == NULL)
 	tcp = "bsd4.3";
-    Setenv(STRSYSTYPE, quote(str2short(tcp)));
+    tsetenv(STRSYSTYPE, quote(str2short(tcp)));
 #endif /* apollo */
 
     /*
@@ -499,10 +514,11 @@ main(argc, argv)
      * xterm, so we are going to want to edit. Unfortunately emacs
      * does not restore all the tty modes, so xterm is not very well
      * set up. But this is not the shell's fault.
+     * Also don't edit if $TERM == wm, for when we're running under an ATK app.
      */
     if ((tcp = getenv("TERM")) != NULL) {
-	set(STRterm, quote(SAVE(tcp)));
-	editing = (strcmp(tcp, "emacs") != 0);
+	set(STRterm, quote(SAVE(tcp)), VAR_READWRITE);
+	editing = (strcmp(tcp, "emacs") != 0 && strcmp(tcp, "wm") != 0);
     }
     else 
 	editing = ((tcp = getenv("EMACS")) == NULL || strcmp(tcp, "t") != 0);
@@ -512,20 +528,20 @@ main(argc, argv)
      * need a value.  Making it 'emacs' might be confusing. 
      */
     if (editing)
-	set(STRedit, Strsave(STRNULL));
+	set(STRedit, Strsave(STRNULL), VAR_READWRITE);
 
 
     /*
      * still more mutability: make the complete routine automatically add the
      * suffix of file names...
      */
-    set(STRaddsuffix, Strsave(STRNULL));
+    set(STRaddsuffix, Strsave(STRNULL), VAR_READWRITE);
 
     /*
      * Re-initialize path if set in environment
      */
     if ((tcp = getenv("PATH")) == NULL)
-	set1(STRpath, defaultpath(), &shvhed);
+	set1(STRpath, defaultpath(), &shvhed, VAR_READWRITE);
     else
 	/* Importpath() allocates memory for the path, and the
 	 * returned pointer from SAVE() was discarded, so
@@ -549,10 +565,10 @@ main(argc, argv)
 	    (sh_len = strlen(tcp)) >= 5 &&
 	    strcmp(tcp + (sh_len - 5), "/tcsh") == 0)
 	{
-	    set(STRshell, quote(SAVE(tcp)));
+	    set(STRshell, quote(SAVE(tcp)), VAR_READWRITE);
 	}
 	else
-	    set(STRshell, Strsave(STR_SHELLPATH));
+	    set(STRshell, Strsave(STR_SHELLPATH), VAR_READWRITE);
     }
 
     doldol = putn((int) getpid());	/* For $$ */
@@ -565,6 +581,11 @@ main(argc, argv)
      * only if we are the login shell.
      */
 #ifdef BSDSIGS
+    /* 
+     * PURIFY-2 claims that osv does not get 
+     * initialized after the sigvec call
+     */
+    setzero((char*) &osv, sizeof(osv));
     /* parents interruptibility */
     (void) mysigvec(SIGINT, NULL, &osv);
     parintr = (sigret_t(*) ()) osv.sv_handler;
@@ -587,19 +608,6 @@ main(argc, argv)
 
 #endif /* BSDSIGS */
 
-    /* No reason I can see not to save history on all these events..
-     * Most usual occurrence is in a window system, where we're not a login
-     * shell, but might as well be... (sg)
-     * But there might be races when lots of shells exit together...
-     * [this is also incompatible].
-     */
-    (void) signal(SIGHUP, phup);	/* exit processing on HUP */
-#ifdef SIGXCPU
-    (void) signal(SIGXCPU, phup);	/* ...and on XCPU */
-#endif
-#ifdef SIGXFSZ
-    (void) signal(SIGXFSZ, phup);	/* ...and on XFSZ */
-#endif
 
 #ifdef TCF
     /* Enable process migration on ourselves and our progeny */
@@ -654,7 +662,6 @@ main(argc, argv)
 		 * ensure that you don't make * nonportable csh scripts.
 		 */
 		{
-		    register Char *cp;
 		    register int count;
 
 		    cp = arginp + Strlen(arginp);
@@ -676,15 +683,15 @@ main(argc, argv)
 #ifdef apollo
 	    case 'D':		/* -D	Define environment variable */
 		{
-		    register Char *cp, *dp;
+		    register Char *dp;
 
 		    cp = str2short(tcp);
 		    if (dp = Strchr(cp, '=')) {
 			*dp++ = '\0';
-			Setenv(cp, dp);
+			tsetenv(cp, dp);
 		    }
 		    else
-			Setenv(cp, STRNULL);
+			tsetenv(cp, STRNULL);
 		}
 		*tcp = '\0'; 	/* done with this argument */
 		break;
@@ -741,7 +748,6 @@ main(argc, argv)
 		setNS(STRecho);	/* NOW! */
 		break;
 
-#ifdef convex
 	    case 'F':		/* Undocumented flag */
 		/*
 		 * This will cause children to be created using fork instead of
@@ -749,7 +755,7 @@ main(argc, argv)
 		 */
 		use_fork = 1;
 		break;
-#endif /* convex */
+
 	    default:		/* Unknown command option */
 		exiterr = 1;
 		stderror(ERR_TCSHUSAGE, tcp-1);
@@ -776,6 +782,7 @@ main(argc, argv)
 	}
 	if (ffile != NULL)
 	    xfree((ptr_t) ffile);
+	dolzero = 1;
 	ffile = SAVE(tempv[0]);
 	/* 
 	 * Replace FSHIN. Handle /dev/std{in,out,err} specially
@@ -836,16 +843,17 @@ main(argc, argv)
     /*
      * Save the remaining arguments in argv.
      */
-    setq(STRargv, blk2short(tempv), &shvhed);
+    setq(STRargv, blk2short(tempv), &shvhed, VAR_READWRITE);
 
     /*
      * Set up the prompt.
      */
     if (prompt) {
-	set(STRprompt, Strsave(uid == 0 ? STRsymhash : STRsymarrow));
+	set(STRprompt, Strsave(uid == 0 ? STRsymhash : STRsymarrow),
+	    VAR_READWRITE);
 	/* that's a meta-questionmark */
-	set(STRprompt2, Strsave(STRmquestion));
-	set(STRprompt3, Strsave(STRKCORRECT));
+	set(STRprompt2, Strsave(STRmquestion), VAR_READWRITE);
+	set(STRprompt3, Strsave(STRKCORRECT), VAR_READWRITE);
     }
 
     /*
@@ -855,12 +863,39 @@ main(argc, argv)
     shpgrp = mygetpgrp();
     opgrp = tpgrp = -1;
     if (setintr) {
+	sigret_t (*osig)();
 	**argv = '-';
 	if (!quitit)		/* Wary! */
 	    (void) signal(SIGQUIT, SIG_IGN);
 	(void) sigset(SIGINT, pintr);
 	(void) sighold(SIGINT);
 	(void) signal(SIGTERM, SIG_IGN);
+
+	/* 
+	 * No reason I can see not to save history on all these events..
+	 * Most usual occurrence is in a window system, where we're not a login
+	 * shell, but might as well be... (sg)
+	 * But there might be races when lots of shells exit together...
+	 * [this is also incompatible].
+	 * We have to be mre careful here. If the parent wants to 
+	 * ignore the signals then we leave them untouched...
+	 * We also only setup the handlers for shells that are trully
+	 * interactive.
+	 */
+	osig = signal(SIGHUP, phup);	/* exit processing on HUP */
+	if (osig == SIG_IGN)
+	    (void) signal(SIGHUP, osig);
+#ifdef SIGXCPU
+	osig = signal(SIGXCPU, phup);	/* exit processing on XCPU */
+	if (osig == SIG_IGN)
+	    (void) signal(SIGXCPU, osig);
+#endif
+#ifdef SIGXFSZ
+	osig = signal(SIGXFSZ, phup);	/* exit processing on XFSZ */
+	if (osig == SIG_IGN)
+	    (void) signal(SIGXFSZ, osig);
+#endif
+
 	if (quitit == 0 && arginp == 0) {
 #ifdef SIGTSTP
 	    (void) signal(SIGTSTP, SIG_IGN);
@@ -987,13 +1022,13 @@ main(argc, argv)
     {
 	struct sigaction act;
         act.sa_handler=pchild;
-	sigemptyset(&(act.sa_mask)); /* Don't block any extra sigs when the
-				      * handler is called
-				      */
+	(void) sigemptyset(&(act.sa_mask));	/* Don't block any extra sigs
+						 * when the handler is called
+						 */
         act.sa_flags=0;	           /* want behaviour of sigset() without
                                     * SA_NOCLDSTOP
 				    */
-        sigaction(SIGCHLD,&act,(struct sigaction *)NULL);
+        (void) sigaction(SIGCHLD,&act,(struct sigaction *)NULL);
     }
 #else /* SYSVREL <= 3 */
     (void) sigset(SIGCHLD, pchild);	/* while signals not ready */
@@ -1019,7 +1054,7 @@ main(argc, argv)
 #ifdef BSDSIGS
 	    sigmask_t omask = sigblock(sigmask(SIGINT));
 #else
-	    sighold(SIGINT);
+	    (void) sighold(SIGINT);
 #endif
 	    setintr = 0;
 	    parintr = SIG_IGN;	/* onintr in /etc/ files has no effect */
@@ -1054,7 +1089,7 @@ main(argc, argv)
 	/*
 	 * Source history before .login so that it is available in .login
 	 */
-	loadhist(NULL);
+	loadhist(NULL, 0);
 #ifndef LOGINFIRST
 	if (loginsh)
 	    (void) srccat(value(STRhome), STRsldotlogin);
@@ -1155,7 +1190,7 @@ importpath(cp)
 	    dp++;
 	}
     pv[i] = 0;
-    set1(STRpath, pv, &shvhed);
+    set1(STRpath, pv, &shvhed, VAR_READWRITE);
 }
 
 /*
@@ -1182,7 +1217,8 @@ srccat(cp, dp)
 static int
 srcfile(f, onlyown, flag, av)
     char   *f;
-    bool    onlyown, flag;
+    bool    onlyown;
+    int flag;
     Char **av;
 {
     register int unit;
@@ -1205,7 +1241,8 @@ static  Char **goargv = NULL;
 static void
 srcunit(unit, onlyown, hflg, av)
     register int unit;
-    bool    onlyown, hflg;
+    bool    onlyown;
+    int hflg;
     Char **av;
 {
     /*
@@ -1229,7 +1266,7 @@ srcunit(unit, onlyown, hflg, av)
     Char   *oevalp = evalp, **oevalvec = evalvec;
     int     oonelflg = onelflg;
     bool    oenterhist = enterhist;
-    char    OHIST = HIST;
+    Char    OHIST = HIST;
     bool    otell = cantell;
     Char **oargv;
     struct Bin saveB;
@@ -1309,7 +1346,7 @@ srcunit(unit, onlyown, hflg, av)
 	struct varent *vp;
 	if ((vp = adrof(STRargv)) != NULL)
 	    goargv = saveblk(vp->vec);
-	setq(STRargv, saveblk(av), &shvhed);
+	setq(STRargv, saveblk(av), &shvhed, VAR_READWRITE);
     }
 
     /*
@@ -1367,7 +1404,7 @@ srcunit(unit, onlyown, hflg, av)
 	    HIST = OHIST;
 	if (av != NULL && *av != NULL && **av != '\0') {
 	    if (goargv)
-		setq(STRargv, goargv, &shvhed);
+		setq(STRargv, goargv, &shvhed, VAR_READWRITE);
 	    else
 		unsetv(STRargv);
 	}
@@ -1392,6 +1429,7 @@ goodbye(v, c)
     Char **v;
     struct command *c;
 {
+    USE(c);
     rechist(NULL);
     recdirs(NULL);
 
@@ -1401,7 +1439,7 @@ goodbye(v, c)
 	(void) signal(SIGTERM, SIG_IGN);
 	setintr = 0;		/* No interrupts after "logout" */
 	if (!(adrof(STRlogout)))
-	    set(STRlogout, STRnormal);
+	    set(STRlogout, STRnormal, VAR_READWRITE);
 #ifdef _PATH_DOTLOGOUT
 	(void) srcfile(_PATH_DOTLOGOUT, 0, 0, NULL);
 #endif
@@ -1417,8 +1455,6 @@ goodbye(v, c)
 void
 exitstat()
 {
-    register Char *cp;
-    register int i;
 #ifdef PROF
     monitor(0);
 #endif
@@ -1429,18 +1465,7 @@ exitstat()
      */
     child = 1;
 
-    /* 
-     * PWP: do this step-by-step because we might get a bus error if
-     * status isn't set, so we call getn(NULL).
-     */
-    cp = value(STRstatus);
-
-    if (!cp)
-	i = 13;
-    else
-	i = getn(cp);
-
-    xexit(i);
+    xexit(getn(value(STRstatus)));
 }
 
 /*
@@ -1464,10 +1489,8 @@ int snum;
      */
     {
 	struct process *pp, *np;
-	int foregnd;
 
 	for (pp = proclist.p_next; pp; pp = pp->p_next) {
-	    foregnd = 0;
 	    np = pp;
 	    /* 
 	     * Find if this job is in the foreground. It could be that
@@ -1475,15 +1498,19 @@ int snum;
 	     * is cleared for it.
 	     */
 	    do
-		if ((np->p_flags & PFOREGND) != 0) {
-		    foregnd = 1;
+		/*
+		 * If a process is in the foreground; we try to kill
+		 * it's process group. If we succeed, then the 
+		 * whole job is gone. Otherwise we keep going...
+		 * But avoid sending HUP to the shell again.
+		 */
+		if ((np->p_flags & PFOREGND) != 0 && np->p_jobid != shpgrp &&
+		    killpg(np->p_jobid, SIGHUP) != -1) {
+		    /* In case the job was suspended... */
+		    (void) killpg(np->p_jobid, SIGCONT);
 		    break;
 		}
 	    while ((np = np->p_friends) != pp);
-
-	    /* Kill the leader of the foreground job */
-	    if (foregnd && pp->p_procid == pp->p_jobid)
-		(void) killpg (pp->p_jobid, SIGHUP);
 	}
     }
 #endif /* POSIXJOBS */
@@ -1589,9 +1616,21 @@ pintr1(wantnl)
 	reset();
     }
     else if (intty && wantnl) {
-	/* xputchar('\n'); *//* Some like this, others don't */
-	(void) putraw('\r');
-	(void) putraw('\n');
+	if (editing) {
+	    /* 
+	     * If we are editing a multi-line input command, and move to
+	     * the beginning of the line, we don't want to trash it when
+	     * we hit ^C
+	     */
+	    PastBottom();
+	    ClearLines();
+	    ClearDisp();
+	}
+	else {
+	    /* xputchar('\n'); *//* Some like this, others don't */
+	    (void) putraw('\r');
+	    (void) putraw('\n');
+	}
     }
     stderror(ERR_SILENT);
 }
@@ -1688,6 +1727,7 @@ process(catch)
 	if (neednote)
 	    pnote();
 	if (intty && prompt && evalvec == 0) {
+	    just_signaled = 0;
 	    mailchk();
 	    /*
 	     * Watch for logins/logouts. Next is scheduled commands stored
@@ -1719,8 +1759,8 @@ process(catch)
 	 * Echo not only on VERBOSE, but also with history expansion. If there
 	 * is a lexical error then we forego history echo.
 	 */
-	if ((lex(&paraml) && !seterr && intty && !tellwhat && !Expand) ||
-	    adrof(STRverbose)) {
+	if ((lex(&paraml) && !seterr && intty && !tellwhat && !Expand && 
+	     !whyles) || adrof(STRverbose)) {
 	    haderr = 1;
 	    prlex(&paraml);
 	    haderr = 0;
@@ -1744,8 +1784,8 @@ process(catch)
 	 * PWP: entry of items in the history list while in a while loop is done
 	 * elsewhere...
 	 */
-	if (enterhist || (catch && intty && !whyles && !tellwhat))
-	    savehist(&paraml);
+	if (enterhist || (catch && intty && !whyles && !tellwhat && !arun))
+	    savehist(&paraml, enterhist > 1);
 
 	if (Expand && seterr)
 	    Expand = 0;
@@ -1824,12 +1864,19 @@ dosource(t, c)
     extern int bequiet;
     char    buf[BUFSIZE];
 
+    USE(c);
     t++;
     if (*t && eq(*t, STRmh)) {
 	if (*++t == NULL)
 	    stderror(ERR_NAME | ERR_HFLAG);
 	hflg++;
     }
+    else if (*t && eq(*t, STRmm)) {
+    	if (*++t == NULL)
+	    stderror(ERR_NAME | ERR_MFLAG);
+	hflg = 2;
+    }
+
     f = globone(*t++, G_ERROR);
     (void) strcpy(buf, short2str(f));
     xfree((ptr_t) f);
@@ -1846,6 +1893,16 @@ dosource(t, c)
  * knows, since the login program insists on saying
  * "You have mail."
  */
+
+/*
+ * The AMS version.
+ * This version checks if the file is a directory, and if so,
+ * tells you the number of files in it, otherwise do the old thang.
+ * The magic "+1" in the time calculation is to compensate for
+ * an AFS bug where directory mtimes are set to 1 second in
+ * the future.
+ */
+
 static void
 mailchk()
 {
@@ -1868,21 +1925,54 @@ mailchk()
     if (chktim + intvl > t)
 	return;
     for (; *vp; vp++) {
-	if (stat(short2str(*vp), &stb) < 0)
+	char *filename = short2str(*vp);
+
+	if (stat(filename, &stb) < 0)
 	    continue;
 #if defined(BSDTIMES) || defined(_SEQUENT_)
 	new = stb.st_mtime > time0.tv_sec;
 #else
 	new = stb.st_mtime > time0;
 #endif
-	if (stb.st_size == 0 || stb.st_atime > stb.st_mtime ||
-	    (stb.st_atime <= chktim && stb.st_mtime <= chktim) ||
-	    (loginsh && !new))
-	    continue;
-	if (cnt == 1)
-	    xprintf("You have %smail.\n", new ? "new " : "");
-	else
-	    xprintf("%s in %S.\n", new ? "New mail" : "Mail", *vp);
+	if ((stb.st_mode & S_IFMT) == S_IFDIR) {
+	    DIR *mailbox;
+	    int mailcount = 0;
+
+	    if (stb.st_mtime <= chktim + 1 || (loginsh && !new))
+		continue;
+
+	    if (!(mailbox = opendir(filename)))
+		continue;
+
+	    if (!readdir(mailbox) || !readdir(mailbox))
+		continue;
+
+	    while (readdir(mailbox))
+		mailcount++;
+
+	    if (mailcount == 0)
+		continue;
+
+	    if (cnt == 1) {
+		xprintf("You have %d piece%s of mail.\n", mailcount,
+			  mailcount == 1 ? "" : "s");
+	    }
+	    else {
+		xprintf("You have %d piece%s of mail in %s.\n",
+			  mailcount, mailcount == 1 ? "" : "s", filename);
+	    }
+	}
+	else {
+	    if (stb.st_size == 0 || stb.st_atime > stb.st_mtime ||
+		(stb.st_atime <= chktim && stb.st_mtime <= chktim) ||
+		(loginsh && !new))
+		continue;
+	    if (cnt == 1)
+		xprintf("You have %smail.\n", new ? "new " : "");
+	    else
+		xprintf("You have %smail in %s.\n", new ? "new " : "",
+			filename);
+	}
     }
     chktim = t;
 }

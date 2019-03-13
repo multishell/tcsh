@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.03/RCS/sh.dir.c,v 3.20 1992/10/10 18:17:34 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.04/RCS/sh.dir.c,v 3.30 1993/07/03 23:47:53 christos Exp $ */
 /*
  * sh.dir.c: Directory manipulation functions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.dir.c,v 3.20 1992/10/10 18:17:34 christos Exp $")
+RCSID("$Id: sh.dir.c,v 3.30 1993/07/03 23:47:53 christos Exp $")
 
 /*
  * C Shell - directory management
@@ -146,7 +146,7 @@ Char *dp;
     vec[0] = Strsave(dp);
     vec[1] = 0;
     (void) Strcpy(olddir, value(STRcwd));
-    setq(STRcwd, vec, &shvhed);
+    setq(STRcwd, vec, &shvhed, VAR_READWRITE);
     tsetenv(STRPWD, dp);
 }
 
@@ -196,6 +196,7 @@ dodirs(v, c)
 {
     int dflag = skipargs(&v, "lvnSLc", "");
 
+    USE(c);
     if ((dflag & DIR_CLEAR) != 0) {
 	struct directory *dp, *fdp;
 	for (dp = dcwd->di_next; dp != dcwd; ) {
@@ -223,12 +224,10 @@ printdirs(dflag)
     int dflag;
 {
     register struct directory *dp;
-    Char   *s, *hp = value(STRhome);
+    Char   *s, *user;
     int     idx, len, cur;
     extern int T_Cols;
 
-    if (*hp == '\0')
-	hp = NULL;
     dp = dcwd;
     idx = 0;
     cur = 0;
@@ -239,33 +238,33 @@ printdirs(dflag)
 	    xprintf("%d\t", idx++);
 	    cur = 0;
 	}
-	len = Strlen(hp);
-	if (!(dflag & DIR_LONG) && hp != NULL && !eq(hp, STRslash) &&
-	    Strncmp(hp, dp->di_name, len) == 0 &&
-	    (dp->di_name[len] == '\0' || dp->di_name[len] == '/')) 
-	    len = Strlen(s = (dp->di_name + len)) + 2;
+	s = dp->di_name;		
+	user = NULL;
+	if (!(dflag & DIR_LONG) && (user = getusername(&s)) != NULL)
+	    len = (int) (Strlen(user) + Strlen(s) + 2);
 	else
-	    len = Strlen(s = dp->di_name) + 1;
+	    len = (int) (Strlen(s) + 1);
 
 	cur += len;
 	if ((dflag & DIR_LINE) && cur >= T_Cols - 1 && len < T_Cols) {
 	    xputchar('\n');
 	    cur = len;
 	}
-	xprintf(s != dp->di_name ? "~%S%c" : "%S%c",
-		s, (dflag & DIR_VERT) ? '\n' : ' ');
+	if (user) 
+	    xprintf("~%S", user);
+	xprintf("%S%c", s, (dflag & DIR_VERT) ? '\n' : ' ');
     } while ((dp = dp->di_prev) != dcwd);
     if (!(dflag & DIR_VERT))
 	xputchar('\n');
 }
 
 void
-dtildepr(home, dir)
-    register Char *home, *dir;
+dtildepr(dir)
+    Char *dir;
 {
-
-    if (!eq(home, STRslash) && prefix(home, dir))
-	xprintf("~%S", dir + Strlen(home));
+    Char* user;
+    if ((user = getusername(&dir)) != NULL)
+	xprintf("~%S%S", user, dir);
     else
 	xprintf("%S", dir);
 }
@@ -324,8 +323,8 @@ dnormalize(cp, exp)
         if (dotdot == 0)
 	    return (Strsave(cp));
 
-	cwd = (Char *) xmalloc((size_t) ((Strlen(dcwd->di_name) + 3) *
-					 sizeof(Char)));
+	cwd = (Char *) xmalloc((size_t) (((int) Strlen(dcwd->di_name) + 3) *
+					   sizeof(Char)));
 	(void) Strcpy(cwd, dcwd->di_name);
 
 	/*
@@ -391,13 +390,13 @@ dnormalize(cp, exp)
 # endif /* apollo */
 
 	    if (buf[0]) {
-	        if ((TRM(cwd[(dotdot = Strlen(cwd)) - 1])) != '/')
+	        if ((TRM(cwd[(dotdot = (int) Strlen(cwd)) - 1])) != '/')
 		    cwd[dotdot++] = '/';
 	        cwd[dotdot] = '\0';
 	        dp = Strspl(cwd, TRM(buf[0]) == '/' ? &buf[1] : buf);
 	        xfree((ptr_t) cwd);
 	        cwd = dp;
-	        if ((TRM(cwd[(dotdot = Strlen(cwd)) - 1])) == '/')
+	        if ((TRM(cwd[(dotdot = (int) Strlen(cwd)) - 1])) == '/')
 		    cwd[--dotdot] = '\0';
 	    }
 	    if (!*cp)
@@ -421,8 +420,9 @@ dochngd(v, c)
 {
     register Char *cp;
     register struct directory *dp;
-
     int dflag = skipargs(&v, "lvn", "[-|<dir>]");
+
+    USE(c);
     printd = 0;
     cp = (dflag & DIR_OLD) ? olddir : *v;
 
@@ -611,8 +611,9 @@ dopushd(v, c)
 {
     register struct directory *dp;
     register Char *cp;
-
     int dflag = skipargs(&v, "lvn", " [-|<dir>|+<n>]");
+    
+    USE(c);
     printd = 1;
     cp = (dflag & DIR_OLD) ? olddir : *v;
 
@@ -723,8 +724,9 @@ dopopd(v, c)
 {
     Char *cp;
     register struct directory *dp, *p = NULL;
-
     int dflag = skipargs(&v, "lvn", " [-|+<n>]");
+
+    USE(c);
     printd = 1;
     cp = (dflag & DIR_OLD) ? olddir : *v;
 
@@ -834,12 +836,13 @@ dcanon(cp, p)
 		continue;
 	p = sp;			/* save start of component */
 	slash = 0;
-	while (*++p)		/* find next slash or end of path */
-	    if (*p == '/') {
-		slash = 1;
-		*p = 0;
-		break;
-	    }
+	if (*p) 
+	    while (*++p)	/* find next slash or end of path */
+		if (*p == '/') {
+		    slash = 1;
+		    *p = 0;
+		    break;
+		}
 
 #ifdef apollo
 	if (&cp[1] == sp && sp[0] == '.' && sp[1] == '.' && sp[2] == '\0')
@@ -858,6 +861,8 @@ dcanon(cp, p)
 	    }
 	    else if (--sp != cp)
 		*sp = '\0';
+	    else
+		sp[1] = '\0';
 	}
 	else if (sp[0] == '.' && sp[1] == '.' && sp[2] == 0) {
 	    /*
@@ -868,7 +873,7 @@ dcanon(cp, p)
 	     */
 	    *--sp = 0;		/* form the pathname for readlink */
 #ifdef S_IFLNK			/* if we have symlinks */
-	    if (sp != cp && symlinks != SYM_IGNORE &&
+	    if (sp != cp && /* symlinks != SYM_IGNORE && */
 		(cc = readlink(short2str(cp), tlink,
 			       sizeof tlink)) >= 0) {
 		(void) Strcpy(link, str2short(tlink));
@@ -1045,16 +1050,17 @@ dcanon(cp, p)
      */
 #ifdef S_IFLNK
     p1 = value(STRhome);
-    cc = Strlen(p1);
+    cc = (int) Strlen(p1);
     /*
      * See if we're not in a subdir of STRhome
      */
-    if (p1 && *p1 == '/' &&
-	(Strncmp(p1, cp, cc) != 0 || (cp[cc] != '/' && cp[cc] != '\0'))) {
+    if (p1 && *p1 == '/' && (Strncmp(p1, cp, (size_t) cc) != 0 ||
+	(cp[cc] != '/' && cp[cc] != '\0'))) {
 	static ino_t home_ino = (ino_t) -1;
-	static dev_t home_dev = -1;
+	static dev_t home_dev = (dev_t) -1;
 	static Char *home_ptr = NULL;
 	struct stat statbuf;
+	int found;
 
 	/*
 	 * Get dev and ino of STRhome
@@ -1069,10 +1075,11 @@ dcanon(cp, p)
 	 * Start comparing dev & ino backwards
 	 */
 	p2 = Strcpy(link, cp);
+	found = 0;
 	for (sp = NULL; *p2 && stat(short2str(p2), &statbuf) != -1;) {
 	    if (DEV_DEV_COMPARE(statbuf.st_dev, home_dev) &&
 			statbuf.st_ino == home_ino) {
-			sp = (Char *) - 1;
+			found = 1;
 			break;
 	    }
 	    if ((sp = Strrchr(p2, '/')) != NULL)
@@ -1081,7 +1088,7 @@ dcanon(cp, p)
 	/*
 	 * See if we found it
 	 */
-	if (*p2 && sp == (Char *) -1) {
+	if (*p2 && found) {
 	    /*
 	     * Use STRhome to make '~' work
 	     */
@@ -1187,7 +1194,7 @@ dgetstack()
 	for (dn = dhead.di_prev; dn != &dhead; dn = dn->di_prev, dbp++) 
 	     *dbp = Strsave(dn->di_name);
 	*dbp = NULL;
-	setq(STRdirstack, dblk, &shvhed);
+	setq(STRdirstack, dblk, &shvhed, VAR_READWRITE);
     }
 }
 
@@ -1274,42 +1281,45 @@ recdirs(fname)
     int     fp, ftmp, oldidfds;
     int     cdflag = 0;
     extern int fast;
-    Char    buf[BUFSIZE];
+    extern struct directory *dcwd;
+    struct directory *dp;
 
-    if (!fast) {
-	if (!adrof(STRsavedirs))/* does it exist */
+    if (fname == NULL) {
+	if (fast || !adrof(STRsavedirs))
 	    return;
-	if (fname == NULL)
-	    if ((fname = value(STRdirsfile)) == STRNULL) {
-		fname = Strcpy(buf, value(STRhome));
-		(void) Strcat(buf, &STRtildotdirs[1]);
-	    }
-		
-	if ((fp = creat(short2str(fname), 0600)) == -1)
-	    return;
-	oldidfds = didfds;
-	didfds = 0;
-	ftmp = SHOUT;
-	SHOUT = fp;
-	{
-	    extern struct directory *dcwd;
-	    struct directory *dp = dcwd->di_next;
 
-	    do {
-		if (dp == &dhead)
-		    continue;
-		if (cdflag == 0)
-		    cdflag++, xprintf("cd %s\n",
-				      short2str(dp->di_name));
-		else
-		    xprintf("pushd %s\n",
-			    short2str(dp->di_name));
-	    } while ((dp = dp->di_next) != dcwd->di_next);
-	}
-	(void) close(fp);
-	SHOUT = ftmp;
-	didfds = oldidfds;
+	if ((fname = value(STRdirsfile)) == STRNULL)
+	    fname = Strspl(value(STRhome), &STRtildotdirs[1]);
+	else
+	    fname = Strsave(fname);
     }
+    else 
+	fname = globone(fname, G_ERROR);
+		
+    if ((fp = creat(short2str(fname), 0600)) == -1) {
+	xfree((ptr_t) fname);
+	return;
+    }
+
+    oldidfds = didfds;
+    didfds = 0;
+    ftmp = SHOUT;
+    SHOUT = fp;
+
+    dp = dcwd->di_next;
+    do {
+	if (dp == &dhead)
+	    continue;
+	if (cdflag == 0) {
+	    cdflag = 1;
+	    xprintf("cd %S\n", dp->di_name);
+	}
+	else
+	    xprintf("pushd %S\n", dp->di_name);
+    } while ((dp = dp->di_next) != dcwd->di_next);
+
+    (void) close(fp);
+    SHOUT = ftmp;
+    didfds = oldidfds;
+    xfree((ptr_t) fname);
 }
-
-
