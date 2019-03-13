@@ -140,7 +140,7 @@ LDFLAGS= 			## The simplest, suitable for all.
 ################################################################
 ## LIBES.  Pick one, or roll your own.
 ################################################################
-LIBES= -ltermcap 			 ## BSD style things
+LIBES= -ltermcap -lcrypt			 ## BSD style things
 #LIBES= -ltermcap			 ## SunOS, HP-UX, pyramid
 #LIBES= -ltermcap			 ## Linux
 #LIBES= -ltermcap -lshadow		 ## Linux with PW_SHADOW
