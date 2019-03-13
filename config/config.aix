@@ -23,7 +23,11 @@
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
  *		job control facilities.
  */
+#ifndef aiws
 #define POSIXJOBS
+#else
+#undef POSIXJOBS
+#endif
 
 /*
  * VFORK	This machine has a vfork().  
@@ -44,7 +48,11 @@
  * BSDJOBS	You have BSD-style job control (both process groups and
  *		a tty that deals correctly
  */
-#define BSDJOBS
+#ifndef aiws
+# define BSDJOBS
+#else
+# undef BSDJOBS
+#endif
 
 /*
  * BSDSIGS	You have 4.2-style signals, rather than USG style.
@@ -58,13 +66,21 @@
  *		This may or may not be true.  For example, Apple Unix
  *		(OREO) has BSDJOBS and BSDSIGS but not BSDTIMES.
  */
-#define BSDTIMES
+#ifndef aiws
+# define BSDTIMES
+#else
+# undef BSDTIMES
+#endif
 
 /*
  * BSDNICE	Your system uses setpriority() instead of nice, to
  *		change a processes scheduling priority
  */
-#define BSDNICE
+#ifndef aiws
+# define BSDNICE
+#else
+# undef BSDNICE
+#endif
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
@@ -72,20 +88,24 @@
  *		BSD uses sgttyb. POSIX systems should define this
  *		anyway, even though they use struct termios.
  */
-#ifdef _IBMR2
+#if defined(_IBMR2) || defined(aiws)
 # define TERMIO
 #else
 # undef TERMIO
-#endif /* _IBMR2 */
+#endif /* _IBMR2 || aiws */
 
 /*
  * SVID		Your machine is SVID complient (Sys V, HPUX, A/UX)
  *		NOTE: don't do this if you are on a Pyramid -- tcsh is
  *		built in a BSD universe.
- *		Set SVID to 1, 2, or 3, depending the version of System V
+ *		Set SVID to 1, 2, 3, or 4, depending the version of System V
  *		you are running. Or set it to 0 if you are not SVID based
  */
-#define SVID	0
+#ifndef aiws
+# define SVID	0
+#else
+# define SVID	2
+#endif /* aiws */
 
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
@@ -97,11 +117,11 @@
  * SIGVOID	Define this if your signal handlers return void.  On older
  *		systems, signal returns int, but on newer ones, it returns void.
  */
-#if defined(_AIX) && defined(_I386)
+#if (defined(_AIX) && defined(_I386)) || defined(aiws)
 # undef SIGVOID
 #else /* _AIX && _I386 */
 # define SIGVOID 
-#endif /* _AIX && _I386 */
+#endif /* (_AIX && _I386) || aiws */
 
 /*
  * HAVEDUP2	Define this if your system supports dup2().
@@ -111,7 +131,11 @@
 /*
  * UTHOST	Does the utmp file have a host field?
  */
-#define UTHOST
+#ifndef aiws
+# define UTHOST
+#else
+# undef UTHOST
+#endif
 
 /*
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
@@ -127,21 +151,26 @@
 /*
  * TCF		You have the transparent computing facility.
  */
-#ifndef _IBMR2
+#if !defined(_IBMR2) && !defined(aiws)
 # define TCF	/* ps2 and 370 have TCF */
 #else
-# undef TCF	/* The rs6000 does not have TCF yet */
+# undef TCF	/* The rs6000 and the rt does not have TCF yet */
 #endif
 
 #if defined(_AIX) && defined(_I386)
 # define _AIXPS2	/* give a more sane name */
 #endif /* _AIX && _386 */
 
-#if defined(_IBMR2) || defined(_AIXPS2)
+#if defined(_AIXPS2)
 # define _NO_PROTO
 # define _BSD
 # define _BSD_INCLUDES
-#endif /* _IBMR2 || _AIXPS2 */
+#endif /* _AIXPS2 */
+
+#if defined(_IBMR2)
+# define _POSIX_SOURCE
+# define _ALL_SOURCE	/* for window size etc, extra tty chars etc. */
+#endif
 
 #ifdef NLS
 # undef NLS	/* Let us decide in config_f.h... */
@@ -154,11 +183,18 @@
 # define NOSTRCOLL	/* only the rs6000 has strcoll() */
 #endif
 
+/*
+ * Function pointer comparisons are broken
+ */
+#ifdef aiws
+#define void int
+#endif /* aiws */
+
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 
 #include "config_f.h"
 
-#ifdef _AIXPS2
+#if defined(_AIXPS2) || defined(aiws)
 # undef NLS
 #endif

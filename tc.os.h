@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.os.h,v 3.12 1991/08/06 02:00:24 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.os.h,v 3.17 1991/10/21 17:24:49 christos Exp $ */
 /*
  * tc.os.h: Shell os dependent defines
  */
@@ -37,6 +37,24 @@
 #ifndef _h_tc_os
 #define _h_tc_os
 
+#define NEEDstrerror		/* Too hard to find which systems have it */
+
+#if SVID > 3
+/*
+ * for SVR4 we fork pipelines backwards. 
+ * more info in sh.sem.c
+ */
+# define BACKPIPE
+#endif /* SVID > 3 */
+
+
+#if SVID > 0 && SVID < 3 && !defined(BSDSIGS)
+/*
+ * If we have unreliable signals...
+ */
+# define UNRELSIG
+#endif /* SVID > 0 && SVID < 3 && !BSDSIGS */
+
 #ifdef OREO
 # include <sys/time.h>
 # include <sys/resource.h>
@@ -49,6 +67,13 @@
 # endif /* POSIX */
 #endif /* OREO */
 
+#ifndef NCARGS
+# ifdef ARG_MAX
+#  define NCARGS ARG_MAX
+# else
+#  define NCARGS 1024
+# endif /* ARG_MAX */
+#endif /* NCARGS */
 #ifdef titan
 extern int end;
 #endif /* titan */
@@ -94,6 +119,10 @@ struct ucred {
 # endif	/* CSUSP */
 #endif /* ISC */
 
+#ifdef ISC202
+# undef TIOCGWINSZ
+#endif /* ISC202 */
+
 /*
  * XXX: This will be changed soon to 
  * #if (SVID > 0) && defined(TIOCGWINSZ)
@@ -108,8 +137,14 @@ struct ucred {
 # include <sys/stream.h>
 # include <sys/ptem.h>
 #endif /* TIOCGWINSZ */
-# define NEEDgethostname
+# ifndef ODT
+#  define NEEDgethostname
+# endif /* ODT */
 #endif /* INTEL || att || isc || sco */
+
+#ifdef UNIXPC
+# define NEEDgethostname
+#endif /* UNIXPC */
 
 #ifdef IRIS4D
 # include <sys/time.h>
@@ -246,18 +281,15 @@ struct ucred {
 # if !defined(_AIX370) && !defined(_AIXPS2)
 #  define setpgid(pid, pgrp)	setpgrp(pid, pgrp)
 # endif /* !_AIX370 && !_AIXPS2 */
-# define tcsetpgrp(fd, pgrp)	ioctl((fd), TIOCSPGRP, (ioctl_t) &(pgrp))
 # define NEEDtcgetpgrp
 #endif /* BSDJOBS && !(POSIX && POSIXJOBS) */
 
-#ifdef RENO
+#ifdef notdef /* RENO */
 /*
  * Older versions of RENO had this broken. It is fixed now. 
- * In any case, we use ours...
  */
-# define tcsetpgrp(fd, pgrp)	ioctl((fd), TIOCSPGRP, (ioctl_t) &(pgrp))
 # define NEEDtcgetpgrp
-#endif /* RENO */
+#endif /* notdef */ /* RENO */
 
 #ifdef DGUX
 # define setpgrp(a, b) setpgrp2(a, b)
@@ -320,7 +352,9 @@ extern char *ttyname();
 
 # ifndef hpux
 extern int abort();
+# ifndef fps500
 extern int qsort();
+# endif /* fps500 */
 # else
 extern void abort();
 extern void qsort();
@@ -337,8 +371,10 @@ extern int sigvec();
 extern int sigpause();
 #  else	/* _AIX370 || MACH || NeXT || _AIXPS2 */
 #   if !defined(apollo) || !defined(__STDC__)
+# ifndef fps500
 extern sigret_t sigvec();
 extern void sigpause();
+# endif /* fps500 */
 #   endif /* !apollo || !__STDC__ */
 #  endif /* _AIX370 || MACH || NeXT || _AIXPS2 */
 extern sigmask_t sigblock();
@@ -400,18 +436,23 @@ extern int setpriority();
 extern int nice();
 # endif	/* !BSDNICE */
 
+# ifndef fps500
 extern void setpwent();
 extern void endpwent();
+# endif /* fps500 */
+
+#ifndef __STDC__
 extern struct passwd *getpwuid(), *getpwnam(), *getpwent();
+#endif /* __STDC__ */
 
 # ifndef getwd
 extern char *getwd();
 # endif	/* getwd */
 #else /* POSIX */
 
-# if defined(sun) && !defined(__GNUC__)
+# if (defined(sun) && !defined(__GNUC__)) || defined(_IBMR2) || defined(_IBMESA)
 extern char *getwd();
-# endif	/* sun && ! __GNUC__ */
+# endif	/* (sun && ! __GNUC__) || _IBMR2 || _IBMESA */
 
 # ifdef SCO
 extern char *ttyname();   

@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tw.help.c,v 3.1 1991/07/15 19:37:24 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tw.help.c,v 3.4 1991/10/20 01:38:14 christos Exp $ */
 /* tw.help.c: actually look up and print documentation on a file.
  *	      Look down the path for an appropriate file, then print it.
  *	      Note that the printing is NOT PAGED.  This is because the
@@ -37,10 +37,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-RCSID("$Id: tw.help.c,v 3.1 1991/07/15 19:37:24 christos Exp $")
-
 #include "sh.h"
+
+RCSID("$Id: tw.help.c,v 3.4 1991/10/20 01:38:14 christos Exp $")
+
 #include "tw.h"
 #include "tc.h"
 
@@ -124,7 +124,7 @@ do_help(command)
 	    }
 	    if (f != -1) {
 		/* so cat it to the terminal */
-		orig_intr = sigset(SIGINT, cleanf);
+		orig_intr = (sigret_t (*)()) sigset(SIGINT, cleanf);
 		while (f != -1 && (len = read(f, (char *) buf, 512)) != 0)
 		    (void) write(SHOUT, (char *) buf, (size_t) len);
 		(void) sigset(SIGINT, orig_intr);
@@ -142,9 +142,10 @@ static  sigret_t
 cleanf(snum)
 int snum;
 {
-#if (SVID > 0) && (SVID < 3)
-    (void) sigset(SIGINT, cleanf);
-#endif /* SVID > 0 && SVID < 3 */
+#ifdef UNRELSIGS
+    if (snum)
+	(void) sigset(SIGINT, cleanf);
+#endif /* UNRELSIGS */
     if (f != -1)
 	(void) close(f);
     f = -1;

@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.prompt.c,v 3.2 1991/07/15 19:37:24 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.prompt.c,v 3.5 1991/10/12 04:23:51 christos Exp $ */
 /*
  * tc.prompt.c: Prompt printing stuff
  */
@@ -34,10 +34,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-RCSID("$Id: tc.prompt.c,v 3.2 1991/07/15 19:37:24 christos Exp $")
-
 #include "sh.h"
+
+RCSID("$Id: tc.prompt.c,v 3.5 1991/10/12 04:23:51 christos Exp $")
+
 #include "ed.h"
 
 /*
@@ -45,10 +45,12 @@ RCSID("$Id: tc.prompt.c,v 3.2 1991/07/15 19:37:24 christos Exp $")
  * PWP 4/27/87 -- rearange for tcsh.
  * mrdch@com.tau.edu.il 6/26/89 - added ~, T and .# - rearanged to switch()
  *                 instead of if/elseif
+ * Luke Mewburn, s902113@minyos.xx.rmit.OZ.AU 6-Sep-91 - changed date format
  */
 
 char   *month_list[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
 			"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+char   *day_list[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
 void
 printprompt(promptno, str)
     int     promptno;
@@ -173,13 +175,14 @@ printprompt(promptno, str)
 	    case '~':		/* show ~ whenever possible - a la dirs */
 		{
 		    static Char *olddir = 0, *olduser = 0, *oldpath = 0;
+		    extern int tlength;	/* cache cleared */
 
 		    if (!(z = value(STRcwd)))
 			break;	/* no cwd, so don't do anything */
 		    /*
 		     * Have we changed directory?
 		     */
-		    if (olddir != z) {
+		    if (tlength == 0 || olddir != z) {
 			oldpath = olddir = z;
 			olduser = getusername(&oldpath);
 		    }
@@ -192,7 +195,6 @@ printprompt(promptno, str)
 		}
 		/* fall through if ~ not matched */
 	    case '/':
-	    case 'd':
 		if (z = value(STRcwd)) {
 		    while (*z)
 			*p++ = attributes | *z++;
@@ -253,14 +255,24 @@ printprompt(promptno, str)
 		    while (*z)
 			*p++ = attributes | *z++;
 		break;
+	    case 'd':
+		for (cz = day_list[t->tm_wday]; *cz;)
+		    *p++ = attributes | *cz++;
+		break;
+	    case 'D':
+		Itoa(t->tm_mday, buff);
+		if (buff[1]) {
+		    *p++ = attributes | buff[0];
+		    *p++ = attributes | buff[1];
+		}
+		else {
+		    *p++ = attributes | '0';
+		    *p++ = attributes | buff[0];
+		}
+		break;
 	    case 'w':
 		for (cz = month_list[t->tm_mon]; *cz;)
 		    *p++ = attributes | *cz++;
-		*p++ = attributes | ' ';
-		Itoa(t->tm_mday, buff);
-		*p++ = attributes | buff[0];
-		if (buff[1])
-		    *p++ = attributes | buff[1];
 		break;
 	    case 'W':
 		Itoa(t->tm_mon + 1, buff);
@@ -272,30 +284,8 @@ printprompt(promptno, str)
 		    *p++ = attributes | '0';
 		    *p++ = attributes | buff[0];
 		}
-		*p++ = attributes | '/';
-
-		Itoa(t->tm_mday, buff);
-		if (buff[1]) {
-		    *p++ = attributes | buff[0];
-		    *p++ = attributes | buff[1];
-		}
-		else {
-		    *p++ = attributes | '0';
-		    *p++ = attributes | buff[0];
-		}
-		*p++ = attributes | '/';
-
-		Itoa(t->tm_year, buff);
-		if (buff[1]) {
-		    *p++ = attributes | buff[0];
-		    *p++ = attributes | buff[1];
-		}
-		else {
-		    *p++ = attributes | '0';
-		    *p++ = attributes | buff[0];
-		}
 		break;
-	    case 'D':
+	    case 'y':
 		Itoa(t->tm_year, buff);
 		if (buff[1]) {
 		    *p++ = attributes | buff[0];
@@ -305,28 +295,12 @@ printprompt(promptno, str)
 		    *p++ = attributes | '0';
 		    *p++ = attributes | buff[0];
 		}
-		*p++ = attributes | '-';
-
-		Itoa(t->tm_mon + 1, buff);
-		if (buff[1]) {
-		    *p++ = attributes | buff[0];
-		    *p++ = attributes | buff[1];
-		}
-		else {
-		    *p++ = attributes | '0';
-		    *p++ = attributes | buff[0];
-		}
-		*p++ = attributes | '-';
-
-		Itoa(t->tm_mday, buff);
-		if (buff[1]) {
-		    *p++ = attributes | buff[0];
-		    *p++ = attributes | buff[1];
-		}
-		else {
-		    *p++ = attributes | '0';
-		    *p++ = attributes | buff[0];
-		}
+	    case 'Y':
+		Itoa(t->tm_year + 1900, buff);
+		*p++ = attributes | buff[0];
+		*p++ = attributes | buff[1];
+		*p++ = attributes | buff[2];
+		*p++ = attributes | buff[3];
 		break;
 	    case 'S':		/* start standout */
 		attributes |= STANDOUT;

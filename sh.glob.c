@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.glob.c,v 3.9 1991/08/06 01:00:15 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.glob.c,v 3.11 1991/10/12 04:23:51 christos Exp $ */
 /*
  * sh.glob.c: Regular expression expansion
  */
@@ -34,13 +34,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-RCSID("$Id: sh.glob.c,v 3.9 1991/08/06 01:00:15 christos Exp $")
-
 #include "sh.h"
+
+RCSID("$Id: sh.glob.c,v 3.11 1991/10/12 04:23:51 christos Exp $")
+
 #include "tc.h"
 
-#include <glob.h>
+#include "glob.h"
 
 static int noglob;
 static int pargsiz, gargsiz;
@@ -95,7 +95,8 @@ globtilde(nv, s)
     gstart = gbuf;
     *gstart++ = *s++;
     u = s;
-    for (b = gstart, e = &gbuf[MAXPATHLEN - 1]; *s && *s != '/' && b < e;
+    for (b = gstart, e = &gbuf[MAXPATHLEN - 1]; 
+	 *s && *s != '/' && *s != ':' && b < e;
 	 *b++ = *s++);
     *b = EOS;
     if (gethdir(gstart)) {
@@ -569,7 +570,7 @@ tglob(t)
 	if (*p == '~' || *p == '=')
 	    gflag |= G_CSH;
 	else if (*p == '{' &&
-		 (p[1] == '\0' || p[1] == '}' && p[2] == '\0'))
+		 (p[1] == '\0' || (p[1] == '}' && p[2] == '\0')))
 	    continue;
 	while (c = *p++)
 	    if (isglob(c))

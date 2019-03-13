@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.6 90/12/12 08:23:27 christos Exp $
+# $Id: Makefile,v 1.5 1991/10/18 16:27:13 christos Exp $
 #	Makefile	4.3	6/11/83
 #
 # C Shell with process control; VM/UNIX VAX Makefile
@@ -12,7 +12,7 @@ VERSION=6.00
 BUILD=tcsh
 
 ################################################################
-## CLAGS.  For various -D things, see config.h
+## CFLAGS.  For various -D things, see config.h
 ################################################################
 #
 # These are the default suffixes from .c to .o and -c to get there
@@ -21,76 +21,97 @@ BUILD=tcsh
 SUF=o
 CF=-c
 
-LFLAGS=-I.
+INCLUDES=-I. -I..
+LFLAGS=$(INCLUDES)
 #LFLAGS=-Zn10000			# hpux lint
 
-#CFLAGS= -I. -g
-#CFLAGS= -I. -O
 
-#CFLAGS= -g -pg -I. -DPROF
-#CFLAGS= -O -pg -I. -DPROF
+#CFLAGS= $(INCLUDES) -g			# debug
+#CFLAGS= $(INCLUDES) -O			# production
+#CFLAGS= $(INCLUDES) 			# Broken optimizers....
+
+#CFLAGS= -g -pg $(INCLUDES) -DPROF
+#CFLAGS= -O -pg $(INCLUDES) -DPROF
 
 # gcc 1.37-
-#CFLAGS=-O -I. -finline-functions -fstrength-reduce 
+#CFLAGS=-O $(INCLUDES) -finline-functions -fstrength-reduce 
 
 # gcc 1.37+
-CFLAGS=-O -I. -fcombine-regs -finline-functions -fstrength-reduce #-msoft-float
+CFLAGS=-O $(INCLUDES) -fcombine-regs -finline-functions -fstrength-reduce 
+# add -msoft-float for 68881 machines.
 
-#CFLAGS= -O -I. -fvolatile
+#CFLAGS= -O $(INCLUDES) -fvolatile
 
 # for silicon graphics (and other mips compilers) -- use the
 # global optimizer! (-O3).
-#CFLAGS= -O3 -I. 
+#CFLAGS= -O3 $(INCLUDES) 
 #CF=-j
 #SUF=u
 #.SUFFIXES: .u 				## Ultrix needs that
 
 # mips systems
-# CFLAGS= -I. -O -systype bsd43 -Wf,-XNd5000 -Wf,-XNp6000 -Olimit 2000
+# CFLAGS= $(INCLUDES) -O -systype bsd43 -Wf,-XNd5000 -Wf,-XNp6000 -Olimit 2000
 
 # for at&t machines
-#CFLAGS= -O -Ksd -I.
+#CFLAGS= -O -Ksd $(INCLUDES)
 
 # for convexen
-#CFLAGS= -I. -ext -tm c1
+#CFLAGS= $(INCLUDES) -ext -tm c1
 
 # Stardent Titan
-#CFLAGS = -I. -O -43
+#CFLAGS = $(INCLUDES) -O -43
 
 # Apollo's with cc [apollo builtins don't work with gcc]
 # and apollo should not define __STDC__ if it does not have
 # the standard header files. RT's (aos4.3) need that too;
 # you might want to skip the -O on the rt's... Not very wise.
+# AIX/ESA needs -D_IBMESA on command line (this may disappear by GA)
 #DFLAGS=-U__STDC__ 
+#DFLAGS=-D_IBMESA
+# On aix2.2.1 we need more compiler space.
+#DFLAGS=-Nd4000 -Nn3000
 DFLAGS=
 
 
 ################################################################
 ## LDLAGS.  Define something here if you need to
 ################################################################
-LDFLAGS=
+LDFLAGS= 			## The simplest, suitable for all.
+#LDFLAGS= -s			## Stripped. Takes less space on disk.
+#LDFLAGS= -s -n			## Pure executable. Spares paging over
+# 				## the network for machines with local
+#				## swap but external /usr/local/bin .
+#LDFLAGS= -s -n -Bstatic	## Without dynamic links. (SunOS)
 
 ################################################################
 ## LIBES.  Pick one, or roll your own.
 ################################################################
 LIBES= -ltermcap		## BSD style things, hpux
 #LIBES= -ltermcap -lcs		## Mach
-#LIBES= -lcurses		## Sys V3 w/o networking
+#LIBES= -lcurses		## Sys V3 w/o networking (and Sys V4)
+#LIBES= -lcurses -lc /usr/ucblib/libucb.a ## Sys V4 with BSDTIMES
+#LIBES= -lcurses		## Sys V4 w/o BSDTIMES
 #LIBES= -lcurses -lnet		## Sys V3 with networking
 #LIBES= -lcurses -ldir		## Sys V2 w/o networking [needs directory lib]
 #LIBES= -lcurses -ldir -lnet	## Sys V2 with networking [needs directory lib]
 #LIBES= -lcurses -lsocket -lbsd	## Amdahl UTS 2.1
-#LIBES= -lcurses -lbsd		## For Irix3.1 on SGI-IRIS4D
+#LIBES= -lcurses -lbsd		## For Irix3.1 on SGI-IRIS4D or ETA10
 #LIBES= -lcurses -lsun -lbsd -lc_s ## For Irix3.3 on SGI-IRIS4D (w/ yp)
 #LIBES= -lcurses -lbsd -lc_s	## For Irix3.3 on SGI-IRIS4D (wo/ yp)
 #LIBES= -lcurses -lbsd		## For aix on an IBM 370 or rs6000 or ps2
+#LIBES= -lcurses		## For aix on the rt
 #LIBES= -lcurses -lcposix	## ISC 2.2 
 #LIBES= -lcposix -lc_s -lcurses -linet ## ISC 2.2 with networking
+#LIBES= -lcurses -linet -lc_s   ## ISC 2.0.2 with networking
 #LIBES= -ltermcap -ldir -lx	## Xenix 386 style things
 #LIBES= -lcurses -lintl		## SCO SysVR3.2v2.0
+#LIBES= -lcurses -lintl -lsocket ## SCO+ODT1.1
 #LIBES= -lposix -ltermcap	## A/UX 2.0
 #LIBES= -ltermcap -lseq		## Sequent's Dynix
-#LIBES= -lcurses -lsocket	## Intel's hypercube
+#LIBES= -lcurses -lsocket	## Intel's hypercube and ns32000 based Opus.
+#LIBES= -ldirent -lcurses       ## att3b1 stk cc w/o shared lib & directory lib
+#LIBES= -shlib -ldirent -lcurses ## att3b1 gcc1.40 w/ shared lib & directory lib
+
 
 # The difficult choice of a c-compiler...
 # First, you should try your own c-compiler. 
@@ -101,6 +122,8 @@ LIBES= -ltermcap		## BSD style things, hpux
 CC=	gcc -Wall 
 #CC=	cc
 #CC=	occ
+#CC=	/bin/cc
+#CC=	/usr/lib/sun.compile/cc  # FPS 500 (+FPX) with Sun C compiler
 ED=	-ed
 AS=	-as
 RM=	-rm
@@ -134,9 +157,9 @@ TWSRCS= tw.decls.h tw.h tw.help.c tw.init.c tw.parse.c tw.spell.c
 TWOBJS=	tw.help.${SUF} tw.init.${SUF} tw.parse.${SUF} tw.spell.${SUF}
 
 EDSRCS= ed.chared.c ed.decls.h ed.defns.c ed.h ed.init.c ed.inputl.c \
-	ed.refresh.c ed.screen.c ed.xmap.c
+	ed.refresh.c ed.screen.c ed.xmap.c ed.term.c ed.term.h
 EDOBJS=	ed.chared.${SUF} ed.refresh.${SUF} ed.screen.${SUF} ed.init.${SUF} \
-	ed.inputl.${SUF} ed.defns.${SUF} ed.xmap.${SUF}
+	ed.inputl.${SUF} ed.defns.${SUF} ed.xmap.${SUF} ed.term.${SUF}
 
 TCSRCS= tc.alloc.c tc.bind.c tc.const.c tc.decls.h tc.disc.c \
 	tc.func.c tc.os.c tc.os.h tc.printf.c tc.prompt.c \
@@ -150,7 +173,8 @@ TCOBJS=	tc.alloc.${SUF} tc.bind.${SUF} tc.const.${SUF} tc.disc.${SUF} \
 PVSRCS= Makefile
 AVSRCS= Fixes MAKEDIFFS MAKESHAR NewThings README FAQ \
 	WishList config_f.h eight-bit.me glob.3 patchlevel.h \
-	pathnames.h tcsh.man Ported
+	pathnames.h tcsh.man Ported src.desc Imakefile imake.config \
+	README.imake
 VHSRCS=${PVSRCS} ${AVSRCS}
 
 CONFSRCS=config/config.*
@@ -221,7 +245,7 @@ sh.err.h: sh.err.c
 tc.const.h: tc.const.c sh.char.h config.h config_f.h sh.types.h sh.err.h
 	@rm -f $@
 	@echo '/* Do not edit this file, make creates it. */' > $@
-	${CC} -E -I. ${DFLAGS} tc.const.c | egrep 'Char STR' | \
+	${CC} -E $(INCLUDES) ${DFLAGS} tc.const.c | egrep 'Char STR' | \
 	    sed -e 's/Char \([a-zA-Z0-9_]*\)\(.*\)/extern Char \1[];/' | \
 	    sort >> $@
 

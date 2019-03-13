@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.bind.c,v 3.1 1991/07/15 19:37:24 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.bind.c,v 3.3 1991/10/12 04:23:51 christos Exp $ */
 /*
  * tc.bind.c: Key binding functions
  */
@@ -34,10 +34,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-RCSID("$Id: tc.bind.c,v 3.1 1991/07/15 19:37:24 christos Exp $")
-
 #include "sh.h"
+
+RCSID("$Id: tc.bind.c,v 3.3 1991/10/12 04:23:51 christos Exp $")
+
 #include "ed.h"
 #include "ed.defns.h"
 
@@ -99,7 +99,7 @@ unparsekey(c)			/* 'c' -> "c", '^C' -> "^" + "C" */
 	*cp++ = '-';
 	c &= 0377;
     }
-    if ((c & META) && !(Isprint(c) || Iscntrl(c) && Isprint(c | 0100))) {
+    if ((c & META) && !(Isprint(c) || (Iscntrl(c) && Isprint(c | 0100)))) {
 	*cp++ = 'M';
 	*cp++ = '-';
 	c &= ASCII;
@@ -716,7 +716,7 @@ bindkey_usage()
     xprintf(
 	"Usage: bindkey [options] [--] [in-string [out-string | command]]\n");
     xprintf("    -a   bind key in alternative key binding\n");
-    xprintf("    -s   bind an out-string instad of a command\n");
+    xprintf("    -s   bind an out-string instead of a command\n");
     xprintf("    -v   initialized maps to default vi bindings\n");
     xprintf("    -e   initialized maps to default emacs bindings\n");
     xprintf("    -d   initialized maps to default bindings\n");

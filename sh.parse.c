@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.parse.c,v 3.2 1991/07/15 19:37:24 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.parse.c,v 3.4 1991/10/12 04:23:51 christos Exp $ */
 /*
  * sh.parse.c: Interpret a list of tokens
  */
@@ -34,10 +34,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-RCSID("$Id: sh.parse.c,v 3.2 1991/07/15 19:37:24 christos Exp $")
-
 #include "sh.h"
+
+RCSID("$Id: sh.parse.c,v 3.4 1991/10/12 04:23:51 christos Exp $")
 
 /*
  * C shell
@@ -598,7 +597,7 @@ again:
 		seterror(ERR_MISRED);
 		continue;
 	    }
-	    if ((flags & P_OUT) && (flags & P_DIAG) == 0 || t->t_drit)
+	    if (((flags & P_OUT) && (flags & P_DIAG) == 0) || t->t_drit)
 		seterror(ERR_OUTRED);
 	    else
 		t->t_drit = Strsave(p->word);

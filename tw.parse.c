@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tw.parse.c,v 3.8 1991/07/23 23:20:08 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tw.parse.c,v 3.13 1991/10/18 16:27:13 christos Exp $ */
 /*
  * tw.parse.c: Everyone has taken a shot in this futile effort to
  *	       lexically analyze a csh line... Well we cannot good
@@ -37,10 +37,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-RCSID("$Id: tw.parse.c,v 3.8 1991/07/23 23:20:08 christos Exp $")
-
 #include "sh.h"
+
+RCSID("$Id: tw.parse.c,v 3.13 1991/10/18 16:27:13 christos Exp $")
+
 #include "tw.h"
 #include "ed.h"
 #include "tc.h"
@@ -118,15 +118,26 @@ tenematch(inputline, inputline_size, num_read, command)
     int     space_left;
     int     is_a_cmd;		/* UNIX command rather than filename */
     int     search_ret;		/* what search returned for debugging */
-    int     in_single, in_double;	/* In single or in_double quotes */
+    /* 
+     * XXX: Avoid gcc bug. If in_single and in_double are ints 
+     * then they always stay 0.
+     */
+    Char    in_single, in_double;	/* In single or in_double quotes */
+    int     backq, skp;
 
     str_end = &inputline[num_read];
 
     /*
+     * Check if in backquotes
+     */
+    for (cmd_st = str_end, backq = 0;
+	 cmd_st >= inputline;
+	 backq ^= (*cmd_st-- == '`'));
+    /*
      * space backward looking for the beginning of this command
      */
     for (cmd_st = str_end; cmd_st > inputline; --cmd_st)
-	if (iscmdmeta(cmd_st[-1])
+	if ((iscmdmeta(cmd_st[-1]) || (cmd_st[-1] == '`' && backq))
 	    && ((cmd_st - 1 == inputline) || (cmd_st[-2] != '\\')))
 	    break;
     /* step forward over leading spaces */
@@ -137,7 +148,13 @@ tenematch(inputline, inputline_size, num_read, command)
      * Find LAST occurence of a delimiter in the inputline. The word start is
      * one character past it.
      */
-    for (word_start = str_end; word_start > inputline; --word_start) {
+    for (word_start = str_end, skp = 0; word_start > inputline; --word_start) {
+	if (!backq && word_start[-1] == '`') {
+	    skp ^= 1;
+	    continue;
+	}
+	if (skp)
+	    continue;
 	if ((ismeta(word_start[-1]) || isaset(cmd_st, word_start)) &&
 	    (word_start[-1] != '#') && (word_start[-1] != '$') &&
 	    ((word_start - 1 == inputline) || (word_start[-2] != '\\')))
@@ -159,17 +176,13 @@ tenematch(inputline, inputline_size, num_read, command)
     space_left = inputline_size - (word_start - inputline) - 1;
 #endif
 
-    is_a_cmd = starting_a_command(word_start, inputline);
-#ifdef TENEDEBUG
-    xprintf("starting_a_command %d\n", is_a_cmd);
-#endif
-
     /*
      * Quote args
      */
     in_double = 0;
     in_single = 0;
-    for (cmd_start = word_start, wp = word; cmd_start < str_end && wp <= word + FILSIZ; cmd_start++)
+    for (cmd_start = word_start, wp = word; 
+	 cmd_start < str_end && wp <= word + FILSIZ; cmd_start++) 
 	switch (*cmd_start) {
 	case '\'':
 	    if (!in_double) {
@@ -177,12 +190,6 @@ tenematch(inputline, inputline_size, num_read, command)
 		    in_single = 0;
 		else
 		    in_single = QUOTE;
-		/*
-		 * Move the word_start further, cause the quotes so far have no
-		 * effect.
-		 */
-		if (cmd_start == word_start)
-		    word_start++;
 	    }
 	    else
 		*wp++ = *cmd_start | QUOTE;
@@ -193,12 +200,6 @@ tenematch(inputline, inputline_size, num_read, command)
 		    in_double = 0;
 		else
 		    in_double = QUOTE;
-		/*
-		 * Move the word_start further, cause the quotes so far have no
-		 * effect.
-		 */
-		if (cmd_start == word_start)
-		    word_start++;
 	    }
 	    else
 		*wp++ = *cmd_start | QUOTE;
@@ -222,9 +223,16 @@ tenematch(inputline, inputline_size, num_read, command)
     if (wp > word + FILSIZ)
 	return (-1);
     *wp = '\0';
+    /*
+     * Move the word_start further if still in quotes, cause the
+     * quotes so far have no effect.
+     */
+    if ((in_single || in_double) && (*word_start == '\'' || *word_start == '"'))
+	word_start++;
 
-
+    is_a_cmd = starting_a_command(word_start - 1, inputline);
 #ifdef TENEDEBUG
+    xprintf("starting_a_command %d\n", is_a_cmd);
     xprintf("\ncmd_st:%s:\n", short2str(cmd_st));
     xprintf("word:%s:\n", short2str(word));
     xprintf("word:");
@@ -279,9 +287,11 @@ tenematch(inputline, inputline_size, num_read, command)
 	/*
 	 * Change by Christos Zoulas: if the name has metachars in it, quote
 	 * the metachars, but only if we are outside quotes.
+	 * We don't quote the last space if we had a unique match and 
+	 * addsuffix was set. Otherwise the last space was part of a word.
 	 */
 	if (*wp && InsertStr((in_single || in_double) ?
-			     wp : quote_meta(wp,
+			     wp : quote_meta(wp, search_ret == 1 &&
 					     (bool) is_set(STRaddsuffix))) < 0)
 	    /* put it in the input buffer */
 	    return -1;		/* error inserting */
@@ -314,8 +324,8 @@ tenematch(inputline, inputline_size, num_read, command)
 	items[1] = NULL;
 	ptr = items;
 	if (is_a_cmd) {
-	    xprintf("Sorry no globbing for commands yet..\n");
-	    return 0;
+	    xprintf("\nSorry no globbing for commands yet..\n");
+	    return -1;
 	}
 	if ((count = t_glob(&ptr)) > 0) {
 	    if (command == GLOB)
@@ -603,8 +613,8 @@ t_search(word, wp, command, max_word_length, looking_for_command, list_max)
     int     looking_for_shellvar,	/* true if looking for $foo */
             looking_for_file;	/* true if looking for a file name */
     Char  **pathv;		/* pointer to PATH elements */
-    struct varent *v_ptr = NULL;/* current shell variable position */
-    Char  **env_ptr = NULL;	/* current env. variable position */
+    struct varent *vptr = NULL;/* current shell variable position */
+    Char  **envptr = NULL;	/* current env. variable position */
 
     int     d = 4, nd;		/* distance and new distance to command for
 				 * SPELL */
@@ -624,7 +634,7 @@ t_search(word, wp, command, max_word_length, looking_for_command, list_max)
      */
     static int numitems;
 
-    pathv = (v_ptr = adrof(STRPATH)) == NULL ? pv : v_ptr->vec;
+    pathv = (vptr = adrof(STRPATH)) == NULL ? pv : vptr->vec;
 
     if (items != NULL)
 	FREE_ITEMS(items, numitems);
@@ -648,8 +658,8 @@ t_search(word, wp, command, max_word_length, looking_for_command, list_max)
     dollar_dir[0] = '\0';
 
     if (looking_for_shellvar) {	/* Looking for a shell var? */
-	v_ptr = tw_start_shell_list();
-	env_ptr = tw_start_env_list();
+	vptr = tw_start_shell_list();
+	envptr = tw_start_env_list();
 	target++;
     }
     else
@@ -731,8 +741,8 @@ again:
 
     while (1) {
 	if (looking_for_shellvar) {
-	    if ((entry = tw_next_shell_var(&v_ptr)) == NULL)
-		if ((entry = tw_next_env_var(&env_ptr)) == NULL)
+	    if ((entry = tw_next_shell_var(&vptr)) == NULL)
+		if ((entry = tw_next_env_var(&envptr)) == NULL)
 		    break;
 	}
 	else if (looking_for_file || looking_for_lognames) {
@@ -1142,7 +1152,8 @@ getentry(dir_fd, looking_for_lognames)
 #else
 	(void) sighold(SIGINT);
 #endif /* BSDSIGS */
-	pw = getpwent();
+	/* ISC does not declare getpwent()? */
+	pw = (struct passwd *) getpwent();
 #ifdef BSDSIGS
 	(void) sigsetmask(omask);
 #else
@@ -1349,7 +1360,8 @@ print_by_column(dir, items, count, no_file_suffix)
     register Char *dir, *items[];
     int     count, no_file_suffix;
 {
-    register int i, r, c, w, maxwidth = 0, columns, rows;
+    register int i, r, c, columns, rows;
+    unsigned int w, maxwidth = 0;
     extern int Tty_raw_mode;
 
     lbuffed = 0;		/* turn off line buffering */

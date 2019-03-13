@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.sig.c,v 3.3 1991/08/06 01:49:53 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.sig.c,v 3.5 1991/10/20 01:38:14 christos Exp $ */
 /*
  * sh.sig.c: Signal routine emulations
  */
@@ -34,36 +34,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-RCSID("$Id: tc.sig.c,v 3.3 1991/08/06 01:49:53 christos Exp $")
-
 #include "sh.h"
-/*
- * a little complicated #include <sys/wait.h>! :-(
- */
-#if SVID > 0
-# ifdef hpux
-#  ifndef __hpux
-#   include "tc.wait.h"	/* 6.5 broke <sys/wait.h> */
-#  else
-#   ifndef POSIX
-#    define _BSD
-#   endif
-#   ifndef _CLASSIC_POSIX_TYPES
-#    define _CLASSIC_POSIX_TYPES
-#   endif
-#   include <sys/wait.h> /* 7.0 fixed it again */
-#  endif /* __hpux */
-# else /* hpux */
-#  if defined(OREO) || defined(IRIS4D) || defined(POSIX)
-#   include <sys/wait.h>
-#  else	/* OREO || IRIS4D || POSIX */
-#   include "tc.wait.h"
-#  endif /* OREO || IRIS4D || POSIX */
-# endif	/* hpux */
-#else /* SVID == 0 */
-# include <sys/wait.h>
-#endif /* SVID == 0 */
+
+RCSID("$Id: tc.sig.c,v 3.5 1991/10/20 01:38:14 christos Exp $")
+
+#include "tc.wait.h"
 
 #ifndef BSDSIGS
 
@@ -79,7 +54,7 @@ static struct mysigstack {
 static int stk_ptr = -1;
 
 
-#if SVID < 3 || defined(UNIXPC)
+#ifdef UNRELSIGS
 /* queue child signals
  */
 static sigret_t
@@ -191,7 +166,7 @@ sigpause(what)
 
 }
 
-#endif /* SVID < 3 || (UNIXPC) */
+#endif /* UNRELSIGS */
 
 #ifdef SXA
 /*

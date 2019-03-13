@@ -73,7 +73,7 @@
  * SVID		Your machine is SVID complient (Sys V, HPUX, A/UX)
  *		NOTE: don't do this if you are on a Pyramid -- tcsh is
  *		built in a BSD universe.
- *		Set SVID to 1, 2, or 3, depending the version of System V
+ *		Set SVID to 1, 2, 3, or 4, depending the version of System V
  *		you are running. Or set it to 0 if you are not SVID based
  */
 #define SVID	0

@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.screen.c,v 3.3 1991/07/18 18:00:02 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.screen.c,v 3.6 1991/10/12 04:23:51 christos Exp $ */
 /*
  * ed.screen.c: Editor/termcap-curses interface
  */
@@ -34,10 +34,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-RCSID("$Id: ed.screen.c,v 3.3 1991/07/18 18:00:02 christos Exp $")
-
 #include "sh.h"
+
+RCSID("$Id: ed.screen.c,v 3.6 1991/10/12 04:23:51 christos Exp $")
+
 #include "ed.h"
 #include "tc.h"
 #include "ed.defns.h"
@@ -477,6 +477,8 @@ EchoTC(v)
 	}
 	v++;
     }
+    if (!*v || *v[0] == '\0')
+	return;
     (void) strcpy(cv, short2str(*v));
     if (strcmp(cv, "tabs") == 0) {
 	xprintf(fmts, T_Tabs ? "yes" : "no");
@@ -516,8 +518,12 @@ EchoTC(v)
      * Count home many values we need for this capability.
      */
     scap = tgetstr(cv, &area);
-    if (!scap || scap[0] == '\0')
-	stderror(silent ? ERR_SILENT : (ERR_NAME | ERR_TCCAP), cv);
+    if (!scap || scap[0] == '\0') {
+	if (silent)
+	    return;
+	else
+	    stderror(ERR_NAME | ERR_TCCAP, cv);
+    }
 
     for (cap = scap, arg_need = 0; *cap; cap++)
 	if (*cap == '%')
@@ -550,9 +556,12 @@ EchoTC(v)
     switch (arg_need) {
     case 0:
 	v++;
-	if (*v && *v[0])
-	    stderror(silent ? ERR_SILENT : (ERR_NAME | ERR_TCARGS), 
-		     cv, arg_need);
+	if (*v && *v[0]) {
+	    if (silent)
+		return;
+	    else
+		stderror(ERR_NAME | ERR_TCARGS, cv, arg_need);
+	}
 	(void) tputs(scap, 1, putraw);
 	break;
     case 1:
@@ -562,9 +571,12 @@ EchoTC(v)
 	arg_rows = 0;
 	arg_cols = atoi(short2str(*v));
 	v++;
-	if (*v && *v[0])
-	    stderror(silent ? ERR_SILENT : (ERR_NAME | ERR_TCARGS), 
-		     cv, arg_need);
+	if (*v && *v[0]) {
+	    if (silent)
+		return;
+	    else
+		stderror(ERR_NAME | ERR_TCARGS, cv, arg_need);
+	}
 	(void) tputs(tgoto(scap, arg_cols, arg_rows), 1, putraw);
 	break;
     default:
@@ -573,17 +585,28 @@ EchoTC(v)
 	    stderror(ERR_NAME | ERR_TCARGS, cv, arg_need);
     case 2:
 	v++;
-	if (!*v || *v[0] == '\0')
-	    stderror(silent ? ERR_SILENT : (ERR_NAME | ERR_TCNARGS), cv, 2);
+	if (!*v || *v[0] == '\0') {
+	    if (silent)
+		return;
+	    else
+		stderror(ERR_NAME | ERR_TCNARGS, cv, 2);
+	}
 	arg_cols = atoi(short2str(*v));
 	v++;
-	if (!*v || *v[0] == '\0')
-	    stderror(silent ? ERR_SILENT : (ERR_NAME | ERR_TCNARGS), cv, 2);
+	if (!*v || *v[0] == '\0') {
+	    if (silent)
+		return;
+	    else
+		stderror(ERR_NAME | ERR_TCNARGS, cv, 2);
+	}
 	arg_rows = atoi(short2str(*v));
 	v++;
-	if (*v && *v[0])
-	    stderror(silent ? ERR_SILENT : (ERR_NAME | ERR_TCARGS), 
-		     cv, arg_need);
+	if (*v && *v[0]) {
+	    if (silent)
+		return;
+	    else
+		stderror(ERR_NAME | ERR_TCARGS, cv, arg_need);
+	}
 	(void) tputs(tgoto(scap, arg_cols, arg_rows), arg_rows, putraw);
 	break;
     }
@@ -640,9 +663,9 @@ SetAttributes(atr)
     atr &= ATTRIBUTES;
     if (atr != cur_atr) {
 	if (me_all && GoodStr(T_me)) {
-	    if ((cur_atr & BOLD) && !(atr & BOLD) ||
-		(cur_atr & UNDER) && !(atr & UNDER) ||
-		(cur_atr & STANDOUT) && !(atr & STANDOUT)) {
+	    if (((cur_atr & BOLD) && !(atr & BOLD)) ||
+		((cur_atr & UNDER) && !(atr & UNDER)) ||
+		((cur_atr & STANDOUT) && !(atr & STANDOUT))) {
 		(void) tputs(Str(T_me), 1, putpure);
 		cur_atr = 0;
 	    }

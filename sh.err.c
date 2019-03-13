@@ -1,7 +1,6 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.err.c,v 3.1 1991/07/15 19:37:24 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.err.c,v 3.5 1991/10/21 17:24:49 christos Exp $ */
 /*
- * sh.err.c: Error printing routines. There are lots of them
- *	     and none does the right thing!
+ * sh.err.c: Error printing routines. 
  */
 /*-
  * Copyright (c) 1980, 1991 The Regents of the University of California.
@@ -35,15 +34,19 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-RCSID("$Id: sh.err.c,v 3.1 1991/07/15 19:37:24 christos Exp $")
-
 #define _h_tc_err		/* Don't redefine the errors	 */
 #include "sh.h"
+
+RCSID("$Id: sh.err.c,v 3.5 1991/10/21 17:24:49 christos Exp $")
 
 /*
  * C Shell
  */
+
+#ifdef lint
+#undef va_arg
+#define va_arg(a, b) (a ? (b) 0 : (b) 0)
+#endif
 
 char   *seterr = NULL;	/* Holds last error if there was one */
 
@@ -217,7 +220,7 @@ static char *errorlist[] =
 #define ERR_HISTUS	78
     "Usage: history [-rht] [# number of events]",
 #define ERR_SPDOLLT	79
-    "$ or < not allowed with $# or $?",
+    "$, ! or < not allowed with $# or $?",
 #define ERR_NEWLINE	80
     "Newline in variable name",
 #define ERR_SPSTAR	81
@@ -322,7 +325,7 @@ static char *errorlist[] =
 void
 /*VARARGS1*/
 #if __STDC__
-seterror(int id, ...)
+seterror(unsigned int id, ...)
 #else
 seterror(va_alist)
     va_dcl
@@ -335,12 +338,12 @@ seterror(va_alist)
 #if __STDC__
 	va_start(va, id);
 #else
-	int id;
+	unsigned int id;
 	va_start(va);
-	id = va_arg(va, int);
+	id = va_arg(va, unsigned int);
 #endif
 
-	if (id < 0 || id > sizeof(errorlist) / sizeof(errorlist[0]))
+	if (id >= sizeof(errorlist) / sizeof(errorlist[0]))
 	    id = ERR_INVALID;
 	xvsprintf(berr, errorlist[id], va);
 	va_end(va);
@@ -370,7 +373,7 @@ seterror(va_alist)
 void
 /*VARARGS*/
 #if __STDC__
-stderror(int id, ...)
+stderror(unsigned int id, ...)
 #else
 stderror(va_alist)
     va_dcl
@@ -383,10 +386,10 @@ stderror(va_alist)
 #if __STDC__
     va_start(va, id);
 #else
-    int	    id;
+    unsigned int id;
 
     va_start(va);
-    id = va_arg(va, int);
+    id = va_arg(va, unsigned int);
 #endif
 
     flags = id & ERR_FLAGS;
@@ -397,7 +400,7 @@ stderror(va_alist)
 	return;
     }
 
-    if (id < 0 || id > sizeof(errorlist) / sizeof(errorlist[0]))
+    if (id >= sizeof(errorlist) / sizeof(errorlist[0]))
 	id = ERR_INVALID;
 
     /*

@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.os.c,v 3.6 1991/07/18 15:24:09 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.os.c,v 3.10 1991/10/21 17:24:49 christos Exp $ */
 /*
  * tc.os.c: OS Dependent builtin functions
  */
@@ -34,10 +34,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-RCSID("$Id: tc.os.c,v 3.6 1991/07/18 15:24:09 christos Exp $")
-
 #include "sh.h"
+
+RCSID("$Id: tc.os.c,v 3.10 1991/10/21 17:24:49 christos Exp $")
+
 #include "tw.h"
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -658,6 +658,19 @@ xtcgetpgrp(fd)
     return (pgrp);
 }
 
+/*
+ * XXX: tcsetpgrp is not a macro any more cause on some systems,
+ * pid_t is a short, but the ioctl() takes a pointer to int (pyr)
+ * Thanks to Simon Day (simon@pharaoh.cyborg.bt.co.uk) for pointing
+ * this out.
+ */
+int
+xtcsetpgrp(fd, pgrp)
+    int fd, pgrp;
+{
+    return ioctl(fd, TIOCSPGRP, (ioctl_t) &pgrp);
+}
+
 #endif	/* tcgetpgrp */
 
 
@@ -687,7 +700,7 @@ osinit()
 {
     extern ptr_t membot;
 
-    membot = (char *) sbrk(0);
+    membot = (ptr_t) sbrk(0);
 
 #ifdef OREO
     set42sig();
@@ -715,6 +728,22 @@ osinit()
 #endif
 }
 
+#ifdef strerror
+char *
+xstrerror(i)
+    int i;
+{
+    static char errbuf[40]; /* 64 bit num */
+
+    if (i >= 0 && i < sys_nerr) 
+	return sys_errlist[i];
+    else {
+	xsprintf(errbuf, "Unknown Error: %d", i);
+	return errbuf;
+    }
+}
+#endif /* strerror */
+    
 #ifdef gethostname
 #include <sys/utsname.h>
 
@@ -889,7 +918,7 @@ xgetwd(pathname)
 
 	/* look if we found root yet */
 	if (st_cur.st_ino == st_root.st_ino &&
-	    st_cur.st_dev == st_root.st_dev) {
+	    DEV_DEV_COMPARE(st_cur.st_dev, st_root.st_dev)) {
 	    (void) strcpy(pathname, *pathptr != '/' ? "/" : pathptr);
 	    return (pathname);
 	}
@@ -915,7 +944,7 @@ xgetwd(pathname)
 
 	    /* check if we found it yet */
 	    if (st_next.st_ino == st_cur.st_ino &&
-		st_next.st_dev == st_cur.st_dev) {
+	    DEV_DEV_COMPARE(st_next.st_dev, st_cur.st_dev)) {
 		st_cur = st_dot;
 		pathptr = strrcpy(pathptr, d->d_name);
 		pathptr = strrcpy(pathptr, "/");
@@ -948,18 +977,6 @@ strrcpy(ptr, str)
 } /* end strrcpy */
 # endif /* hp9000s500 */
 #endif /* getwd */
-
-#ifdef iconuxv
-#include <sys/vendor.h>
-#include <sys/bsd_syscall.h>
-
-int
-vfork()
-{
-    return sys_local(VEND_ICON_BSD, 66);
-}
-
-#endif				/* iconuxv */
 
 #ifdef apollo
 /***

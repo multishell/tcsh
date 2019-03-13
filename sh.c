@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.c,v 3.9 1991/08/06 07:16:11 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.c,v 3.15 1991/10/22 06:52:57 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -34,16 +34,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
+#define EXTERN	/* Intern */
+#include "sh.h"
+
 #ifndef lint
 char    copyright[] =
 "@(#) Copyright (c) 1991 The Regents of the University of California.\n\
  All rights reserved.\n";
 #endif				/* not lint */
 
-RCSID("$Id: sh.c,v 3.9 1991/08/06 07:16:11 christos Exp $")
+RCSID("$Id: sh.c,v 3.15 1991/10/22 06:52:57 christos Exp $")
 
-#include "sh.h"
 #include "tc.h"
 #include "ed.h"
 
@@ -517,6 +518,23 @@ main(argc, argv)
 		nofile = 1;
 		break;
 
+#ifdef apollo
+	    case 'D':		/* -D	Define environment variable */
+		{
+		    register Char *cp, *dp;
+
+		    cp = str2short(tcp);
+		    if (dp = Strchr(cp, '=')) {
+			*dp++ = '\0';
+			Setenv(cp, dp);
+		    }
+		    else
+			Setenv(cp, STRNULL);
+		}
+		*tcp = '\0'; 	/* done with this argument */
+		break;
+#endif /* apollo */
+
 #ifdef CSHDIRS
 	    case 'd':		/* -d   Force load of ~/.cshdirs */
 		dflag++;
@@ -658,7 +676,7 @@ main(argc, argv)
      * Note that in only the login shell is it likely that parent may have set
      * signals to be ignored
      */
-    if (loginsh || intact || intty && isatty(SHOUT))
+    if (loginsh || intact || (intty && isatty(SHOUT)))
 	setintr = 1;
     settell();
     /*
@@ -806,8 +824,36 @@ main(argc, argv)
     }
     if ((setintr == 0) && (parintr == SIG_DFL))
 	setintr = 1;
-    (void) sigset(SIGCHLD, pchild);	/* while signals not ready */
 
+/*
+ * SVR4 doesn't send a SIGCHLD when a child is stopped or continued if the
+ * handler is installed with signal(2) or sigset(2).  sigaction(2) must
+ * be used instead.
+ *
+ * David Dawes (dawes@physics.su.oz.au) Sept 1991
+ */
+
+#if SVID > 3
+    {
+	struct sigaction act;
+        act.sa_handler=pchild;
+	sigemptyset(&(act.sa_mask)); /* Don't block any extra sigs when the
+				      * handler is called
+				      */
+        act.sa_flags=0;	           /* want behaviour of sigset() without
+                                    * SA_NOCLDSTOP
+				    */
+        sigaction(SIGCHLD,&act,(struct sigaction *)NULL);
+    }
+#else /* SVID <= 3 */
+    (void) sigset(SIGCHLD, pchild);	/* while signals not ready */
+#endif /* SVID <= 3 */
+
+
+    if (intty && !arginp) 	
+	(void) ed_Setup(editing);/* Get the tty state, and set defaults */
+				 /* Only alter the tty state if editing */
+    
     /*
      * Set an exit here in case of an interrupt or error reading the shell
      * start-up scripts.
@@ -1131,7 +1177,13 @@ srcunit(unit, onlyown, hflg)
 
 /* PWP: think of this as like a LISP (unwind-protect ...) */
 /* thanks to Diana Smetters for pointing out how this _should_ be written */
+#ifdef cray
+    my_reenter = 1;		/* assume non-zero return val */
+    if (setexit() == 0) {
+	my_reenter = 0;		/* Oh well, we were wrong */
+#else
     if ((my_reenter = setexit()) == 0) {
+#endif
 	process(0);		/* 0 -> blow away on errors */
     }
 
@@ -1265,12 +1317,13 @@ exitstat()
  * in the event of a HUP we want to save the history
  */
 static  sigret_t
-phup(i)
-int i;
+phup(snum)
+int snum;
 {
-#if (SVID > 0) && (SVID < 3)
-    (void) sigset(i, SIG_IGN);
-#endif /* SVID > 0 && SVID < 3 */
+#ifdef UNRELSIGS
+    if (snum)
+	(void) sigset(snum, SIG_IGN);
+#endif /* UNRELSIGS */
     rechist();
 #ifdef CSHDIRS
     /*
@@ -1278,9 +1331,9 @@ int i;
      */
     recdirs();
 #endif
-    xexit(i);
+    xexit(snum);
 #ifndef SIGVOID
-    return (i);
+    return (snum);
 #endif
 }
 
@@ -1299,16 +1352,17 @@ int     just_signaled;		/* bugfix by Michael Bloom (mg@ttidca.TTI.COM) */
 /*ARGSUSED*/
 #endif
 sigret_t
-pintr(i)
-int i;
+pintr(snum)
+int snum;
 {
-#if (SVID > 0) && (SVID < 3)
-    (void) sigset(i, pintr);
-#endif /* SVID > 0 && SVID < 3 */
+#ifdef UNRELSIGS
+    if (snum)
+	(void) sigset(snum, pintr);
+#endif /* UNRELSIGS */
     just_signaled = 1;
     pintr1(1);
 #ifndef SIGVOID
-    return (i);
+    return (snum);
 #endif
 }
 
@@ -1471,7 +1525,7 @@ process(catch)
 	     * read fresh stuff. Otherwise, we are rereading input and don't
 	     * need or want to prompt.
 	     */
-	    if (fseekp == feobp)
+	    if (fseekp == feobp && aret == F_SEEK)
 		printprompt(0, NULL);
 	    flush();
 	    setalarm();
@@ -1485,7 +1539,7 @@ process(catch)
 	 * Echo not only on VERBOSE, but also with history expansion. If there
 	 * is a lexical error then we forego history echo.
 	 */
-	if (lex(&paraml) && !seterr && intty && !tellwhat && !Expand ||
+	if ((lex(&paraml) && !seterr && intty && !tellwhat && !Expand) ||
 	    adrof(STRverbose)) {
 	    haderr = 1;
 	    prlex(&paraml);
@@ -1510,7 +1564,7 @@ process(catch)
 	 * PWP: entry of items in the history list while in a while loop is done
 	 * elsewhere...
 	 */
-	if (enterhist || catch && intty && !whyles && !tellwhat)
+	if (enterhist || (catch && intty && !whyles && !tellwhat))
 	    savehist(&paraml);
 
 	if (Expand && seterr)
@@ -1643,7 +1697,7 @@ mailchk()
 #endif
 	if (stb.st_size == 0 || stb.st_atime > stb.st_mtime ||
 	    (stb.st_atime <= chktim && stb.st_mtime <= chktim) ||
-	    loginsh && !new)
+	    (loginsh && !new))
 	    continue;
 	if (cnt == 1)
 	    xprintf("You have %smail.\n", new ? "new " : "");

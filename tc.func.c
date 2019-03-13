@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.func.c,v 3.5 1991/07/17 13:21:49 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.func.c,v 3.11 1991/10/20 01:38:14 christos Exp $ */
 /*
  * tc.func.c: New tcsh builtins.
  */
@@ -34,14 +34,18 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-RCSID("$Id: tc.func.c,v 3.5 1991/07/17 13:21:49 christos Exp $")
-
 #include "sh.h"
+
+RCSID("$Id: tc.func.c,v 3.11 1991/10/20 01:38:14 christos Exp $")
+
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
 #include "tw.h"
 #include "tc.h"
+
+#ifdef HESIOD
+# include <hesiod.h>
+#endif /* HESIOD */
 
 extern time_t t_period;
 extern int do_logout;
@@ -108,7 +112,7 @@ expand_lex(buf, bufsiz, sp0, from, to)
 		 */
 		if ((*s & QUOTE)
 		    && (((*s & TRIM) == HIST) ||
-			((*s & TRIM) == '\\') && (prev_c != '\\'))) {
+			(((*s & TRIM) == '\\') && (prev_c != '\\')))) {
 		    *d++ = '\\';
 		}
 		*d++ = (*s & TRIM);
@@ -406,40 +410,42 @@ struct process *
 find_stop_ed()
 {
     register struct process *pp;
-    register char *ep, *vp, *p;
+    register char *ep, *vp, *cp, *p;
     int     epl, vpl;
 
     if ((ep = getenv("EDITOR")) != NULL) {	/* if we have a value */
-	if ((p = strrchr(ep, '/')) != NULL) {	/* if it has a path */
+	if ((p = strrchr(ep, '/')) != NULL) 	/* if it has a path */
 	    ep = p + 1;		/* then we want only the last part */
-	}
     }
-    else {
+    else 
 	ep = "ed";
-    }
+
     if ((vp = getenv("VISUAL")) != NULL) {	/* if we have a value */
-	if ((p = strrchr(vp, '/')) != NULL) {	/* and it has a path */
+	if ((p = strrchr(vp, '/')) != NULL) 	/* and it has a path */
 	    vp = p + 1;		/* then we want only the last part */
-	}
     }
-    else {
+    else 
 	vp = "vi";
-    }
+
     vpl = strlen(vp);
     epl = strlen(ep);
 
     if (pcurrent == PNULL)	/* see if we have any jobs */
 	return PNULL;		/* nope */
 
-    for (pp = proclist.p_next; pp; pp = pp->p_next) {
+    for (pp = proclist.p_next; pp; pp = pp->p_next)
 	if (pp->p_pid == pp->p_jobid) {
 	    p = short2str(pp->p_command);
+	    if ((cp = strrchr(p, '/')) != NULL)	/* and it has a path */
+		cp = cp + 1;		/* then we want only the last part */
+	    else
+		cp = p;			/* else we get all of it */
 	    /* if we find either in the current name, fg it */
-	    if (strncmp(ep, p, (size_t) epl) == 0 ||
-		strncmp(vp, p, (size_t) vpl) == 0)
+	    if (strncmp(ep, cp, (size_t) epl) == 0 ||
+		strncmp(vp, cp, (size_t) vpl) == 0)
 		return pp;
 	}
-    }
+
     return PNULL;		/* didn't find a job */
 }
 
@@ -502,9 +508,10 @@ alrmcatch(snum)
 int snum;
 {
     time_t  cl, nl;
-#if (SVID > 0) && (SVID < 3)
-    (void) sigset(SIGALRM, alrmcatch);
-#endif /* SVID > 0 && SVID < 3 */
+#ifdef UNRELSIGS
+    if (snum)
+	(void) sigset(SIGALRM, alrmcatch);
+#endif /* UNRELSIGS */
 
     if ((nl = sched_next()) == -1)
 	auto_logout();		/* no other possibility - logout */
@@ -771,8 +778,8 @@ setalarm()
     if ((nl = sched_next()) != -1) {
 	(void) time(&cl);
 	sched_dif = nl - cl;
-	if ((alrm_time == 0) || (sched_dif < alrm_time))
-	    alrm_time = ((int) sched_dif) + 1;
+	if ((alrm_time == 0) || ((unsigned) sched_dif < alrm_time))
+	    alrm_time = ((unsigned) sched_dif) + 1;
     }
     (void) alarm(alrm_time);	/* Autologout ON */
 }
@@ -817,7 +824,7 @@ rmstar(cp)
 		    silent = (*charac == 'i' || *charac == 'f');
 		args = args->next;
 	    }
-	    ask = (ask || !ask && !silent);
+	    ask = (ask || (!ask && !silent));
 	    if (ask) {
 		for (; !star && *args->word != ';'
 		     && args != cp; args = args->next)
@@ -1094,7 +1101,8 @@ static struct tildecache {
 }      *tcache = NULL;
 
 #define TILINCR 10
-static int tlength = 0, tsize = TILINCR;
+int tlength = 0;
+static int tsize = TILINCR;
 
 static int
 tildecompare(p1, p2)
@@ -1104,11 +1112,63 @@ tildecompare(p1, p2)
 }
 
 Char   *
+gethomedir(us)
+    Char   *us;
+{
+    register struct passwd *pp;
+#ifdef HESIOD
+    char **res, **res1, *cp;
+    Char *rp;
+#endif /* HESIOD */
+    
+    pp = getpwnam(short2str(us));
+#ifdef YPBUGS
+    fix_yp_bugs();
+#endif
+    if (pp != NULL)
+	return Strsave(str2short(pp->pw_dir));
+#ifdef HESIOD
+    res = hes_resolve(short2str(us), "filsys");
+    rp = 0;
+    if (res != 0) {
+	extern char *strtok();
+	if ((*res) != 0) {
+	    /*
+	     * Look at the first token to determine how to interpret
+	     * the rest of it.
+	     * Yes, strtok is evil (it's not thread-safe), but it's also
+	     * easy to use.
+	     */
+	    cp = strtok(*res, " ");
+	    if (strcmp(cp, "AFS") == 0) {
+		/* next token is AFS pathname.. */
+		cp = strtok(NULL, " ");
+		if (cp != NULL)
+		    rp = Strsave(str2short(cp));
+	    } else if (strcmp(cp, "NFS") == 0) {
+		cp = NULL;
+		if ((strtok(NULL, " ")) && /* skip remote pathname */
+		    (strtok(NULL, " ")) && /* skip host */
+		    (strtok(NULL, " ")) && /* skip mode */
+		    (cp = strtok(NULL, " "))) {
+		    rp = Strsave(str2short(cp));
+		}
+	    }
+	}
+	for (res1 = res; *res1; res1++)
+	    free(*res1);
+	return rp;
+    }
+#endif
+    return NULL;
+}
+
+Char   *
 gettilde(us)
     Char   *us;
 {
     struct tildecache *bp1, *bp2, *bp;
-    register struct passwd *pp;
+    Char *hd;
 
     if (tcache == NULL)
 	tcache = (struct tildecache *) xmalloc((size_t) (TILINCR *
@@ -1130,22 +1190,19 @@ gettilde(us)
     /*
      * Not in the cache, try to get it from the passwd file
      */
-    pp = getpwnam(short2str(us));
-#ifdef YPBUGS
-    fix_yp_bugs();
-#endif
-    if (pp == NULL)
+    hd = gethomedir(us);
+    if (hd == NULL)
 	return NULL;
 
     /*
      * Update the cache
      */
     tcache[tlength].user = Strsave(us);
-    us = tcache[tlength].home = Strsave(str2short(pp->pw_dir));
-    tcache[tlength++].hlen = Strlen(us);
+    tcache[tlength].home = hd;
+    tcache[tlength++].hlen = Strlen(hd);
 
     (void) qsort((ptr_t) tcache, (size_t) tlength, sizeof(struct tildecache),
-		 tildecompare);
+		 (int (*) __P((const void *, const void *))) tildecompare);
 
     if (tlength == tsize) {
 	tsize += TILINCR;
@@ -1153,7 +1210,7 @@ gettilde(us)
 						(size_t) (tsize *
 						  sizeof(struct tildecache)));
     }
-    return (us);
+    return (hd);
 }
 
 /*

@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.set.c,v 3.2 1991/07/17 21:52:22 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.set.c,v 3.5 1991/10/14 20:42:30 christos Exp $ */
 /*
  * sh.set.c: Setting and Clearing of variables
  */
@@ -34,10 +34,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-RCSID("$Id: sh.set.c,v 3.2 1991/07/17 21:52:22 christos Exp $")
-
 #include "sh.h"
+
+RCSID("$Id: sh.set.c,v 3.5 1991/10/14 20:42:30 christos Exp $")
+
 #include "ed.h"
 #include "tw.h"
 
@@ -342,7 +342,7 @@ xset(cp, vp)
 	xfree((ptr_t) ** vp);
 	**vp = dp;
     }
-    return (putn(exp(vp)));
+    return (putn(expr(vp)));
 }
 
 static Char *
@@ -367,7 +367,7 @@ operate(op, vp, p)
     }
     *v++ = p;
     *v++ = 0;
-    i = exp(&vecp);
+    i = expr(&vecp);
     if (*vecp)
 	stderror(ERR_NAME | ERR_EXPRESSION);
     return (putn(i));
@@ -387,8 +387,8 @@ putn(n)
 	n = -n;
 	*putp++ = '-';
     }
-    num = 2;			/* comfuse lint */
-    if (sizeof(int) == num && n == -32768) {
+    num = 2;			/* confuse lint */
+    if (sizeof(int) == num && ((unsigned int) n) == 32768) {
 	*putp++ = '3';
 	n = 2768;
 #ifdef pdp11
@@ -396,8 +396,8 @@ putn(n)
 #else
     }
     else {
-	num = 4;		/* comfuse lint */
-	if (sizeof(int) == num && n == -2147483648) {
+	num = 4;		/* confuse lint */
+	if (sizeof(int) == num && ((unsigned int) n) == 2147483648) {
 	    *putp++ = '2';
 	    n = 147483648;
 	}

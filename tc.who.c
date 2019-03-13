@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.who.c,v 3.2 1991/07/17 13:25:11 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.who.c,v 3.7 1991/10/21 17:24:49 christos Exp $ */
 /*
  * tc.who.c: Watch logins and logouts...
  */
@@ -34,17 +34,32 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-RCSID("$Id: tc.who.c,v 3.2 1991/07/17 13:25:11 christos Exp $")
-
 #include "sh.h"
+
+RCSID("$Id: tc.who.c,v 3.7 1991/10/21 17:24:49 christos Exp $")
+
 #include "tc.h"
 
 /*
  * kfk 26 Jan 1984 - for login watch functions.
  */
 #include <ctype.h>
-#include <utmp.h>
+
+#ifdef HAVEUTMPX
+# include <utmpx.h>
+/* I just redefine a few words here.  Changing every occurrence below
+ * seems like too much of work.  All UTMP functions have equivalent
+ * UTMPX counterparts, so they can be added all here when needed.
+ * Kimmo Suominen, Oct 14 1991
+ */
+# ifndef _PATH_UTMP
+#  define _PATH_UTMP UTMPX_FILE
+# endif /* _PATH_UTMP */
+# define utmp utmpx
+# define ut_time ut_xtime
+#else /* !HAVEUTMPX */
+# include <utmp.h>
+#endif /* HAVEUTMPX */
 
 #ifndef BROKEN_CC
 # define UTNAMLEN	sizeof(((struct utmp *) 0)->ut_name)
@@ -55,7 +70,7 @@ RCSID("$Id: tc.who.c,v 3.2 1991/07/17 13:25:11 christos Exp $")
 #  else
 #   define UTHOSTLEN	sizeof(((struct utmp *) 0)->ut_host)
 #  endif
-# endif				/* UTHOST */
+# endif	/* UTHOST */
 #else
 /* give poor cc a little help if it needs it */
 struct utmp __ut;
@@ -68,16 +83,16 @@ struct utmp __ut;
 #  else
 #   define UTHOSTLEN	sizeof(__ut.ut_host)
 #  endif
-# endif				/* UTHOST */
-#endif				/* BROKEN_CC */
+# endif /* UTHOST */
+#endif /* BROKEN_CC */
 
 #ifndef _PATH_UTMP
 # ifdef	UTMP_FILE
 #  define _PATH_UTMP UTMP_FILE
 # else
 #  define _PATH_UTMP "/etc/utmp"
-# endif				/* UTMP_FILE */
-#endif				/* _PATH_UTMP */
+# endif /* UTMP_FILE */
+#endif /* _PATH_UTMP */
 
 
 struct who {
@@ -97,6 +112,7 @@ static struct who *wholist = NULL;
 static int watch_period = 0;
 static time_t stlast = 0;
 extern char *month_list[];
+extern char *day_list[];
 #ifdef WHODEBUG
 static	void	debugwholist	__P((struct who *, struct who *));
 #endif
@@ -118,7 +134,7 @@ static	void	print_who	__P((struct who *));
 void
 initwatch()
 {
-    register int i;
+    register unsigned i;
 
     wholist = (struct who *) xcalloc(1, sizeof *wholist);
     wholist->w_next = (struct who *) xcalloc(1, sizeof *wholist);
@@ -179,7 +195,7 @@ watch_login()
 #endif
 	return;			/* no names to watch */
     }
-    vp = v->vec;
+    trim(vp = v->vec);
     if (blklen(vp) % 2)		/* odd # args: 1st == # minutes. */
 	interval = (number(*vp)) ? getn(*vp++) : MAILINTVL;
     (void) time(&t);
@@ -352,11 +368,11 @@ watch_login()
 
 	for (wp = wholist; wp != NULL; wp = wp->w_next) {
 	    if (wp->w_status & ANNOUNCE ||
-		(!eq(*vp, STRany) &&
-		 !eq(*vp, str2short(wp->w_name)) &&
-		 !eq(*vp, str2short(wp->w_new))) ||
-		(!eq(*(vp + 1), str2short(wp->w_tty)) &&
-		 !eq(*(vp + 1), STRany)))
+		(!eq(STRany, vp[0]) &&
+		 !Gmatch(str2short(wp->w_name), vp[0]) &&
+		 !Gmatch(str2short(wp->w_new),  vp[0])) ||
+		(!Gmatch(str2short(wp->w_tty),  vp[1]) &&
+		 !eq(STRany, vp[1])))
 		continue;	/* entry doesn't qualify */
 	    /* already printed or not right one to print */
 
@@ -392,7 +408,7 @@ watch_login()
 }
 
 #ifdef WHODEBUG
-static  oid
+static void
 debugwholist(new, wp)
     register struct who *new, *wp;
 {
@@ -506,17 +522,23 @@ print_who(wp)
 		else
 		    xprintf("%a%d:%02d", attributes, t->tm_hour, t->tm_min);
 		break;
-	    case 'w':
-		xprintf("%a%s %d", attributes, month_list[t->tm_mon],
-			t->tm_mday);
-		break;
-	    case 'W':
-		xprintf("%a%02d/%02d/%02d", attributes,
-			t->tm_mon + 1, t->tm_mday, t->tm_year);
+	    case 'd':
+		xprintf("%a%02d", attributes, day_list[t->tm_wday]);
 		break;
 	    case 'D':
-		xprintf("%a%02d-%02d-%02d", attributes,
-			t->tm_year, t->tm_mon + 1, t->tm_mday);
+		xprintf("%a%02d", attributes, t->tm_mday);
+		break;
+	    case 'w':
+		xprintf("%a%s", attributes, month_list[t->tm_mon]);
+		break;
+	    case 'W':
+		xprintf("%a%02d", attributes, t->tm_mon + 1);
+		break;
+	    case 'y':
+		xprintf("%a%02d", attributes, t->tm_year);
+		break;
+	    case 'Y':
+		xprintf("%a%04d", attributes, t->tm_year + 1900);
 		break;
 	    case 'l':
 		xprintf("%a%s", attributes, wp->w_tty);

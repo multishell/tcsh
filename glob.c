@@ -33,7 +33,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)glob.c	5.12 (Berkeley) 6/24/91";
 #endif /* LIBC_SCCS and not lint */
@@ -503,8 +502,7 @@ glob3(pathbuf, pathend, pattern, restpattern, pglob, no_match)
 
     if (!(dirp = Opendir(pathbuf)))
 	/* todo: don't call for ENOENT or ENOTDIR? */
-	if (pglob->gl_errfunc &&
-	    (*pglob->gl_errfunc) (pathbuf, errno) ||
+	if ((pglob->gl_errfunc && (*pglob->gl_errfunc) (pathbuf, errno)) ||
 	    (pglob->gl_flags & GLOB_ERR))
 	    return (GLOB_ABEND);
 	else

@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.lex.c,v 3.3 1991/07/24 17:38:12 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.lex.c,v 3.8 1991/10/21 17:24:49 christos Exp $ */
 /*
  * sh.lex.c: Lexical analysis into tokens
  */
@@ -34,11 +34,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-RCSID("$Id: sh.lex.c,v 3.3 1991/07/24 17:38:12 christos Exp $")
-
 #include "sh.h"
+
+RCSID("$Id: sh.lex.c,v 3.8 1991/10/21 17:24:49 christos Exp $")
+
 #include "ed.h"
+/* #define DEBUG_INP */
+/* #define DEBUG_SEEK */
 
 /*
  * C shell
@@ -95,6 +97,7 @@ static int exclc = 0;
 
 /* "Globp" for alias resubstitution */
 static Char *alvecp = NULL;
+int aret = F_SEEK;
 
 /*
  * Labuf implements a general buffer for lookahead during lexical operations.
@@ -142,10 +145,10 @@ lex(hp)
     histlinep = histline;
     *histlinep = '\0';
 
-    lineloc = btell();
+    btell(&lineloc);
     hp->next = hp->prev = hp;
     hp->word = STRNULL;
-    alvecp = 0, hadhist = 0;
+    hadhist = 0;
     do
 	c = readc(0);
     while (c == ' ' || c == '\t');
@@ -454,6 +457,7 @@ getdol()
 
     case '<':
     case '$':
+    case '!':
 	if (special)
 	    seterror(ERR_SPDOLLT);
 	*np = 0;
@@ -566,17 +570,51 @@ getdol()
 	 * -strike
 	 */
 
-	int     gmodflag = 0;
+	int     gmodflag = 0, amodflag = 0;
 
 #ifndef COMPAT
 	do {
 #endif /* COMPAT */
 	    *np++ = c, c = getC(DOEXCL);
-	    if (c == 'g')
-		gmodflag++, *np++ = c, c = getC(DOEXCL);
+	    if (c == 'g' || c == 'a') {
+		if (c == 'g')
+		    gmodflag++;
+		else
+		    amodflag++;
+		*np++ = c; c = getC(DOEXCL);
+	    }
+	    if ((c == 'g' && !gmodflag) || (c == 'a' && !amodflag)) {
+		if (c == 'g')
+		    gmodflag++;
+		else
+		    amodflag++;
+		*np++ = c; c = getC(DOEXCL);
+	    }
 	    *np++ = c;
-	    if (!any("htrqxe", c)) {
-		if (gmodflag && c == '\n')
+	    /* scan s// [eichin:19910926.0512EST] */
+	    if (c == 's') {
+		int delimcnt = 2;
+		int delim = getC(0);
+		*np++ = delim;
+		
+		if (!delim || letter(delim)
+		    || Isdigit(delim) || any(" \t\n", delim)) {
+		    seterror(ERR_BADSUBST);
+		    break;
+		}	
+		while ((c = getC(0)) != (-1)) {
+		    *np++ = c;
+		    if(c == delim) delimcnt--;
+		    if(!delimcnt) break;
+		}
+		if(delimcnt) {
+		    seterror(ERR_BADSUBST);
+		    break;
+		}
+		c = 's';
+	    }
+	    if (!any("htrqxes", c)) {
+		if ((amodflag || gmodflag) && c == '\n')
 		    stderror(ERR_VARSYN);	/* strike */
 		seterror(ERR_VARMOD, c);
 		*np = 0;
@@ -725,8 +763,14 @@ getsub(en)
 	exclnxt = 0;
 	global = 0;
 	sc = c = getC(0);
-	if (c == 'g')
-	    global++, sc = c = getC(0);
+	if (c == 'g' || c == 'a') {
+	    global |= (c == 'g') ? 1 : 2;
+	    sc = c = getC(0);
+	}
+	if (((c =='g') && !(global & 1)) || ((c == 'a') && !(global & 2))) {
+	    global |= (c == 'g') ? 1 : 2;
+	    sc = c = getC(0);
+	}
 
 	switch (c) {
 	case 'p':
@@ -735,7 +779,7 @@ getsub(en)
 
 	case 'x':
 	case 'q':
-	    global++;
+	    global |= 1;
 
 	    /* fall into ... */
 
@@ -860,8 +904,8 @@ dosub(sc, en, global)
 
     wdp = hp;
     while (--i >= 0) {
-	register struct wordent *new = (struct wordent *)
-	xcalloc(1, sizeof *wdp);
+	register struct wordent *new = 
+		(struct wordent *) xcalloc(1, sizeof *wdp);
 
 	new->word = 0;
 	new->prev = wdp;
@@ -869,8 +913,24 @@ dosub(sc, en, global)
 	wdp->next = new;
 	wdp = new;
 	en = en->next;
-	wdp->word = (en->word && (global ||didsub == 0)) ?
-	    subword(en->word, sc, &didsub) : Strsave(en->word);
+	if (en->word) {
+	    Char *tword, *otword;
+
+	    if ((global & 1) || didsub == 0) {
+		tword = subword(en->word, sc, &didsub);
+		if (global & 2) {
+		    while (didsub) {
+			otword = tword;
+			tword = subword(otword, sc, &didsub);
+			xfree((ptr_t) otword);
+		    }
+		    didsub = 1;
+		}
+	    }
+	    else
+		tword = Strsave(en->word);
+	    wdp->word = tword;
+	}
     }
     if (didsub == 0)
 	seterror(ERR_MODFAIL);
@@ -1145,7 +1205,7 @@ gethent(sc)
 	    }
 	    np = lhsb;
 	    event = 0;
-	    while (!any(": \t\\\n}", c)) {
+	    while (!cmap(c, _ESC | _META | _Q | _Q1) && !any("${}:", c)) {
 		if (event != -1 && Isdigit(c))
 		    event = event * 10 + c - '0';
 		else
@@ -1286,17 +1346,30 @@ readc(wanteof)
     register int c;
     static  sincereal;
 
+#ifdef DEBUG_INP
+    xprintf("readc\n");
+#endif
     if (c = peekread) {
 	peekread = 0;
 	return (c);
     }
 top:
+    aret = F_SEEK;
     if (alvecp) {
+#ifdef DEBUG_INP
+	xprintf("alvecp %c\n", *alvecp & 0xff);
+#endif
+	aret = A_SEEK;
 	if (c = *alvecp++)
 	    return (c);
-	if (*alvec) {
-	    alvecp = *alvec++;
-	    return (' ');
+	if (alvec && *alvec) {
+		alvecp = *alvec++;
+		return (' ');
+	}
+	else {
+	    alvecp = NULL;
+	    aret = F_SEEK;
+	    return('\n');
 	}
     }
     if (alvec) {
@@ -1308,12 +1381,14 @@ top:
 	return ('\n');
     }
     if (evalp) {
+	aret = E_SEEK;
 	if (c = *evalp++)
 	    return (c);
-	if (*evalvec) {
+	if (evalvec && *evalvec) {
 	    evalp = *evalvec++;
 	    return (' ');
 	}
+	aret = F_SEEK;
 	evalp = 0;
     }
     if (evalvec) {
@@ -1345,35 +1420,29 @@ reread:
 	c = bgetc();
 	if (c < 0) {
 #ifndef POSIX
-#ifdef TERMIO
-#include <termio.h>
+# ifdef TERMIO
 	    struct termio tty;
-
-#else				/* SGTTYB */
-#include <sys/ioctl.h>
+# else /* SGTTYB */
 	    struct sgttyb tty;
-
-#endif				/* TERMIO */
-#else				/* POSIX */
-#include <termios.h>
+# endif /* TERMIO */
+#else /* POSIX */
 	    struct termios tty;
-
-#endif				/* POSIX */
+#endif /* POSIX */
 	    if (wanteof)
 		return (-1);
 	    /* was isatty but raw with ignoreeof yields problems */
 #ifndef POSIX
-#ifdef TERMIO
+# ifdef TERMIO
 	    if (ioctl(SHIN, TCGETA, (ioctl_t) & tty) == 0 &&
 		(tty.c_lflag & ICANON))
-#else				/* GSTTYB */
+# else /* GSTTYB */
 	    if (ioctl(SHIN, TIOCGETP, (ioctl_t) & tty) == 0 &&
 		(tty.sg_flags & RAW) == 0)
-#endif				/* TERMIO */
-#else				/* POSIX */
+# endif /* TERMIO */
+#else /* POSIX */
 	    if (tcgetattr(SHIN, &tty) == 0 &&
 		(tty.c_lflag & ICANON))
-#endif				/* POSIX */
+#endif /* POSIX */
 	    {
 		/* was 'short' for FILEC */
 		int     ctpgrp;
@@ -1389,7 +1458,7 @@ reread:
 		    xprintf("Reset tty pgrp from %d to %d\n", ctpgrp, tpgrp);
 		    goto reread;
 		}
-#endif				/* BSDJOBS */
+#endif /* BSDJOBS */
 		if (adrof(STRignoreeof)) {
 		    if (loginsh)
 			xprintf("\nUse \"logout\" to logout.\n");
@@ -1562,44 +1631,78 @@ bfree()
 
 void
 bseek(l)
-    off_t   l;
+    struct Ain   *l;
 {
-
-    fseekp = l;
-    if (!cantell) {
-#ifdef notdef
-	register struct whyle *wp;
+    switch (aret = l->type) {
+    case E_SEEK:
+	evalvec = l->a_seek;
+	evalp = (Char *) l->f_seek;
+#ifdef DEBUG_SEEK
+	xprintf("seek to eval %x %x\n", evalvec, evalp);
 #endif
-	if (!whyles)
-	    return;
-#ifdef notdef
-	/*
-	 * Christos: I don't understand this? both wp and l are local. What is
-	 * this used for? I suspect the author meant fseek = wp->w_start
-	 */
-	for (wp = whyles; wp->w_next; wp = wp->w_next)
-	    continue;
-	if (wp->w_start > l)
-	    l = wp->w_start;
+	return;
+    case A_SEEK:
+	alvec = l->a_seek;
+	alvecp = (Char *) l->f_seek;
+#ifdef DEBUG_SEEK
+	xprintf("seek to alias %x %x\n", alvec, alvecp);
 #endif
+	return;
+    case F_SEEK:	
+#ifdef DEBUG_SEEK
+	xprintf("seek to file %x\n", fseekp);
+#endif
+	fseekp = l->f_seek;
+	return;
+    default:
+	xprintf("Bad seek type %d\n", aret);
+	abort();
     }
 }
 
 /* any similarity to bell telephone is purely accidental */
-#ifndef btell
-off_t
-btell()
+void
+btell(l)
+struct Ain *l;
 {
-    return (fseekp);
-}
-
+    switch (l->type = aret) {
+    case E_SEEK:
+	l->a_seek = evalvec;
+	l->f_seek = (off_t) evalp;
+#ifdef DEBUG_SEEK
+	xprintf("tell eval %x %x\n", evalvec, evalp);
 #endif
+	return;
+    case A_SEEK:
+	l->a_seek = alvec;
+	l->f_seek = (off_t) alvecp;
+#ifdef DEBUG_SEEK
+	xprintf("tell alias %x %x\n", alvec, alvecp);
+#endif
+	return;
+    case F_SEEK:
+	l->f_seek = fseekp;
+	l->a_seek = NULL;
+#ifdef DEBUG_SEEK
+	xprintf("tell file %x\n", fseekp);
+#endif
+	return;
+    default:
+	xprintf("Bad seek type %d\n", aret);
+	abort();
+    }
+}
 
 void
 btoeof()
 {
     (void) lseek(SHIN, (off_t) 0, L_XTND);
+    aret = F_SEEK;
     fseekp = feobp;
+    alvec = NULL;
+    alvecp = NULL;
+    evalvec = NULL;
+    evalp = NULL;
     wfree();
     bfree();
 }

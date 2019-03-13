@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.vers.c,v 3.5 1991/08/06 01:50:07 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.vers.c,v 3.8 1991/10/13 23:44:48 christos Exp $ */
 /*
  * tc.vers.c: Version dependent stuff
  */
@@ -34,10 +34,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-RCSID("$Id: tc.vers.c,v 3.5 1991/08/06 01:50:07 christos Exp $")
-
 #include "sh.h"
+
+RCSID("$Id: tc.vers.c,v 3.8 1991/10/13 23:44:48 christos Exp $")
+
 #include "patchlevel.h"
 
 
@@ -112,6 +112,11 @@ gethosttype()
     hosttype = str2short("aix370");
 # endif /* _AIX370 */
 
+# ifdef _IBMESA
+#  define _havehosttype_
+    hosttype = str2short("aixESA");
+# endif /* _IBMESA */
+
 # ifdef _IBMR2
 #  define _havehosttype_
     hosttype = str2short("rs6000");
@@ -140,11 +145,11 @@ gethosttype()
 #   define _havehosttype_
    hosttype = str2short("hp9000s300");
 #  endif /* hp9000s300 */
-#  ifndef _havehosttype_
 # if defined(hp9000s500) && !defined(_havehosttype_)
 #  define _havehosttype_
    hosttype = str2short("hp9000s500");
 # endif /* hp9000s500 */
+#  ifndef _havehosttype_
 #   define _havehosttype_
    hosttype = str2short("hp");
 #  endif /* _havehosttype_ */
@@ -343,11 +348,32 @@ gethosttype()
 #  endif
 # endif /* sgi */
 
-#ifdef uts
-# define _havehosttype_
+# ifdef uts
+#  define _havehosttype_
     hosttype = str2short("amdahl");
-#endif /* uts */
+# endif /* uts */
   
+# ifdef OPUS
+#  define _havehosttype_
+    hosttype = str2short("opus");
+# endif /* OPUS */
+
+# ifdef eta10
+#  define _havehosttype_
+   /* Bruce Woodcock <woodcock@mentor.cc.purdue.edu> */
+   hosttype = str2short("eta10");
+# endif /* eta10 */
+
+# ifdef cray
+#  define _havehosttype_
+   hosttype = str2short("cray");
+# endif /* cray */
+
+# ifdef NDIX
+#  define _havehosttype_
+   /* B|rje Josefsson <bj@dc.luth.se> */
+   hosttype = str2short("nd500");
+# endif /* NDIX */
 
 # ifndef _havehosttype_
 #  define _havehosttype_

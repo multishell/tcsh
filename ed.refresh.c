@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.refresh.c,v 3.1 1991/07/15 19:37:24 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.refresh.c,v 3.3 1991/10/12 04:23:51 christos Exp $ */
 /*
  * ed.refresh.c: Lower level screen refreshing functions
  */
@@ -34,10 +34,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-RCSID("$Id: ed.refresh.c,v 3.1 1991/07/15 19:37:24 christos Exp $")
-
 #include "sh.h"
+
+RCSID("$Id: ed.refresh.c,v 3.3 1991/10/12 04:23:51 christos Exp $")
+
 #include "ed.h"
 /* #define DEBUG_UPDATE */
 /* #define DEBUG_REFRESH */
@@ -205,7 +205,7 @@ Refresh()
     register Char *cp;
     int     cur_h, cur_v = 0, new_vcv;
     Char    oldgetting;
-    int     litnum = 0;
+    unsigned int litnum = 0;
 
 #ifdef DEBUG_REFRESH
     dprintf("PromptBuf = :%s:\r\n", short2str(PromptBuf));

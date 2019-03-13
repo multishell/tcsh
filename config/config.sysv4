@@ -10,21 +10,13 @@
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
  */
-#ifdef _SEQUENT_
-# define POSIX
-#else /* _SEQUENT_ */
-# undef POSIX
-#endif /* _SEQUENT_ */
+#define POSIX
 
 /*
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
  *		job control facilities.
  */
-#ifdef _SEQUENT_
-# define POSIXJOBS
-#else /* _SEQUENT_ */
-# undef POSIXJOBS
-#endif /* _SEQUENT_ */
+#define POSIXJOBS
 
 /*
  * VFORK	This machine has a vfork().  
@@ -39,7 +31,7 @@
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
  */
-#define VFORK
+#undef VFORK
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and
@@ -52,28 +44,20 @@
  *		Note: POSIX systems should not define this unless they
  *		have sigvec() and friends (ie: 4.3BSD-RENO, HP-UX).
  */
-#define BSDSIGS
+#undef BSDSIGS
 
 /*
  * BSDTIMES	You have BSD-style process time stuff (like rusage)
  *		This may or may not be true.  For example, Apple Unix
  *		(OREO) has BSDJOBS and BSDSIGS but not BSDTIMES.
  */
-#ifdef _SEQUENT_
-# undef BSDTIMES
-#else /* _SEQUENT_ */
-# define BSDTIMES
-#endif /* _SEQUENT_ */
+#define BSDTIMES
 
 /*
  * BSDNICE	Your system uses setpriority() instead of nice, to
  *		change a processes scheduling priority
  */
-#ifdef _SEQUENT_
-# undef BSDNICE
-#else /* _SEQUENT_ */
-# define BSDNICE
-#endif /* _SEQUENT_ */
+#undef BSDNICE
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
@@ -81,11 +65,7 @@
  *		BSD uses sgttyb. POSIX systems should define this
  *		anyway, even though they use struct termios.
  */
-#ifdef _SEQUENT_
-# define TERMIO
-#else /* _SEQUENT_ */
-# undef TERMIO
-#endif /* _SEQUENT_ */
+#define TERMIO
 
 /*
  * SVID		Your machine is SVID complient (Sys V, HPUX, A/UX)
@@ -94,32 +74,19 @@
  *		Set SVID to 1, 2, or 3, depending the version of System V
  *		you are running. Or set it to 0 if you are not SVID based
  */
-#ifdef _SEQUENT_
-# define SVID	3
-#else /* _SEQUENT_ */
-# define SVID	0
-#endif /* _SEQUENT_ */
+#define SVID	4
 
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
  *		to send command output to /dev/null
- *		This is fixed in sunos 4.1, broken in 4.0..
  */
-#ifdef _SEQUENT_
-# undef YPBUGS
-#else /* _SEQUENT_ */
-# define YPBUGS
-#endif /* _SEQUENT_ */
-  
+#undef YPBUGS
+
 /*
  * SIGVOID	Define this if your signal handlers return void.  On older
  *		systems, signal returns int, but on newer ones, it returns void.
  */
-#ifdef _SEQUENT_
-# define SIGVOID 
-#else /* _SEQUENT_ */
-# undef SIGVOID 
-#endif /* _SEQUENT_ */
+#define SIGVOID 
 
 /*
  * HAVEDUP2	Define this if your system supports dup2().
@@ -127,35 +94,30 @@
 #define HAVEDUP2
 
 /*
+ * HAVEUTMPX	Define if you have extended utmp (utmpx).
+ *		(common for svr4 systems)
+ */
+#define HAVEUTMPX
+
+/*
  * UTHOST	Does the utmp file have a host field?
  */
-#define UTHOST
+#ifdef HAVEUTMPX
+# define UTHOST
+#else
+# undef UTHOST
+#endif /* HAVEUTMPX */
 
 /*
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
  */
-#ifdef _SEQUENT_
 #define DIRENT
-#else /* _SEQUENT_ */
-#undef DIRENT
-#endif /* _SEQUENT_ */
-
-/*
- * BSD		Your system has <strings.h> instead of <string.h>
- */
-#ifdef _SEQUENT_
-#undef BSD
-#else /* _SEQUENT_ */
-#define BSD
-#endif /* _SEQUENT_ */
-
 /****************** local defines *********************/
+#ifndef BSDTIMES
+# define NEEDgethostname
+#endif
+
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
 
-#ifdef _SEQUENT_
-#define NAMEI_BUG
-#else /* _SEQUENT_ */
-#undef NLS
-#endif /* _SEQUENT_ */

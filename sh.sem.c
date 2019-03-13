@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.sem.c,v 3.3 1991/07/23 23:20:08 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.sem.c,v 3.7 1991/10/18 16:27:13 christos Exp $ */
 /*
  * sh.sem.c: I/O redirections and job forking. A touchy issue!
  *	     Most stuff with builtins is incorrect
@@ -35,10 +35,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-RCSID("$Id: sh.sem.c,v 3.3 1991/07/23 23:20:08 christos Exp $")
-
 #include "sh.h"
+
+RCSID("$Id: sh.sem.c,v 3.7 1991/10/18 16:27:13 christos Exp $")
+
 #include "tc.h"
 
 #ifdef FIOCLEX
@@ -62,6 +62,23 @@ static	void		chkclob	__P((char *));
 /*
  * C shell
  */
+
+/*
+ * For SVR4, there are problems with pipelines having the first process as
+ * the group leader.  The problem occurs when the first process exits before
+ * the others have a chance to setpgid().  This is because in SVR4 you can't
+ * have a zombie as a group leader.  The solution I have used is to reverse
+ * the order in which pipelines are started, making the last process the
+ * group leader.  (Note I am not using 'pipeline' in the generic sense -- I
+ * mean processes connected by '|'.)  I don't know yet if this causes other
+ * problems.
+ *
+ * All the changes for this are in execute(), and are enclosed in 
+ * '#ifdef BACKPIPE'
+ *
+ * David Dawes (dawes@physics.su.oz.au) Oct 1991
+ */
+
 /*VARARGS 1*/
 void
 execute(t, wanttty, pipein, pipeout)
@@ -108,8 +125,13 @@ execute(t, wanttty, pipein, pipeout)
 	/* fall into... */
 
     case NODE_PAREN:
+#ifdef BACKPIPE
+	if (t->t_dflg & F_PIPEIN)
+	    mypipe(pipein);
+#else /* !BACKPIPE */
 	if (t->t_dflg & F_PIPEOUT)
 	    mypipe(pipeout);
+#endif /* BACKPIPE */
 	/*
 	 * Must do << early so parent will know where input pointer should be.
 	 * If noexec then this is all we do.
@@ -120,8 +142,6 @@ execute(t, wanttty, pipein, pipeout)
 	    if (noexec)
 		(void) close(0);
 	}
-	if (noexec)
-	    break;
 
 	set(STRstatus, Strsave(STR0));
 
@@ -179,15 +199,35 @@ execute(t, wanttty, pipein, pipeout)
 	    else
 		break;
 
-	/* is t a command */
+	/* is it a command */
 	if (t->t_dtyp == NODE_COMMAND) {
 	    /*
 	     * Check if we have a builtin function and remember which one.
 	     */
 	    bifunc = isbfunc(t);
+ 	    if (noexec) {
+		/*
+		 * Continue for builtins that are part of the scripting language
+		 */
+		if (bifunc->bfunct != (void (*)())dobreak	&&
+		    bifunc->bfunct != (void (*)())docontin	&&
+		    bifunc->bfunct != (void (*)())doelse	&&
+		    bifunc->bfunct != (void (*)())doend	&&
+		    bifunc->bfunct != (void (*)())doforeach	&&
+		    bifunc->bfunct != (void (*)())dogoto	&&
+		    bifunc->bfunct != (void (*)())doif	&&
+		    bifunc->bfunct != (void (*)())dorepeat	&&
+		    bifunc->bfunct != (void (*)())doswbrk	&&
+		    bifunc->bfunct != (void (*)())doswitch	&&
+		    bifunc->bfunct != (void (*)())dowhile	&&
+		    bifunc->bfunct != (void (*)())dozip)
+		    break;
+	    }
 	}
 	else {			/* not a command */
 	    bifunc = NULL;
+	    if (noexec)
+		break;
 	}
 
 	/*
@@ -200,18 +240,27 @@ execute(t, wanttty, pipein, pipeout)
 	 * Prevent forking cd, pushd, popd, chdir cause this will cause the
 	 * shell not to change dir!
 	 */
-	if (bifunc && (bifunc->bfunct == dochngd ||
-		       bifunc->bfunct == dopushd ||
-		       bifunc->bfunct == dopopd))
+#ifdef BACKPIPE
+	/*
+	 * Can't have NOFORK for the tail of a pipe - because it is not the
+	 * last command spawned (even if it is at the end of a parenthesised
+	 * list).
+	 */
+	if (t->t_dflg & F_PIPEIN)
+	    t->t_dflg &= ~(F_NOFORK);
+#endif /* BACKPIPE */
+	if (bifunc && (bifunc->bfunct == (void(*)())dochngd ||
+		       bifunc->bfunct == (void(*)())dopushd ||
+		       bifunc->bfunct == (void(*)())dopopd))
 	    t->t_dflg &= ~(F_NICE);
-	if (((t->t_dflg & F_TIME) || (t->t_dflg & F_NOFORK) == 0 &&
+	if (((t->t_dflg & F_TIME) || ((t->t_dflg & F_NOFORK) == 0 &&
 	     (!bifunc || t->t_dflg &
-	      (F_PIPEOUT | F_AMPERSAND | F_NICE | F_NOHUP))) ||
+	      (F_PIPEOUT | F_AMPERSAND | F_NICE | F_NOHUP)))) ||
 	/*
 	 * We have to fork for eval too.
 	 */
 	    (bifunc && (t->t_dflg & F_PIPEIN) != 0 &&
-	     bifunc->bfunct == doeval))
+	     bifunc->bfunct == (void(*)())doeval))
 #ifdef VFORK
 	    if (t->t_dtyp == NODE_PAREN ||
 		t->t_dflg & (F_REPEAT | F_AMPERSAND) || bifunc)
@@ -241,6 +290,8 @@ execute(t, wanttty, pipein, pipeout)
 #endif /* BSDSIGS */
 		    nosigchld = 0;
 		}
+		else if (t->t_dflg & F_AMPERSAND)
+		    backpid = pid;
 	    }
 
 #ifdef VFORK
@@ -388,10 +439,8 @@ execute(t, wanttty, pipein, pipeout)
 		    }
 
 		    if (setintr)
-			ignint =
-			    (tpgrp == -1 &&
-			     (t->t_dflg & F_NOINTERRUPT))
-			    || gointr && eq(gointr, STRminus);
+			ignint = (tpgrp == -1 && (t->t_dflg & F_NOINTERRUPT))
+				|| (gointr && eq(gointr, STRminus));
 		    pgrp = pcurrjob ? pcurrjob->p_jobid : getpid();
 		    child++;
 		    if (setintr) {
@@ -462,29 +511,47 @@ execute(t, wanttty, pipein, pipeout)
 	     * wait for the whole job anyway, but this test doesn't really
 	     * express our intentions.
 	     */
+#ifdef BACKPIPE
+	    if (didfds == 0 && t->t_dflg & F_PIPEOUT) {
+		(void) close(pipeout[0]);
+		(void) close(pipeout[1]);
+	    }
+	    if ((t->t_dflg & F_PIPEIN) != 0)
+		break;
+#else /* !BACKPIPE */
 	    if (didfds == 0 && t->t_dflg & F_PIPEIN) {
 		(void) close(pipein[0]);
 		(void) close(pipein[1]);
 	    }
-	    if ((t->t_dflg & F_PIPEOUT) == 0) {
-		if (nosigchld) {
+	    if ((t->t_dflg & F_PIPEOUT) != 0)
+		break;
+#endif /* BACKPIPE */
+
+	    if (nosigchld) {
 #ifdef BSDSIGS
-		    (void) sigsetmask(csigmask);
+		(void) sigsetmask(csigmask);
 #else /* !BSDSIGS */
-		    (void) sigrelse(SIGCHLD);
+		(void) sigrelse(SIGCHLD);
 #endif /* BSDSIGS */
-		    nosigchld = 0;
-		}
-		if ((t->t_dflg & F_AMPERSAND) == 0)
-		    pwait();
+		nosigchld = 0;
 	    }
+	    if ((t->t_dflg & F_AMPERSAND) == 0)
+		pwait();
 	    break;
 	}
+
 	doio(t, pipein, pipeout);
+#ifdef BACKPIPE
+	if (t->t_dflg & F_PIPEIN) {
+	    (void) close(pipein[0]);
+	    (void) close(pipein[1]);
+	}
+#else /* !BACKPIPE */
 	if (t->t_dflg & F_PIPEOUT) {
 	    (void) close(pipeout[0]);
 	    (void) close(pipeout[1]);
 	}
+#endif /* BACKPIPE */
 	/*
 	 * Perform a builtin function. If we are not forked, arrange for
 	 * possible stopping
@@ -519,6 +586,16 @@ execute(t, wanttty, pipein, pipeout)
 	exitstat();
 
     case NODE_PIPE:
+#ifdef BACKPIPE
+	t->t_dcdr->t_dflg |= F_PIPEIN | (t->t_dflg &
+			(F_PIPEOUT | F_AMPERSAND | F_NOFORK | F_NOINTERRUPT));
+	execute(t->t_dcdr, wanttty, pv, pipeout);
+	t->t_dcar->t_dflg |= F_PIPEOUT |
+	    (t->t_dflg & (F_PIPEIN | F_AMPERSAND | F_STDERR | F_NOINTERRUPT));
+	if (wanttty > 0)
+	    wanttty = 0;	/* got tty already */
+	execute(t->t_dcar, wanttty, pipein, pv);
+#else /* !BACKPIPE */
 	t->t_dcar->t_dflg |= F_PIPEOUT |
 	    (t->t_dflg & (F_PIPEIN | F_AMPERSAND | F_STDERR | F_NOINTERRUPT));
 	execute(t->t_dcar, wanttty, pipein, pv);
@@ -527,6 +604,7 @@ execute(t, wanttty, pipein, pipeout)
 	if (wanttty > 0)
 	    wanttty = 0;	/* got tty already */
 	execute(t->t_dcdr, wanttty, pv, pipeout);
+#endif /* BACKPIPE */
 	break;
 
     case NODE_LIST:

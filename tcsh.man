@@ -1,11 +1,12 @@
-\" $Id: tcsh.man,v 3.10 1991/08/06 02:00:24 christos Exp $
-.TH TCSH 1 "5 August 1991" "Cornell"
+.\" $Id: tcsh.man,v 3.19 1991/10/21 17:24:49 christos Exp $
+.TH TCSH 1 "20 October 1991" "Cornell"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
 .B tcsh 
 [ 
-.B \-bcdefilmnqstvVxX 
+.B \-bcdefFilmnqstvVxX 
+.B \-Dname[=value]
 ] 
 [ 
 .I argument .\|.\|.  
@@ -90,9 +91,11 @@ in a set of characters and the ability to negate a globbing pattern.
 21) Searching for the visual history mechanism.
 .sp
 .ti -4
-22) A new builtin for the
-.IR which (1)
-command.
+22) New builtins for the
+.IR which (1) 
+and
+.IR where
+commands.
 .sp
 .ti -4
 23) Restarting a stopped editor with two keystrokes.
@@ -346,30 +349,36 @@ EMACS Multi-character and 8 bit bindings
 .PP
 VI Insert Mode functions
 .sp
+"^@"	->  is undefined
+"^A"	->  beginning-of-line
+"^B"	->  backward-char
 "^C"	->  tty-sigintr
 "^D"	->  list-or-eof
+"^E"	->  end-of-line
+"^F"	->  forward-char
+"^G"	->  list-glob
 "^H"	->  backward-delete-char
 "^I"	->  complete-word
 "^J"	->  newline
 "^K"	->  kill-line
 "^L"	->  clear-screen
 "^M"	->  newline
-"^N"	->  is undefined
+"^N"	->  down-history
 "^O"	->  tty-flush-output
-"^P"	->  is undefined
+"^P"	->  up-history
 "^Q"	->  tty-start-output
 "^R"	->  redisplay
 "^S"	->  tty-stop-output
-"^T"	->  is undefined
+"^T"	->  transpose-chars
 "^U"	->  backward-kill-line
 "^V"	->  quoted-insert
 "^W"	->  backward-delete-word
-"^X"	->  is undefined
+"^X"	->  expand-line
 "^Y"	->  tty-dsusp
 "^Z"	->  tty-sigtsusp
 "^["	->  vi-cmd-mode
 "^\e"	->  tty-sigquit
-" "  to "~"	->  self-insert-command
+" " to "~"	->  self-insert-command
 "^?"	->  backward-delete-char
 .PP
 VI Command Mode functions
@@ -382,7 +391,7 @@ VI Command Mode functions
 "^E"	->  end-of-line
 "^F"	->  is undefined
 "^G"	->  list-glob
-"^H"	->  backward-delete-char
+"^H"	->  backward-char
 "^I"	->  vi-cmd-mode-complete
 "^J"	->  newline
 "^K"	->  kill-line
@@ -405,38 +414,53 @@ VI Command Mode functions
 "!"	->  expand-history
 "$"	->  end-of-line
 "*"	->  expand-glob
+"+"	->  down-history
+";"	->  vi-repeat-char-fwd
+","	->  vi-repeat-char-back
+"-"	->  up-history
+"."	->  is undefined
+"/"	->  vi-search-back
 "0"	->  vi-zero
-"1"  to "9"	->  digit-argument
-"?"	->  which-command
+"1" to "9"	->  digit-argument
+"?"	->  vi-search-fwd
 "@"	->  is undefined
 "A"	->  vi-add-at-eol
-"B"	->  backward-word
-"C"	->  vi-chg-to-eol
+"B"	->  vi-word-back
+"C"	->  change-till-end-of-line
 "D"	->  kill-line
+"E"	->  vi-endword
+"F"	->  vi-char-back
 "I"	->  vi-insert-at-bol
 "J"	->  history-search-forward
 "K"	->  history-search-backward
+"N"	->  vi-search-back
 "O"	->  sequence-lead-in
 "R"	->  vi-replace-mode
 "S"	->  vi-substitute-line
-"T"	->  toggle-literal-history
+"T"	->  vi-charto-back
+"U"	->  is undefined
 "V"	->  expand-variables
-"W"	->  forward-word
+"W"	->  vi-word-fwd
 "X"	->  backward-delete-char
 "["	->  sequence-lead-in
 "\e^"	->  beginning-of-line
 "a"	->  vi-add
 "b"	->  backward-word
 "c"	->  is undefined
-"d"	->  delete-word
+"d"	->  vi-delmeta
+"e"	->  vi-eword
+"f"	->  vi-char-fwd
 "h"	->  backward-char
 "i"	->  vi-insert
 "j"	->  down-history
 "k"	->  up-history
 "l"	->  forward-char
+"m"	->  is undefined
+"n"	->  vi-search-fwd
 "r"	->  vi-replace-char
 "s"	->  vi-substitute-char
-"t"	->  toggle-literal-history
+"t"	->  vi-charto-fwd
+"u"	->  vi-undo
 "v"	->  expand-variables
 "w"	->  vi-beginning-of-next-word
 "x"	->  delete-char
@@ -554,10 +578,7 @@ been changed, then
 will change to using that speed.
 .I Tcsh
 will also obey changes in the padding needed by the tty.
-Some changes to the command keys will be obeyed, however if a command key
-is unset,
-.I tcsh
-will reset it to what it was.  Also, the shell will automatically turn off
+Also, the shell will automatically turn off
 RAW and CBREAK (on systems that use 
 .I termio(7) 
 it will turn on ICANON) modes, and will turn on 
@@ -574,15 +595,32 @@ display is similar to
 and varies depending on the system's tty driver. Modes that 
 .I tcsh 
 will always try to set are shown as
-.I "+mode"
-modes that 
+.I "+mode".
+Modes that 
 .I tcsh 
 will always try to clear are shown as
 .I "-mode"
 and modes that tcsh will track and allow to be modified are not shown by
 default, or if the 
 .I "-a"
-flag is given, are shown without a leading sign.
+flag is given, are shown without a leading sign. For tty characters,
+.I "-char"
+disables the tty character, while 
+.I "+char" 
+protects the tty character from being changed.
+.PP
+Setty can be used to control the three different modes 
+.I tcsh
+uses for the tty. The default mode displayed is the "execute" mode which is 
+used when tcsh executes commands. The two other modes are the "edit" mode 
+and the "quote" mode. The "edit" mode is used for command line editing, and
+the "quote" mode is used when entering literal characters. The "execute" mode
+can be specified with
+.I "-x",
+the "edit" mode with 
+.I "-d", 
+and the "quote" mode with
+.I "-q"
 For example if one wants to set the 
 .I echok
 flag and let the 
@@ -597,6 +635,7 @@ oflag:+opost +onlcr -onlret
 cflag:
 lflag:+isig +icanon +echo +echoe -echok -echonl -noflsh 
       +echoctl -flusho +iexten 
+chars:
 > setty +echok echoe
 > setty
 iflag:-inlcr -igncr +icrnl 
@@ -604,6 +643,7 @@ oflag:+opost +onlcr -onlret
 cflag:
 lflag:+isig +icanon +echo +echok -echonl -noflsh +echoctl 
       -flusho +iexten 
+chars:
 .RE
 .fi
 .sp
@@ -956,13 +996,14 @@ variable, followed by the corrected line, e.g.
 .RS +.6i
 .nf
 > lz /usr/bin
-CORRECT>ls /usr/bin (y/n)?
+CORRECT>ls /usr/bin (y|n|e)?
 .fi
 .RE
 .sp
 Answering 'y' or <space> at the prompt
-will cause the corrected line to be used,
-anything else will leave the original line unchanged.
+will cause the corrected line to be executed, 'e' will leave the uncorrected 
+command in the input buffer and
+anything else will execute the original line unchanged.
 .PP
 Automatic correction is not guaranteed to work the way the user intended.
 Command line parsing is done in a rudimentary fashion. It is mostly provided
@@ -1145,7 +1186,7 @@ The available sequences are:
 .RS +.6i
 .ta 1.2i 1.7i
 .nf
-%d or %/	Current working directory.
+%/	Current working directory.
 %~	cwd.  If it starts with $HOME, that part is 
 	replaced by a ~. In addition if a directory
 	name prefix matches a user's home directory,
@@ -1175,9 +1216,12 @@ The available sequences are:
 ^c	`c' is parsed the same way as in bindkey.
 %%	A single %.
 %n	The user name, contents of $user.
-%w	The date in <Mon> dd format.
-%W	The date in mm/dd/yy format.
-%D	The date in yy-mm-dd format.
+%d	The weekday in <Day> format.
+%D	The day in dd format.
+%w	The month in <Mon> format.
+%W	The month in mm format.
+%y	The year in yy format.
+%Y	The year in yyyy format.
 %l	The line (tty) the user is logged on.
 %L	clear from prompt to end of display or end of line.
 %#	A `#' if tcsh is run as a root shell, 
@@ -1386,7 +1430,7 @@ has a mechanism so that the user can watch for login and logout
 activity of any user or terminal in the system.
 This is accomplished using the new special shell variable
 .I watch,
-which contains login/terminal name pairs to be checked for activity.
+which contains login/terminal pattern pairs to be checked for activity.
 For example:
 .nf
 .sp
@@ -1402,13 +1446,13 @@ either a user's or a terminal's name, thus allowing
 .nf
 .sp
 .RS +.6i
-> set watch=(brad any any ttyh0)
+> set watch=('b*' any any ttyh0)
 .RE
 .sp
 .fi
-which will check for user "brad" logging in or out of the system on any
-terminal, as well as anyone logging in to /dev/ttyh0.
-Naturally, the completely general case
+which will check for users that match the pattern 'b*' logging in 
+or out of the system on any terminal, as well as anyone logging in 
+to /dev/ttyh0. Naturally, the completely general case
 .nf
 .sp
 .RS +.6i
@@ -1484,9 +1528,10 @@ The following sequences are available for the format specification:
 	time is approximated if unavailable).
 %T	The time, in 24-hour format. (but see 
 	the "ampm" shell variable below).
-%w	The date in <Mon> dd format.
-%W	The date in mm/dd/yy format.
-%D	The date in yy-mm-dd format.
+%D	The day in dd format.
+%w	The month in <Mon> format.
+%W	The month in mm format.
+%Y	The year in yy format.
 .RE
 .DT
 .fi
@@ -1731,7 +1776,7 @@ set path = (~/bin.$HOSTTYPE /usr/ucb /bin /usr/bin /usr/games .)
 .sp
 and the user has directories named "bin.\fImachine\fR" (where
 .I machine
-is a name from the above list), then the user can have the same
+is a name from the list below), then the user can have the same
 programs compiled for different machines in the appropriate
 "bin.\fImachine\fR" directories and
 .I tcsh
@@ -1742,6 +1787,7 @@ The current possible values are:
 .ta 1.5i
 .nf
 \fIaix370\fR		an IBM 370, running aix
+\fIaixESA\fR		an IBM ESA, running aix
 \fIalliant\fR		an Alliant FX series
 \fIamdahl\fR		an Amdahl running uts 2.1
 \fIapollo\fR		an Apollo running DomainOS
@@ -1752,7 +1798,9 @@ The current possible values are:
 \fIbalance\fR		a Sequent Balance (32000 based)
 \fIbutterfly\fR		a BBN Computer Butterfly 1000
 \fIconvex\fR		a Convex
+\fIcray\fR		a Cray running Unicos
 \fIdecstation\fR	a DecStation XXXX
+\fIeta10\fR		an ETA 10 running SVR3
 \fIgould-np1\fR		a Gould NP1
 \fIhk68\fR		a Heurikon HK68 running Uniplus+ 5.0
 \fIhp300\fR		an HP 9000, series 300, running mtXinu
@@ -1775,6 +1823,7 @@ The current possible values are:
 \fImultimax\fR		an Encore Computer Corp. Multimax (32000 based)
 \fInews\fR			a Sony NEWS 800 or 1700 workstation
 \fInews_mips\fR		a NeWS machine with mips CPU
+\fInd500\fR		a Norsk Data ND 500/5000 running Ndix
 \fIns32000\fR		an NS32000 CPU machine
 \fInext\fR			a NeXT computer
 \fIpfa50\fR			a PFU/Fujitsu A-xx computer
@@ -1830,10 +1879,17 @@ to believe that the termcap capability `cap' ( as defined in
 improper use.
 .PP
 .SH "21. SEARCHING FOR THE VISUAL HISTORY"
-Two new editor functions have been added: history-search-backward,
-bound to M-p (and M-P), and history-search-forward, bound to M-n (and
-M-N).  Each of these search backward (or forward) through the history
-list for previous (next) occurrence of the first word in the input
+Four new editor functions have been added in emacs mode: Two of them,
+history-search-backward, bound to M-p (and M-P),
+and history-search-forward, bound to M-n (and M-N),
+implement a conventional search mechanism,
+while the other two, i-search-back and i-search-fwd,
+both unbound by default, implement the emacs-style
+incremental search.
+.PP
+History-search-backward (history-search-forward)
+searches backward (forward) through the history
+list for previous (next) occurrence of the beginnng of the input
 buffer as a command.  That is, if the user types:
 .sp
 .nf
@@ -1857,7 +1913,58 @@ through the history is defined by the characters from the beginning of
 the line up to the current cursor position and may contain a shell globbing
 pattern. Successive history searches use the same pattern.
 .PP
-.SH "22. BUILTIN WHICH(1) COMMAND"
+When the incremental search functions are used, a prompt -
+"bck:" or "fwd:", depending on the chosen direction - appears, and
+characters typed are appended to the search pattern.
+The matching command line is placed in the editing buffer,
+with the cursor positioned at the point where the pattern was found
+(the incremental search will also do searching within a command line).
+If the search fails, the terminal bell is rung,
+and the ':' in the prompt is changed to '?'.
+.PP
+If these functions are bound to single characters, and one of those
+is typed again during the incremental search, the search continues
+in the corresponding direction, with the pattern unchanged; if the previous
+search failed, this will also cause it to "wrap around" the history list.
+Finally, the following characters also have a special meaning
+during the search:
+.RS +.6i
+.nf
+.ta 1.2i
+.sp
+Delete	(or any character bound to \fIbackward-delete-char\fR)
+	Undo the effect of the last character typed,
+	deleting a character from the pattern if appropriate.
+^G	Abort the search, back to the last successful one
+	if previous search failed, otherwise entire search.
+^Y	Append the rest of the current word to the pattern.
+ESC	Terminate the search, leaving current line in buffer.
+.RE
+.DT
+.fi
+.sp
+Any other character, that isn't bound to
+.I self-insert-command,
+terminates the search, leaving the current command line in the editing
+buffer, after which
+.I tcsh
+interprets the character as if it was normal input -
+notably
+.I Return
+will cause the current command line to be executed.
+.PP
+In vi mode "vi-search-fwd" (bound to '/') and "vi-search-back" (bound to '?') 
+can be used to search the visual history. In command mode '/' or '?' followed 
+by a shell pattern, searches the visual history for the pattern. The pattern
+can be terminated either with a
+.I Return, 
+in which case the matched history event is placed in the command buffer or
+an 
+.I Escape,
+in which case the matched history event is executed. If no history event 
+matches the shell pattern then the bell is rung.
+.PP
+.SH "22. BUILTIN WHICH(1)/WHERE COMMANDS"
 There is now a builtin version of the
 .IR which (1)
 command.  The builtin version is just like the original, except that
@@ -1869,6 +1976,9 @@ There is also a key-function interface to this command: the
 .I which-command
 function (normally bound to M-?), can be used anywhere on the command line,
 and will in effect do a 'which' on the command name.
+.PP
+Similarly where will report all known instances of the command: aliases,
+builtins, as well as all references in the path.
 .PP
 .SH "23. RESTARTING A STOPPED EDITOR"
 There is another new editor function: run-fg-editor, which is bound to
@@ -1988,7 +2098,7 @@ a colon, and the full current working directory.
 A more fancy way to do that is:
 .sp
 .RS +.6i
-> alias cwdcmd 'echo -n "]2;${HOST}:$cwd]1;${HOST}"'
+> alias cwdcmd 'echo -n "^[]2;${HOST}:$cwd^G^[]1;${HOST}^G"'
 .RE
 .sp
 This will put the hostname and working directory on the title bar but
@@ -2281,7 +2391,12 @@ the names of the system default files are
 .I "/etc/login"
 and
 .I "/etc/logout"
-respectively and on
+respectively. On the NeXT the names are also different:
+.I "/etc/cshrc.std",
+.I "/etc/login.std"
+and
+.I "/etc/logout.std"
+Finally on
 .I irix
 or
 .I A/UX
@@ -2302,6 +2417,12 @@ or present only in
 Load ~/.cshdirs (If 
 .I tcsh 
 was compiled with CSHDIRS enabled)(+)
+.TP 4
+.I \-Dname[=value]
+Set environment variable name to value. (Domain/OS only) (+)
+.TP 4
+.I \-F
+Use fork() instead of vfork() to spawn processes. (Convex/OS only) (+)
 .TP 4
 .I \-l
 Make 
@@ -2366,6 +2487,64 @@ re-written as:
 .RE
 .fi
 .sp
+Also 
+.I tcsh 
+has an additional : character
+.I a
+which applies the current modifier multiple times in the same word, in
+the same way
+.I g
+applies the modifier once in each word:
+.sp
+.nf
+.RS +.6in
+> set foo=(a:b:c d:e:f)
+> echo $foo:s/:/ /
+a b:c d:e:f
+> echo $foo:gs/:/ /
+a b:c d e:f
+> echo $foo:as/:/ /
+a b c d:e:f
+> echo $foo:ags/:/ /
+a b c d e f
+.RE
+.fi
+.sp
+The 
+.I csh 
+expert will notice in the above example another
+.I tcsh 
+enhancement. In 
+.I csh
+the 
+.I s
+modifier does not work for variables.
+.sp
+The 
+.I a 
+character works correctly with other modifiers, for example:
+.sp
+.nf
+.RS +.6in
+> echo $host
+tesla.ee.cornell.edu
+> echo $host:r
+tesla.ee.cornell
+> echo $host:ar
+tesla
+.RE
+.fi
+.sp
+.I Note:
+The 
+.I a
+character causes a modifier to be applied to a word repeatedly until
+the modifier fails. This can lead to an infinite loop in the current
+implementation when used with the
+.I s
+modifier. For example :as/f/ff/ will never terminate. This behavior
+might change in the future.
+
 .SH FYI
 This shell uses cbreak mode but takes typed-ahead characters anyway.
 You can still use
@@ -2634,7 +2813,7 @@ I am certain that there are bugs.  Bugs (preferably with fixes)
 should be sent to Christos Zoulas (christos@ee.cornell.edu).
 .PP
 .SH VERSION
-This man page documents tcsh 6.00.02 (Cornell) 08/05/91.
+This man page documents tcsh 6.00.03 (Cornell) 10/20/91.
 .PP
 .SH AUTHORS
 Ken Greer, HP Labs, 1981
@@ -2686,9 +2865,18 @@ James J Dempsey, BBN, 1988, and Paul Placeway, OSU, 1988
 Re-ported tcsh to A/UX.
 .sp
 .SH "BUGFIXES AND ENHANCEMENTS"
-Marc Horowitz, MIT, 1991
-Ansification fixes
+David Dawes, Sydney U. Australia, Physics dept., 1991
 .br
+SVR4 job control fixes. (reverse pipeline startup code, and signal fixes).
+.sp
+Jose Sousa, Interactive Systems Corp., 1991
+.br
+Extended vi fixes. Added delete command in vi.
+.sp
+Marc Horowitz, MIT, 1991
+.br
+Ansification fixes, new exec hashing code, imake fixes, where builtin.
+.sp
 Eric Schnoebelen, Convex, 1990
 .br
 Convex support, lots of csh bug fixes, save and restore of directory stack.
@@ -2714,7 +2902,7 @@ Johan Widen, SICS Sweden, 1990
 .br
 Shell level variable, mach support, correct-line, 8-bit printing.
 .sp
-Matthew T. Day, Sanyo/ICON, 1990
+Matt Day, Sanyo Icon, 1990
 .br
 Added POSIX termio support; Fixed limit stuff for SysV.
 .sp

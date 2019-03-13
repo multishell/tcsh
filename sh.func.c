@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.func.c,v 3.5 1991/08/06 03:00:23 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.func.c,v 3.12 1991/10/20 01:38:14 christos Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -34,11 +34,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-
-RCSID("$Id: sh.func.c,v 3.5 1991/08/06 03:00:23 christos Exp $")
-
 #include "sh.h"
+
+RCSID("$Id: sh.func.c,v 3.12 1991/10/20 01:38:14 christos Exp $")
+
 #include "ed.h"
 #include "tw.h"
 #include "tc.h"
@@ -314,7 +313,7 @@ doif(v, kp)
     register Char **vv;
 
     v++;
-    i = exp(&v);
+    i = expr(&v);
     vv = v;
     if (*vv == NOSTR)
 	stderror(ERR_NAME | ERR_EMPTYIF);
@@ -383,12 +382,13 @@ dogoto(v, c)
      */
     zlast = T_GOTO;
     for (wp = whyles; wp; wp = wp->w_next)
-	if (wp->w_end == 0) {
+	if (wp->w_end.type == F_SEEK && wp->w_end.f_seek == 0) {
 	    search(T_BREAK, 0, NOSTR);
-	    wp->w_end = btell();
+	    btell(&wp->w_end);
 	}
-	else
-	    bseek(wp->w_end);
+	else {
+	    bseek(&wp->w_end);
+	}
     search(T_GOTO, 0, lp = globone(v[1], G_ERROR));
     xfree((ptr_t) lp);
     /*
@@ -442,7 +442,7 @@ doexit(v, c)
      */
     v++;
     if (*v) {
-	set(STRstatus, putn(exp(&v)));
+	set(STRstatus, putn(expr(&v)));
 	if (*v)
 	    stderror(ERR_NAME | ERR_EXPRESSION);
     }
@@ -481,9 +481,10 @@ doforeach(v, c)
     nwp = (struct whyle *) xcalloc(1, sizeof *nwp);
     nwp->w_fe = nwp->w_fe0 = v;
     gargv = 0;
-    nwp->w_start = btell();
+    btell(&nwp->w_start);
     nwp->w_fename = Strsave(cp);
     nwp->w_next = whyles;
+    nwp->w_end.type = F_SEEK;
     whyles = nwp;
     /*
      * Pre-read the loop so as to be more comprehensible to a terminal user.
@@ -501,7 +502,7 @@ dowhile(v, c)
     struct command *c;
 {
     register int status;
-    register bool again = whyles != 0 && whyles->w_start == lineloc &&
+    register bool again = whyles != 0 && SEEKEQ(&whyles->w_start, &lineloc) &&
     whyles->w_fename == 0;
 
     v++;
@@ -512,7 +513,7 @@ dowhile(v, c)
     if (intty && !again)
 	status = !exp0(&v, 1);
     else
-	status = !exp(&v);
+	status = !expr(&v);
     if (*v)
 	stderror(ERR_NAME | ERR_EXPRESSION);
     if (!again) {
@@ -520,7 +521,8 @@ dowhile(v, c)
 	(struct whyle *) xcalloc(1, sizeof(*nwp));
 
 	nwp->w_start = lineloc;
-	nwp->w_end = 0;
+	nwp->w_end.type = F_SEEK;
+	nwp->w_end.f_seek = 0;
 	nwp->w_next = whyles;
 	whyles = nwp;
 	zlast = T_WHILE;
@@ -541,7 +543,7 @@ dowhile(v, c)
 static void
 preread()
 {
-    whyles->w_end = -1;
+    whyles->w_end.type = I_SEEK;
     if (setintr)
 #ifdef BSDSIGS
 	(void) sigsetmask(sigblock((sigmask_t) 0) & ~sigmask(SIGINT));
@@ -555,7 +557,7 @@ preread()
 #else /* !BSDSIGS */
 	(void) sighold(SIGINT);
 #endif /* BSDSIGS */
-    whyles->w_end = btell();
+    btell(&whyles->w_end);
 }
 
 /*ARGSUSED*/
@@ -566,7 +568,7 @@ doend(v, c)
 {
     if (!whyles)
 	stderror(ERR_NAME | ERR_NOTWHILE);
-    whyles->w_end = btell();
+    btell(&whyles->w_end);
     doagain();
 }
 
@@ -586,7 +588,7 @@ doagain()
 {
     /* Repeating a while is simple */
     if (whyles->w_fename == 0) {
-	bseek(whyles->w_start);
+	bseek(&whyles->w_start);
 	return;
     }
     /*
@@ -599,7 +601,7 @@ doagain()
 	return;
     }
     set(whyles->w_fename, Strsave(*whyles->w_fe++));
-    bseek(whyles->w_start);
+    bseek(&whyles->w_start);
 }
 
 void
@@ -702,10 +704,14 @@ search(type, level, goal)
 
     Stype = type;
     Sgoal = goal;
-    if (type == T_GOTO)
-	bseek((off_t) 0);
+    if (type == T_GOTO) {
+	struct Ain a;
+	a.type = F_SEEK;
+	a.f_seek = 0;
+	bseek(&a);
+    }
     do {
-	if (intty && fseekp == feobp)
+	if (intty && fseekp == feobp && aret == F_SEEK)
 	    printprompt(1, str2short(isrchx(type == T_BREAK ?
 					    zlast : type)));
 	/* xprintf("? "), flush(); */
@@ -763,8 +769,8 @@ search(type, level, goal)
 	    if (lastchr(aword) != ':')
 		break;
 	    aword[Strlen(aword) - 1] = 0;
-	    if (type == T_GOTO && eq(aword, goal) ||
-		type == T_SWITCH && eq(aword, STRdefault))
+	    if ((type == T_GOTO && eq(aword, goal)) ||
+		(type == T_SWITCH && eq(aword, STRdefault)))
 		level = -1;
 	    break;
 
@@ -831,8 +837,8 @@ getword(wp)
 		*wp++ = c;
 		*wp = 0;	/* end the string b4 test */
 	    }
-	} while ((d || !(kwd = keyword(owp)) && c != ' '
-		  && c != '\t') && c != '\n');
+	} while ((d || (!(kwd = keyword(owp)) && c != ' '
+		  && c != '\t')) && c != '\n');
     } while (wp == 0);
 
     /*
@@ -901,32 +907,39 @@ keyword(wp)
 static void
 toend()
 {
-    if (whyles->w_end == 0) {
+    if (whyles->w_end.type == F_SEEK && whyles->w_end.f_seek == 0) {
 	search(T_BREAK, 0, NOSTR);
-	whyles->w_end = btell() - 1;
+	btell(&whyles->w_end);
+	whyles->w_end.f_seek--;
     }
-    else
-	bseek(whyles->w_end);
+    else {
+	bseek(&whyles->w_end);
+    }
     wfree();
 }
 
 void
 wfree()
 {
-    long    o = btell();
+    struct Ain    o;
+    struct whyle *nwp;
+    btell(&o);
+    if (o.type != F_SEEK)
+	return;
 
-    while (whyles) {
+    for (; whyles; whyles = nwp) {
 	register struct whyle *wp = whyles;
-	register struct whyle *nwp = wp->w_next;
-
-	if (o >= wp->w_start && (wp->w_end == 0 || o < wp->w_end))
+	nwp = wp->w_next;
+	if (wp->w_start.type != F_SEEK || wp->w_end.type != F_SEEK) 
+	    break;
+	if (o.f_seek >= wp->w_start.f_seek && 
+	    (wp->w_end.f_seek == 0 || o.f_seek < wp->w_end.f_seek))
 	    break;
 	if (wp->w_fe0)
 	    blkfree(wp->w_fe0);
 	if (wp->w_fename)
 	    xfree((ptr_t) wp->w_fename);
 	xfree((ptr_t) wp);
-	whyles = nwp;
     }
 }
 
@@ -1178,7 +1191,7 @@ dounsetenv(v, c)
 		Unsetenv(name);
 		break;
 	    }
-    xfree((ptr_t) name), name = NULL;
+    xfree((ptr_t) name); name = NULL;
 }
 
 void
@@ -1282,6 +1295,7 @@ doumask(v, c)
 #  endif /* RLIM_INFINITY */
 #  ifdef aiws
 #   define toset(a) (((a) == 3) ? 1004 : (a) + 1)
+#   define RLIMIT_DATA	3
 #   define RLIMIT_STACK 1005
 #  else /* aiws */
 #   define toset(a) ((a) + 1)
@@ -1303,7 +1317,11 @@ static struct limits {
 # endif /* RLIMIT_CPU */
 
 # ifdef RLIMIT_FSIZE
+#  ifndef aiws
     RLIMIT_FSIZE, 	"filesize",	1024,	"kbytes",
+#  else
+    RLIMIT_FSIZE, 	"filesize",	512,	"blocks",
+#  endif /* aiws */
 # endif /* RLIMIT_FSIZE */
 
 # ifdef RLIMIT_DATA
@@ -1311,7 +1329,11 @@ static struct limits {
 # endif /* RLIMIT_DATA */
 
 # ifdef RLIMIT_STACK
+#  ifndef aiws
     RLIMIT_STACK, 	"stacksize",	1024,	"kbytes",
+#  else
+    RLIMIT_STACK, 	"stacksize",	1024 * 1024,	"kbytes",
+#  endif /* aiws */
 # endif /* RLIMIT_STACK */
 
 # ifdef RLIMIT_CORE
@@ -1430,6 +1452,7 @@ getval(lp, v)
 
     register float f;
     double  atof();
+    static int lmin = 0x80000000, lmax = 0x7fffffff;
     Char   *cp = *v++;
 
     f = atof(short2str(cp));
@@ -1505,6 +1528,14 @@ getval(lp, v)
 	limtail(cp, "kbytes");
 	f *= 1024.0;
 	break;
+    case 'b':
+# ifdef RLIMIT_CPU
+	if (lp->limconst == RLIMIT_CPU)
+	    goto badscal;
+# endif /* RLIMIT_CPU */
+	limtail(cp, "blocks");
+	f *= 512.0;
+	break;
     case 'u':
 	limtail(cp, "unlimited");
 	return (RLIM_INFINITY);
@@ -1517,6 +1548,8 @@ badscal:
 # if defined(convex) || defined(__convex__)
     return ((RLIM_TYPE) restrict_limit((f + 0.5)));
 # else
+    if ((f + 0.5) >= (float) lmax || (f + 0.5) < (float) lmin)
+	stderror(ERR_NAME | ERR_SCALEF);
     return ((RLIM_TYPE) (f + 0.5));
 # endif /* convex */
 }
@@ -1548,6 +1581,10 @@ plim(lp, hard)
 
 # ifndef BSDTIMES
     limit = ulimit(lp->limconst, 0);
+#  ifdef aiws
+    if (lp->limconst == RLIMIT_DATA)
+	limit -= 0x20000000;
+#  endif /* aiws */
 # else /* BSDTIMES */
     (void) getrlimit(lp->limconst, &rlim);
     limit = hard ? rlim.rlim_max : rlim.rlim_cur;
@@ -1566,7 +1603,8 @@ plim(lp, hard)
 	 * Christos: filesize comes in 512 blocks. we divide by 2 to get 1024
 	 * blocks. Note we cannot pre-multiply cause we might overflow (A/UX)
 	 */
-	xprintf("%ld %s", (long) (limit / 2), lp->limscale);
+	xprintf("%ld %s", (long) (limit / (lp->limdiv == 1024 ? 2 : 1)), 
+	        lp->limscale);
     else
 # endif /* BSDTIMES */
 	xprintf("%ld %s", (long) (limit / lp->limdiv), lp->limscale);
@@ -1625,6 +1663,10 @@ setlim(lp, hard, limit)
 # else /* BSDTIMES */
     if (limit != RLIM_INFINITY && lp->limconst == RLIMIT_FSIZE)
 	limit /= 512;
+# ifdef aiws
+    if (lp->limconst == RLIMIT_DATA)
+	limit += 0x20000000;
+# endif /* aiws */
     if (ulimit(toset(lp->limconst), limit) < 0) {
 # endif /* BSDTIMES */
 	xprintf("%s: %s: Can't %s%s limit\n", bname, lp->limname,
@@ -1750,7 +1792,13 @@ doeval(v, c)
     getexit(osetexit);
 
     /* PWP: setjmp/longjmp bugfix for optimizing compilers */
+#ifdef cray
+    my_reenter = 1;             /* assume non-zero return val */
+    if (setexit() == 0) {
+        my_reenter = 0;         /* Oh well, we were wrong */
+#else /* !cray */
     if ((my_reenter = setexit()) == 0) {
+#endif /* cray */
 	evalvec = v;
 	evalp = 0;
 	SHIN = dcopy(0, -1);

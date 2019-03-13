@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.exp.c,v 3.1 1991/07/15 19:37:24 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.exp.c,v 3.3 1991/10/12 04:23:51 christos Exp $ */
 /*
  * sh.exp.c: Expression evaluations
  */
@@ -34,10 +34,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "config.h"
-RCSID("$Id: sh.exp.c,v 3.1 1991/07/15 19:37:24 christos Exp $")
-
 #include "sh.h"
+
+RCSID("$Id: sh.exp.c,v 3.3 1991/10/12 04:23:51 christos Exp $")
 
 /*
  * C shell
@@ -80,7 +79,7 @@ static	void	 etraci	__P((char *, int, Char ***));
 #endif
 
 int
-exp(vp)
+expr(vp)
     register Char ***vp;
 {
     return (exp0(vp, 0));

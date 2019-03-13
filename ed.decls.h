@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.decls.h,v 3.2 1991/07/24 21:46:36 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.decls.h,v 3.9 1991/10/20 01:38:14 christos Exp $ */
 /*
  * ed.decls.h: Editor external definitions
  */
@@ -46,11 +46,11 @@ extern	void	DeleteBack		__P((int));
 /*
  * ed.init.c
  */
-extern	void	dosetty			__P((Char **, struct command *));
 extern	void	check_window_size	__P((int));
 #ifdef SIG_WINDOW
 extern	sigret_t window_change		__P((int));
 #endif
+extern	int	ed_Setup		__P((int));
 extern	void	ed_Init			__P((void));
 extern	int	Cookedmode		__P((void));
 extern	int	Rawmode			__P((void));
@@ -60,6 +60,22 @@ extern	void	QuoteModeOn		__P((void));
 extern	void	QuoteModeOff		__P((void));
 extern	void	ResetInLine		__P((void));
 extern	int	Load_input_line		__P((void));
+
+/*
+ * ed.term.c:
+ */
+extern	void	dosetty			__P((Char **, struct command *));
+extern	int	tty_getty 		__P((int, ttydata_t *));
+extern	int	tty_setty 		__P((int, ttydata_t *));
+extern	void	tty_getchar 		__P((ttydata_t *, unsigned char *));
+extern	void	tty_setchar 		__P((ttydata_t *, unsigned char *));
+extern	speed_t	tty_getspeed 		__P((ttydata_t *));
+extern	int	tty_gettabs 		__P((ttydata_t *));
+extern	int	tty_geteightbit		__P((ttydata_t *));
+extern	int	tty_cooked_mode		__P((ttydata_t *));
+#ifdef _IBMR2
+extern	void	tty_setdisc		__P((int, int));
+#endif /* _IBMR2 */
 
 /*
  * ed.screen.c
@@ -177,6 +193,26 @@ extern	CCRETVAL	e_expand		__P((int));
 extern	CCRETVAL	e_expand_vars		__P((int));
 extern	CCRETVAL	e_toggle_hist		__P((int));
 extern  CCRETVAL        e_load_average		__P((int));
+extern  CCRETVAL        v_delprev		__P((int));
+extern  CCRETVAL        v_delmeta		__P((int));
+extern  CCRETVAL        v_wordfwd		__P((int));
+extern  CCRETVAL        v_wordback		__P((int));
+extern  CCRETVAL        v_endword		__P((int));
+extern  CCRETVAL        v_eword			__P((int));
+extern  CCRETVAL        v_undo			__P((int));
+extern  CCRETVAL        v_ush_meta		__P((int));
+extern  CCRETVAL        v_dsh_meta		__P((int));
+extern  CCRETVAL        v_rsrch_fwd		__P((int));
+extern  CCRETVAL        v_rsrch_back		__P((int));
+extern  CCRETVAL        v_char_fwd		__P((int));
+extern  CCRETVAL        v_char_back		__P((int));
+extern  CCRETVAL        v_chgmeta		__P((int));
+extern	CCRETVAL	e_inc_fwd		__P((int));
+extern	CCRETVAL	e_inc_back		__P((int));
+extern	CCRETVAL	v_rchar_fwd		__P((int));
+extern	CCRETVAL	v_rchar_back		__P((int));
+extern  CCRETVAL        v_charto_fwd		__P((int));
+extern  CCRETVAL        v_charto_back		__P((int));
 
 /*
  * ed.inputl.c

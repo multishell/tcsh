@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.dir.h,v 3.0 1991/07/04 21:49:28 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.dir.h,v 3.1 1991/10/20 01:38:14 christos Exp $ */
 /*
  * sh.dir.h: Directory data structures and globals
  */
@@ -45,6 +45,6 @@ struct directory {
     unsigned short *di_count;	/* refcount of processes */
     Char   *di_name;		/* actual name */
 };
-struct directory *dcwd;		/* the one we are in now */
+EXTERN struct directory *dcwd;	/* the one we are in now */
 
 #endif				/* _h_sh_dir */
