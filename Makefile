@@ -34,7 +34,8 @@ LFLAGS=-I.
 #CFLAGS=-O -I. -finline-functions -fstrength-reduce 
 
 # gcc 1.37+
-CFLAGS=-O -I. -fcombine-regs -finline-functions -fstrength-reduce #-msoft-float
+#CFLAGS=-O -I. -fcombine-regs -finline-functions -fstrength-reduce #-msoft-float
+CFLAGS=-O -I. -finline-functions -fstrength-reduce #-msoft-float
 
 #CFLAGS= -O -I. -fvolatile
 
