@@ -179,6 +179,7 @@ extern int setpgrp();
 #  include <time.h>
 # endif /* !aiws || !pyr */
 #endif /* SVID > 0 */
+#include <time.h>
 
 #if !(defined(sun) && defined(TERMIO))
 # include <sys/ioctl.h>
