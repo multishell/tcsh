@@ -322,8 +322,10 @@ sigblock(mask)
     int     m;
     register int i;
 
-    set = 0;
-    oset = 0;
+    // set = 0;
+    memset(&set, 0, sizeof(sigset_t));
+    // oset = 0;
+    memset(&set, 0, sizeof(sigset_t));
 
     /* Get present set of signals. */
     if (sigprocmask(SIG_SETMASK, NULL, &set))
