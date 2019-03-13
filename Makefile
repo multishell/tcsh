@@ -38,7 +38,8 @@ LFLAGS=$(INCLUDES)
 #CFLAGS=-O $(INCLUDES) -finline-functions -fstrength-reduce 
 
 # gcc 1.37+
-CFLAGS=-O $(INCLUDES) -fcombine-regs -finline-functions -fstrength-reduce 
+#CFLAGS=-O $(INCLUDES) -fcombine-regs -finline-functions -fstrength-reduce 
+CFLAGS=-O $(INCLUDES) -finline-functions -fstrength-reduce 
 # add -msoft-float for 68881 machines.
 
 #hpux 8.0
