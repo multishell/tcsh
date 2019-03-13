@@ -65,7 +65,9 @@ static char sccsid[] = "@(#)glob.c	5.12 (Berkeley) 6/24/91";
 typedef void * ptr_t;
 #endif
 
+#define Char __Char
 #include "sh.h"
+#undef Char
 #undef QUOTE
 #undef TILDE
 #undef META
@@ -87,9 +89,7 @@ typedef void * ptr_t;
 #define lstat stat
 #endif
 
-#ifdef notdef
 typedef unsigned short Char;
-#endif
 
 static	int	 glob1 		__P((Char *, glob_t *, int));
 static	int	 glob2		__P((Char *, Char *, Char *, glob_t *, int));
@@ -97,7 +97,7 @@ static	int	 glob3		__P((Char *, Char *, Char *, Char *,
 				     glob_t *, int));
 static	int	 globextend	__P((Char *, glob_t *));
 static	int	 match		__P((Char *, Char *, Char *, int));
-static	int	 compare	__P((const void *, const void *));
+static	int	 compare	__P((const ptr_t, const ptr_t));
 static 	DIR	*Opendir	__P((Char *));
 #ifdef S_IFLNK
 static	int	 Lstat		__P((Char *, struct stat *));
@@ -241,7 +241,7 @@ Char *s;
 
 static int
 compare(p, q)
-    const void  *p, *q;
+    const ptr_t  p, q;
 {
     return (strcmp(*(char **) p, *(char **) q));
 }
@@ -320,7 +320,6 @@ glob(pattern, flags, errfunc, pglob)
     while ((c = *qpatnext++) != EOS) {
 	switch (c) {
 	case LBRACKET:
-	    pglob->gl_flags |= GLOB_MAGCHAR;
 	    c = *qpatnext;
 	    if (c == not)
 		++qpatnext;
@@ -331,6 +330,7 @@ glob(pattern, flags, errfunc, pglob)
 		    --qpatnext;
 		break;
 	    }
+	    pglob->gl_flags |= GLOB_MAGCHAR;
 	    *bufnext++ = M_SET;
 	    if (c == not)
 		*bufnext++ = m_not;
@@ -367,7 +367,15 @@ glob(pattern, flags, errfunc, pglob)
     if ((err = glob1(patbuf, pglob, no_match)) != 0)
 	return (err);
 
-    if (pglob->gl_pathc == oldpathc && flags & GLOB_NOCHECK) {
+    /*
+     * If there was no match we are going to append the pattern 
+     * if GLOB_NOCHECK was specified or if GLOB_NOMAGIC was specified
+     * and the pattern did not contain any magic characters
+     * GLOB_NOMAGIC is there just for compatibility with csh.
+     */
+    if (pglob->gl_pathc == oldpathc && 
+	((flags & GLOB_NOCHECK) || 
+	 ((flags & GLOB_NOMAGIC) && !(pglob->gl_flags & GLOB_MAGCHAR)))) {
 	if (!(flags & GLOB_QUOTE)) {
 	    Char *dp = compilebuf;
 	    const unsigned char *sp = compilepat;
@@ -643,7 +651,7 @@ globfree(pglob)
 	pp = pglob->gl_pathv + pglob->gl_offs;
 	for (i = pglob->gl_pathc; i--; ++pp)
 	    if (*pp)
-		free((ptr_t) * pp);
+		free((ptr_t) *pp);
 	free((ptr_t) pglob->gl_pathv);
     }
 }

@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.glob.c,v 3.0 1991/07/04 21:49:28 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.glob.c,v 3.2 1991/07/15 19:37:24 christos Exp $ */
 /*
  * sh.glob.c: Regular expression expansion
  */
@@ -35,15 +35,14 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-#ifndef lint
-static char *rcsid() 
-    { return "$Id: sh.glob.c,v 3.0 1991/07/04 21:49:28 christos Exp $"; }
-#endif
+RCSID("$Id: sh.glob.c,v 3.2 1991/07/15 19:37:24 christos Exp $")
 
 #include "sh.h"
+#include "tc.h"
+
 #include <glob.h>
 
-static int noglob, nonomatch;
+static int noglob;
 static int pargsiz, gargsiz;
 
 /*
@@ -390,14 +389,18 @@ static Char **
 libglob(vl)
     Char  **vl;
 {
-    int     gflgs = GLOB_QUOTE | GLOB_NOCHECK | GLOB_ALTNOT;
+    int     gflgs = GLOB_QUOTE | GLOB_NOMAGIC | GLOB_ALTNOT;
     glob_t  globv;
     char   *ptr;
+    int     nonomatch = adrof(STRnonomatch) != 0, magic = 0, match = 0;
 
     globv.gl_offs = 0;
     globv.gl_pathv = 0;
     globv.gl_pathc = 0;
-    nonomatch = adrof(STRnonomatch) != 0;
+
+    if (nonomatch)
+	gflgs |= GLOB_NOCHECK;
+
     do {
 	ptr = short2qstr(*vl);
 	switch (glob(ptr, gflgs, 0, &globv)) {
@@ -411,15 +414,15 @@ libglob(vl)
 	default:
 	    break;
 	}
-	if (!nonomatch && (globv.gl_matchc == 0) &&
-	    (globv.gl_flags & GLOB_MAGCHAR)) {
-	    globfree(&globv);
-	    return (NULL);
+	if (globv.gl_flags & GLOB_MAGCHAR) {
+	    match |= (globv.gl_matchc != 0);
+	    magic = 1;
 	}
 	gflgs |= GLOB_APPEND;
     }
     while (*++vl);
-    vl = blk2short(globv.gl_pathv);
+    vl = (globv.gl_pathc == 0 || (magic && !match && !nonomatch)) ? 
+	NULL : blk2short(globv.gl_pathv);
     globfree(&globv);
     return (vl);
 }
@@ -753,7 +756,7 @@ backeval(cp, literal)
 
 static void
 psave(c)
-    Char    c;
+    int    c;
 {
     if (--pnleft <= 0)
 	stderror(ERR_WTOOLONG);

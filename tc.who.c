@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.who.c,v 3.0 1991/07/04 21:49:28 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.who.c,v 3.1 1991/07/15 19:37:24 christos Exp $ */
 /*
  * tc.who.c: Watch logins and logouts...
  */
@@ -35,12 +35,10 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-#ifndef lint
-static char *rcsid() 
-    { return "$Id: tc.who.c,v 3.0 1991/07/04 21:49:28 christos Exp $"; }
-#endif
+RCSID("$Id: tc.who.c,v 3.1 1991/07/15 19:37:24 christos Exp $")
 
 #include "sh.h"
+#include "tc.h"
 
 /*
  * kfk 26 Jan 1984 - for login watch functions.
@@ -560,8 +558,9 @@ print_who(wp)
 
 void
 /*ARGSUSED*/
-dolog(v)
+dolog(v, c)
 Char **v;
+struct command *c;
 {
     struct who *wp;
     struct varent *vp;

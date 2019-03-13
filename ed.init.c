@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.init.c,v 3.0 1991/07/04 21:49:28 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.init.c,v 3.2 1991/07/15 19:37:24 christos Exp $ */
 /*
  * ed.init.c: Editor initializations
  */
@@ -35,14 +35,12 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-#ifndef lint
-static char *rcsid()
-    { return "$Id: ed.init.c,v 3.0 1991/07/04 21:49:28 christos Exp $"; }
-#endif
+RCSID("$Id: ed.init.c,v 3.2 1991/07/15 19:37:24 christos Exp $")
 
 #include "sh.h"
 #define EXTERN			/* intern */
 #include "ed.h"
+#include "tc.h"
 #include "ed.defns.h"
 
 #if defined(TERMIO) || defined(POSIX)
@@ -188,6 +186,11 @@ sigret_t
 window_change(snum)
 int snum;
 {
+#if (SVID > 0) && (SVID < 3)
+    /* If we were called as a signal handler, restore it. */
+    if (snum > 0)
+      sigset(snum, window_change);
+#endif /* SVID > 0 && SVID < 3 */
     check_window_size(0);
 #ifndef SIGVOID
     return (snum);
@@ -354,8 +357,11 @@ ed_Init()
 
 	(void) ioctl(SHIN, TIOCGLTC, (ioctl_t) & nlc);
 	xlc = nlc;
-
+#  ifdef VSUSP
+	nlc.t_suspc = nio.c_cc[VSUSP];	/* stop process signal	 */
+#  else
 	nlc.t_suspc = '\032';	/* stop process signal	 */
+#  endif
 	nlc.t_dsuspc = '\031';	/* delayed stop process signal */
 #  ifdef hpux
 	/*
@@ -451,7 +457,8 @@ ed_Init()
     xio.c_oflag &= ~(ONLRET);
     xio.c_oflag |= (OPOST | ONLCR);
 
-    xio.c_lflag &= ~(NOFLSH | ICANON | ECHO | ECHOE | ECHOK | ECHONL | 
+    /* don't mask out ECHOE cause programs need it */
+    xio.c_lflag &= ~(NOFLSH | ICANON | ECHO | ECHOK | ECHONL | 
 		     EXTPROC | IEXTEN | FLUSHO);
     xio.c_lflag |= (ISIG);
 
@@ -505,24 +512,28 @@ ed_Init()
 # endif				/* VPAGE */
 
 # if defined(OREO) || defined(hpux) || defined(_IBMR2)
-    xlc.t_suspc = -1;		/* stop process signal	 */
-    xlc.t_dsuspc = -1;		/* delayed stop process signal	 */
+#  ifdef VSUSP
+    xlc.t_suspc = xio.c_cc[VSUSP];	/* stop process signal	 */
+#  else
+    xlc.t_suspc = _POSIX_VDISABLE;	/* stop process signal	 */
+#  endif 
+    xlc.t_dsuspc = _POSIX_VDISABLE;	/* delayed stop process signal	 */
 #  ifdef hpux
     /*
-     * These must be 0377. (Reserved)
+     * These must be _POSIX_VDISABLE. (Reserved)
      */
-    xlc.t_rprntc = '\377';	/* reprint line */
-    xlc.t_flushc = '\377';	/* flush output (toggles) */
-    xlc.t_werasc = '\377';	/* word erase */
-    xlc.t_lnextc = '\377';	/* literal next character */
+    xlc.t_rprntc = _POSIX_VDISABLE;	/* reprint line */
+    xlc.t_flushc = _POSIX_VDISABLE;	/* flush output (toggles) */
+    xlc.t_werasc = _POSIX_VDISABLE;	/* word erase */
+    xlc.t_lnextc = _POSIX_VDISABLE;	/* literal next character */
 #  else
-    xlc.t_rprntc = -1;		/* reprint line */
-    xlc.t_flushc = '\017';	/* flush output */
-    xlc.t_werasc = -1;		/* word erase */
-    xlc.t_lnextc = -1;		/* literal next character */
-#  endif				/* hpux */
-# endif				/* OREO || hpux || _IBMR2 */
-#else				/* GSTTY */
+    xlc.t_rprntc = _POSIX_VDISABLE;	/* reprint line */
+    xlc.t_flushc = '\017';		/* flush output */
+    xlc.t_werasc = _POSIX_VDISABLE;	/* word erase */
+    xlc.t_lnextc = _POSIX_VDISABLE;	/* literal next character */
+#  endif /* hpux */
+# endif	/* OREO || hpux || _IBMR2 */
+#else /* GSTTY */
     if (T_Tabs) {		/* order of &= and |= is important to XTABS */
 	xb.sg_flags &= ~(RAW | ECHO | LCASE | XTABS | VTDELAY | ALLDELAY);
 	xb.sg_flags |= (CBREAK | CRMOD | ANYP);
@@ -661,7 +672,8 @@ Rawmode()
 	nio.c_lflag &= ~(NOFLSH | ECHOK | ECHONL | EXTPROC | FLUSHO);
 	nio.c_lflag |= (ISIG | ICANON | IEXTEN | ECHO | ECHOE | ECHOCTL);
 	xio.c_lflag = testio.c_lflag;
-	xio.c_lflag &= ~(NOFLSH | ICANON | IEXTEN | ECHO | ECHOE | ECHOK |
+	/* don't mask out ECHOE cause programs need it */
+	xio.c_lflag &= ~(NOFLSH | ICANON | IEXTEN | ECHO | ECHOK |
 			 ECHONL | ECHOCTL | EXTPROC | FLUSHO);
 	xio.c_lflag |= (ISIG);
     }
@@ -693,9 +705,11 @@ Rawmode()
 	T_Tabs = CanWeTab();
     }
     if (dosetkey((char *) &testio.c_cc[VINTR], (char *) &nio.c_cc[VINTR]))
-	(void) dosetkey((char *) &testio.c_cc[VINTR], (char *) &xio.c_cc[VINTR]);
+	(void) dosetkey((char *) &testio.c_cc[VINTR], 
+			(char *) &xio.c_cc[VINTR]);
     if (dosetkey((char *) &testio.c_cc[VQUIT], (char *) &nio.c_cc[VQUIT]))
-	(void) dosetkey((char *) &testio.c_cc[VQUIT], (char *) &xio.c_cc[VQUIT]);
+	(void) dosetkey((char *) &testio.c_cc[VQUIT], 
+			(char *) &xio.c_cc[VQUIT]);
     if (dosetkey((char *) &testio.c_cc[VERASE], (char *) &nio.c_cc[VERASE]))
 	(void) dosetkey((char *) &testio.c_cc[VERASE],
 			(char *) &xio.c_cc[VERASE]);
@@ -768,28 +782,32 @@ Rawmode()
 # ifndef POSIX
     if (ioctl(SHIN, TCSETAW, (ioctl_t) & xio) < 0)
 	return (-1);
-# else				/* POSIX */
+# else /* POSIX */
     if (tcsetattr(SHIN, TCSADRAIN, &xio) < 0)
 	return (-1);
-# endif				/* POSIX */
+# endif	/* POSIX */
 
 # if defined(OREO) || defined(hpux) || defined(_IBMR2)
     /* get and set the new local chars */
     if (ioctl(SHIN, TIOCGLTC, (ioctl_t) & testlc) < 0)
 	return (-1);
-
+#ifdef VSUSP
+    testlc.t_suspc = nio.c_cc[VSUSP];	/* stop process signal	 */
+#endif
     (void) dosetkey((char *) &testlc.t_suspc, (char *) &nlc.t_suspc);
     (void) dosetkey((char *) &testlc.t_dsuspc, (char *) &nlc.t_dsuspc);
+# ifndef hpux
     (void) dosetkey((char *) &testlc.t_rprntc, (char *) &nlc.t_rprntc);
     if (dosetkey((char *) &testlc.t_flushc, (char *) &nlc.t_flushc))
 	xlc.t_flushc = nlc.t_flushc;
     (void) dosetkey((char *) &testlc.t_werasc, (char *) &nlc.t_werasc);
     (void) dosetkey((char *) &testlc.t_lnextc, (char *) &nlc.t_lnextc);
+# endif /* hpux */
     if (ioctl(SHIN, TIOCSLTC, (ioctl_t) & xlc) < 0)
 	return (-1);
-# endif				/* OREO || hpux || _IBMR2 */
+# endif	/* OREO || hpux || _IBMR2 */
 
-#else	/* GSTTY */		/* for BSD... */
+#else /* GSTTY */		/* for BSD... */
 
     if (testsgb.sg_ispeed != nb.sg_ispeed) {
 	nb.sg_ispeed = testsgb.sg_ispeed;
@@ -1015,7 +1033,7 @@ Load_input_line()
 
 	chrs = read(SHIN, buf, (size_t) min(chrs, BUFSIZ - 1));
 	if (chrs > 0) {
-	    buf[chrs] = NULL;
+	    buf[chrs] = '\0';
 	    Input_Line = Strsave(str2short(buf));
 	    PushMacro(Input_Line);
 	}

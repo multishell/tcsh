@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.print.c,v 3.0 1991/07/04 21:49:28 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.print.c,v 3.1 1991/07/15 19:37:24 christos Exp $ */
 /*
  * sh.print.c: Primitive Output routines.
  */
@@ -35,10 +35,7 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-#ifndef lint
-static char *rcsid() 
-    { return "$Id: sh.print.c,v 3.0 1991/07/04 21:49:28 christos Exp $"; }
-#endif
+RCSID("$Id: sh.print.c,v 3.1 1991/07/15 19:37:24 christos Exp $")
 
 #include "sh.h"
 #include "ed.h"

@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.dir.c,v 3.0 1991/07/04 21:49:28 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.dir.c,v 3.1 1991/07/15 19:37:24 christos Exp $ */
 /*
  * sh.dir.c: Directory manipulation functions
  */
@@ -35,10 +35,7 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-#ifndef lint
-static char *rcsid() 
-    { return "$Id: sh.dir.c,v 3.0 1991/07/04 21:49:28 christos Exp $"; }
-#endif
+RCSID("$Id: sh.dir.c,v 3.1 1991/07/15 19:37:24 christos Exp $")
 
 
 #include "sh.h"
@@ -185,9 +182,11 @@ skipargs(v, str)
 /*
  * dodirs - list all directories in directory loop
  */
+/*ARGSUSED*/
 void
-dodirs(v)
+dodirs(v, c)
     Char  **v;
+    struct command *c;
 {
     skipargs(&v, "");
 
@@ -354,9 +353,11 @@ dnormalize(cp)
 /*
  * dochngd - implement chdir command.
  */
+/*ARGSUSED*/
 void
-dochngd(v)
+dochngd(v, c)
     Char  **v;
+    struct command *c;
 {
     register Char *cp;
     register struct directory *dp;
@@ -524,9 +525,11 @@ dfollow(cp)
  *	with no arguments exchange top and second.
  *	with numeric argument (+n) bring it to top.
  */
+/*ARGSUSED*/
 void
-dopushd(v)
+dopushd(v, c)
     Char  **v;
+    struct command *c;
 {
     register struct directory *dp;
     register Char *cp;
@@ -630,9 +633,11 @@ dfind(cp)
  * dopopd - pop a directory out of the directory stack
  *	with a numeric argument just discard it.
  */
+/*ARGSUSED*/
 void
-dopopd(v)
+dopopd(v, c)
     Char  **v;
+    struct command *c;
 {
     register struct directory *dp, *p = NULL;
 

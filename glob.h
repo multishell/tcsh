@@ -56,7 +56,9 @@ typedef struct {
 #define	GLOB_NOCHECK	0x020	/* return pattern itself if nothing matches */
 #define	GLOB_NOSORT	0x040	/* don't sort */
 #define	GLOB_QUOTE	0x080	/* quote special chars with \ */
-#define	GLOB_ALTNOT	0x100	/* use alternate glob character [^ not !] */
+#define GLOB_NOMAGIC	0x100	/* like GLOB_NOCHECK but only if the pattern
+				 * did not have any magic characters */
+#define	GLOB_ALTNOT	0x200	/* use alternate glob character [^ not !] */
 
 #define	GLOB_NOSPACE	(-1)	/* malloc call failed */
 #define	GLOB_ABEND	(-2)	/* unignored error */

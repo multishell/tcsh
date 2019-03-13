@@ -8,6 +8,10 @@
 
 /****************** System dependant compilation flags ****************/
 /*
+ * For A/UX 2.00 you can define POSIX and POSIXJOBS, but you'll have
+ * to add -ZP in CFLAGS and set LIBES to -lposix -ltermcap.
+ */
+/*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
  */
 #undef POSIX
@@ -89,9 +93,9 @@
 #undef SIGVOID 
 
 /*
- * DUP2		Define this if your system supports dup2().
+ * HAVEDUP2	Define this if your system supports dup2().
  */
-#define DUP2
+#define HAVEDUP2
 
 /*
  * UTHOST	Does the utmp file have a host field?

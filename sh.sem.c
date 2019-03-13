@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.sem.c,v 3.0 1991/07/04 23:34:26 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.sem.c,v 3.1 1991/07/15 19:37:24 christos Exp $ */
 /*
  * sh.sem.c: I/O redirections and job forking. A touchy issue!
  *	     Most stuff with builtins is incorrect
@@ -36,29 +36,27 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-#ifndef lint
-static char *rcsid() 
-    { return "$Id: sh.sem.c,v 3.0 1991/07/04 23:34:26 christos Exp $"; }
-#endif
+RCSID("$Id: sh.sem.c,v 3.1 1991/07/15 19:37:24 christos Exp $")
 
 #include "sh.h"
+#include "tc.h"
 
 #ifdef FIOCLEX
-#ifndef sun
-#ifndef CLEX_DUPS
-#define CLEX_DUPS
-#endif				/* CLEX_DUPS */
-#endif				/* sun */
-#endif				/* FIOCLEX */
+# ifndef sun
+#  ifndef CLEX_DUPS
+#   define CLEX_DUPS
+#  endif /* CLEX_DUPS */
+# endif /* sun */
+#endif /* FIOCLEX */
 
 #ifdef sparc
-#include <vfork.h>
-#endif				/* sparc */
+# include <vfork.h>
+#endif /* sparc */
 
 #ifdef VFORK
 static	sigret_t	vffree	__P((int));
 #endif
-static	void		doio	__P((struct command *t, int *, int *));
+static	void		doio	__P((struct command *, int *, int *));
 static	void		chkclob	__P((char *));
 
 /*
@@ -72,7 +70,6 @@ execute(t, wanttty, pipein, pipeout)
 {
 #if defined(convex) || defined(__convex__)
     extern bool use_fork;	/* use fork() instead of vfork()? */
-
 #endif
 
     bool    forked = 0;
@@ -598,6 +595,10 @@ int snum;
 	xfree((ptr_t) v);
     }
     _exit(1);
+#ifndef SIGVOID
+    /*NOTREACHED*/
+    return(0);
+#endif /* SIGVOID */
 }
 
 #endif

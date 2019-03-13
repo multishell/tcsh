@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.parse.c,v 3.0 1991/07/04 21:49:28 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.parse.c,v 3.2 1991/07/15 19:37:24 christos Exp $ */
 /*
  * sh.parse.c: Interpret a list of tokens
  */
@@ -35,10 +35,7 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-#ifndef lint
-static char *rcsid() 
-    { return "$Id: sh.parse.c,v 3.0 1991/07/04 21:49:28 christos Exp $"; }
-#endif
+RCSID("$Id: sh.parse.c,v 3.2 1991/07/15 19:37:24 christos Exp $")
 
 #include "sh.h"
 
@@ -56,13 +53,13 @@ static	struct command	*syn1b	 __P((struct wordent *, struct wordent *, int));
 static	struct command	*syn2	 __P((struct wordent *, struct wordent *, int));
 static	struct command	*syn3	 __P((struct wordent *, struct wordent *, int));
 
-#define ALEFT	21		/* max of 20 alias expansions	 */
-#define HLEFT	11		/* max of 10 history expansions	 */
+#define ALEFT	51		/* max of 50 alias expansions	 */
+#define HLEFT	11		/* max of 10 history expansions */
 /*
  * Perform aliasing on the word list lex
  * Do a (very rudimentary) parse to separate into commands.
  * If word 0 of a command has an alias, do it.
- * Repeat a maximum of 20 times.
+ * Repeat a maximum of 50 times.
  */
 static int aleft;
 extern int hleft;

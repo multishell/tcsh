@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.sched.c,v 3.0 1991/07/04 21:49:28 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.sched.c,v 3.2 1991/07/15 19:37:24 christos Exp $ */
 /*
  * tc.sched.c: Scheduled command execution
  *
@@ -37,13 +37,11 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-#ifndef lint
-static char *rcsid() 
-    { return "$Id: tc.sched.c,v 3.0 1991/07/04 21:49:28 christos Exp $"; }
-#endif
+RCSID("$Id: tc.sched.c,v 3.2 1991/07/15 19:37:24 christos Exp $")
 
 #include "sh.h"
 #include "ed.h"
+#include "tc.h"
 
 extern int just_signaled;
 
@@ -63,12 +61,14 @@ sched_next()
     return ((time_t) - 1);
 }
 
+/*ARGSUSED*/
 void
-dosched(v)
+dosched(v, c)
     register Char **v;
+    struct command *c;
 {
     register struct sched_event *tp, *tp1, *tp2;
-    long    cur_time;
+    time_t  cur_time;
     int     count, hours, minutes, dif_hour, dif_min;
     Char   *cp;
     bool    relative;		/* time specified as +hh:mm */
@@ -185,7 +185,7 @@ dosched(v)
 void
 sched_run()
 {
-    long    cur_time;
+    time_t   cur_time;
     register struct sched_event *tp, *tp1;
     struct wordent cmd, *nextword, *lastword;
     struct command *t;

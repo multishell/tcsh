@@ -90,9 +90,9 @@
 #undef SIGVOID 
 
 /*
- * DUP2		Define this if your system supports dup2().
+ * HAVEDUP2	Define this if your system supports dup2().
  */
-#define DUP2
+#define HAVEDUP2
 
 /*
  * UTHOST	Does the utmp file have a host field?

@@ -10,7 +10,7 @@
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
  */
-#define POSIX
+#undef POSIX
 
 /*
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
@@ -31,33 +31,45 @@
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
  */
-#define VFORK
+#undef VFORK
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and
  *		a tty that deals correctly
  */
-#define BSDJOBS
+#ifdef mips
+# define BSDJOBS
+#else
+# undef BSDJOBS
+#endif
 
 /*
  * BSDSIGS	You have 4.2-style signals, rather than USG style.
  *		Note: POSIX systems should not define this unless they
  *		have sigvec() and friends (ie: 4.3BSD-RENO, HP-UX).
  */
-#define BSDSIGS
+#undef BSDSIGS
 
 /*
  * BSDTIMES	You have BSD-style process time stuff (like rusage)
  *		This may or may not be true.  For example, Apple Unix
  *		(OREO) has BSDJOBS and BSDSIGS but not BSDTIMES.
  */
-#define BSDTIMES
+#ifdef mips
+# define BSDTIMES
+#else
+# undef BSDTIMES
+#endif
 
 /*
  * BSDNICE	Your system uses setpriority() instead of nice, to
  *		change a processes scheduling priority
  */
-#define BSDNICE
+#ifdef mips
+# define BSDNICE
+#else
+# undef BSDNICE
+#endif
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
@@ -74,12 +86,22 @@
  *		Set SVID to 1, 2, or 3, depending the version of System V
  *		you are running. Or set it to 0 if you are not SVID based
  */
-#define SVID	0
+#ifdef mips
+# define SVID	3
+#else
+/* 
+ * For the 3000:
+ * We may not technically be compliant, and I don't know whether we are
+ * SVR1 or SVR2.  We're pretty System V-ish, though, so we won't say 0.
+ * We'll guess 1.  There are no checks for SVID <= 1 vs. SVID >= 2 at
+ * current writing anyway. 
+ */
+# define SVID	1
+#endif
 
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
  *		to send command output to /dev/null
- *		This is fixed in sunos 4.1, broken in 4.0..
  */
 #undef YPBUGS
 
@@ -87,28 +109,52 @@
  * SIGVOID	Define this if your signal handlers return void.  On older
  *		systems, signal returns int, but on newer ones, it returns void.
  */
-#define SIGVOID 
+#ifdef mips
+# define SIGVOID 
+#else
+# undef SIGVOID 
+#endif
 
 /*
  * HAVEDUP2	Define this if your system supports dup2().
  */
-#define HAVEDUP2
+#ifdef mips
+# define HAVEDUP2
+#else
+# undef HAVEDUP2
+#endif
 
 /*
  * UTHOST	Does the utmp file have a host field?
  */
-#define UTHOST
+#undef UTHOST
 
 /*
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
  */
 #define DIRENT
 /****************** local defines *********************/
+#ifdef mips
 /*
- * SUNOS4	You are runnig SunOS 4 (on a Sun 2, 3, 4, or 386i)
+ * IRIS4D	You are running on an Iris 4D
  */
-#define SUNOS4
+# define IRIS4D
+
+/*
+ * IRIX3_3	You are running IRIX 3.3 (or later)
+ */
+# define IRIX3_3
+#endif
+
+#ifdef m68000
+/*
+ * IRIS3D	You are running on an Iris 3000 series
+ */
+# define IRIS3D
+#endif
 
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
+
+#undef NLS

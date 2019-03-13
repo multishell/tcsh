@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.types.h,v 3.0 1991/07/04 23:38:32 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.types.h,v 3.3 1991/07/15 19:37:24 christos Exp $ */
 /* sh.types.h: Do the necessary typedefs for each system.
  *             Up till now I avoided making this into a separate file
  *	       But I just wanted to eliminate the whole mess from sh.h
@@ -160,10 +160,22 @@ extern char *sbrk();
 /*
  * DGUX types
  */
-# ifndef _SIZE_T
-#  define _SIZE_T
-   typedef unsigned int size_t;
-# endif /* _SIZE_T */
+# ifdef ___int_size_t_h
+#  ifdef _TARGETTING_M88KBCS_OR_DGUX
+#   ifdef _USING_ANSI_C_OR_POSIX_OR_SYSV3_OR_BSD_OR_DGUX
+#    ifndef _SIZE_T
+#     define _SIZE_T
+#    endif /* _SIZE_T */
+#   endif  /* #ifdef _USING_ANSI_C_OR_POSIX_OR_SYSV3_OR_BSD_OR_DGUX */
+#  endif  /* #ifdef _TARGETTING_M88KBCS_OR_DGUX */
+# endif  /* #ifndef ___int_size_t_h */
+
+# ifdef _USING_POSIX_OR_SYSV3_OR_BSD_OR_DGUX
+#  ifndef _PID_T
+#   define _PID_T
+#  endif /* _PID_T */
+# endif  /* #ifdef _USING_POSIX_OR_SYSV3_OR_BSD_OR_DGUX */
+
 #endif
 
 
@@ -181,8 +193,6 @@ extern char *sbrk();
  *** BSD systems, pre and post 4.3
  ***/
 #ifdef BSD
-extern uid_t getuid(), geteuid();
-extern gid_t getgid(), getegid();
 # ifndef _SIZE_T
 #  define _SIZE_T
 # endif /* _SIZE_T */
@@ -279,6 +289,27 @@ extern gid_t getgid(), getegid();
 #  define _SIZE_T
 # endif /* _SIZE_T */
 #endif	/* masscomp */
+
+/***
+ *** Encore multimax running umax 4.2
+ ***/
+#ifdef	ns32000
+# ifdef __TYPES_DOT_H__
+#  ifndef _SIZE_T
+#   define _SIZE_T
+#  endif /* _SIZE_T */
+# endif /* __TYPES_DOT_H__ */
+#endif	/* ns32000 */
+
+/***
+ *** Silicon Graphics IRIS 3000
+ ***
+ ***/
+#ifdef IRIS3D
+# ifndef _SIZE_T
+#  define _SIZE_T
+# endif /* _SIZE_T */
+#endif /* IRIS3D */
 
 /***
  *** Catch all for non POSIX systems.

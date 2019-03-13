@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.os.h,v 3.1 1991/07/05 19:07:33 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.os.h,v 3.3 1991/07/16 11:39:38 christos Exp $ */
 /*
  * tc.os.h: Shell os dependent defines
  */
@@ -38,8 +38,15 @@
 #define _h_tc_os
 
 #ifdef OREO
-#include <sys/time.h>
-#include <sys/resource.h>
+# include <sys/time.h>
+# include <sys/resource.h>
+# ifdef POSIX
+#  ifdef T_BREAK
+#   undef T_BREAK
+#  endif /* T_BREAK */
+#  include <sys/tty.h>
+#  include <termios.h>
+# endif /* POSIX */
 #endif /* OREO */
 
 #ifdef titan
@@ -76,6 +83,14 @@ struct ucred {
 # endif	/* POSIX */
 #endif /* hpux */
 
+/*
+ * ISC does not define CSUSP
+ */
+#ifdef ISC
+# ifndef CSUSP
+#  define CSUSP 032
+# endif	/* CSUSP */
+#endif /* ISC */
 #ifdef HYPERCUBE
 /*
  * for struct winsiz
@@ -263,9 +278,9 @@ struct ucred {
 #endif /* POSIX */
 
 
-#if SVID > 0 && !defined(OREO) && !defined(IRIS4D)
+#if SVID > 0 && !defined(OREO) && !defined(sgi)
 # define NEEDgetwd
-#endif /* SVID > 0 && !OREO && !IRIS4D */
+#endif /* SVID > 0 && !OREO && !sgi */
 
 #ifndef S_IFLNK
 # define lstat stat
@@ -325,6 +340,11 @@ extern int killpg();
 # ifndef lstat
 extern int lstat();
 # endif	/* lstat */
+
+#ifdef BSD
+extern uid_t getuid(), geteuid();
+extern gid_t getgid(), getegid();
+#endif /* BSD */
 
 # ifdef SYSMALLOC
 extern memalign_t malloc();

@@ -37,7 +37,7 @@
  * BSDJOBS	You have BSD-style job control (both process groups and
  *		a tty that deals correctly
  */
-#define BSDJOBS
+#undef BSDJOBS
 
 /*
  * BSDSIGS	You have 4.2-style signals, rather than USG style.
@@ -51,13 +51,13 @@
  *		This may or may not be true.  For example, Apple Unix
  *		(OREO) has BSDJOBS and BSDSIGS but not BSDTIMES.
  */
-#define BSDTIMES
+#undef BSDTIMES
 
 /*
  * BSDNICE	Your system uses setpriority() instead of nice, to
  *		change a processes scheduling priority
  */
-#define BSDNICE
+#undef BSDNICE
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
@@ -68,7 +68,7 @@
 #define TERMIO
 
 /*
- * SVID		Your machine is SVID complient (Sys V, HPUX, A/UX)
+ * SVID		Your machine is SVID compliant (Sys V, HPUX, A/UX)
  *		NOTE: don't do this if you are on a Pyramid -- tcsh is
  *		built in a BSD universe.
  *		Set SVID to 1, 2, or 3, depending the version of System V
@@ -86,12 +86,12 @@
  * SIGVOID	Define this if your signal handlers return void.  On older
  *		systems, signal returns int, but on newer ones, it returns void.
  */
-#define SIGVOID 
+#undef SIGVOID 
 
 /*
- * DUP2		Define this if your system supports dup2().
+ * HAVEDUP2	Define this if your system supports dup2().
  */
-#define DUP2
+#define HAVEDUP2
 
 /*
  * UTHOST	Does the utmp file have a host field?
@@ -103,15 +103,10 @@
  */
 #define DIRENT
 /****************** local defines *********************/
-/*
- * IRIS4D	You are running on an Iris 4D
- */
-#define IRIS4D
 
-/*
- * IRIX3_3	You are running IRIX 3.3 (or later)
- */
-#define IRIX3_3
+#define _SIZE_T
+#define i386
+#define NEEDgethostname
 
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */

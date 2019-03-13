@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.os.c,v 3.0 1991/07/05 00:05:11 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.os.c,v 3.2 1991/07/15 19:37:24 christos Exp $ */
 /*
  * tc.os.c: OS Dependent builtin functions
  */
@@ -35,12 +35,10 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-#ifndef lint
-static char *rcsid() 
-    { return "$Id: tc.os.c,v 3.0 1991/07/05 00:05:11 christos Exp $"; }
-#endif
+RCSID("$Id: tc.os.c,v 3.2 1991/07/15 19:37:24 christos Exp $")
 
 #include "sh.h"
+#include "tw.h"
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
 
@@ -74,9 +72,11 @@ static Char STREPATH[] = {'E', 'P', 'A', 'T', 'H', '\0'};
 static Char *syspaths[] = {STRPATH, STRCPATH, STRLPATH, STRMPATH, STREPATH, 0};
 #define LOCALSYSPATH	"/usr/cs"
 
+/*ARGSUSED*/
 void
-dosetpath(arglist)
+dosetpath(arglist, c)
     Char  **arglist;
+    struct command *c;
 {
     extern char *getenv();
 
@@ -189,10 +189,11 @@ abortpath:
  *** AIX
  ***/
 #ifdef TCF
-/* VARARGS *//* ARGSUSED */
+/* ARGSUSED */
 void
-dogetxvers(v)
+dogetxvers(v, c)
     Char  **v;
+    struct command *c;
 {
     char    xvers[MAXPATHLEN];
 
@@ -202,9 +203,11 @@ dogetxvers(v)
     flush();
 }
 
+/*ARGSUSED*/
 void
-dosetxvers(v)
+dosetxvers(v, c)
     Char  **v;
+    struct command *c;
 {
     char   *xvers;
 
@@ -281,9 +284,11 @@ getxid(xcname)
 }
 
 
+/*ARGSUSED*/
 void
-dogetspath(v)
+dogetspath(v, c)
     Char  **v;
+    struct command *c;
 {
     int     i, j;
     sitepath_t p[MAXSITE];
@@ -325,9 +330,11 @@ dogetspath(v)
     flush();
 }
 
+/*ARGSUSED*/
 void
-dosetspath(v)
+dosetspath(v, c)
     Char  **v;
+    struct command *c;
 {
     int     i;
     short   j;
@@ -406,9 +413,11 @@ migratepid(pid, new_site)
     return (0);
 }
 
+/*ARGSUSED*/
 void
-domigrate(v)
+domigrate(v, c)
     Char  **v;
+    struct command *c;
 {
     struct sf *st;
     char   *s;
@@ -514,9 +523,11 @@ catch_sigsys()
 }
 
 
+/*ARGSUSED*/
 void
-dowarp(v)
+dowarp(v, c)
     Char  **v;
+    struct command *c;
 {
     int     warp, oldwarp;
     struct warpent *we;
@@ -572,9 +583,11 @@ dowarp(v)
  ***/
 /* Added, DAS DEC-90. */
 #ifdef masscomp
+/*ARGSUSED*/
 void
-douniverse(v)
+douniverse(v, c)
     register Char **v;
+    struct command *c;
 {
     register Char *cp = v[1];
     char    ubuf[100];
@@ -886,9 +899,11 @@ llib(s)
 	stderror(ERR_SYSTEM, t, apperr(&st));
 }
 
+/*ARGSUSED*/
 void
-doinlib(v)
+doinlib(v, c)
     Char **v;
+    struct command *c;
 {
     setname(short2str(*v++));
     gflag = 0, tglob(v);
@@ -922,9 +937,11 @@ getv(v)
     return(0);
 }
 
+/*ARGSUSED*/
 void
-dover(v)
+dover(v, c)
     Char **v;
+    struct command *c;
 {
     Char *p;
 
@@ -952,9 +969,11 @@ typedef short enum {
 	name_$node_dir_type,
 } name_$dir_type_t;
 
+/*ARGSUSED*/
 void
-dorootnode(v)
+dorootnode(v, c)
     Char **v;
+    struct command *c;
 {
     name_$dir_type_t dirtype = name_$node_dir_type;
     uid_$t uid;

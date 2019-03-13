@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.func.c,v 3.0 1991/07/04 21:49:28 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.func.c,v 3.4 1991/07/16 16:21:55 christos Exp $ */
 /*
  * tc.func.c: New tcsh builtins.
  */
@@ -35,20 +35,20 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-#ifndef lint
-static char *rcsid() 
-    { return "$Id: tc.func.c,v 3.0 1991/07/04 21:49:28 christos Exp $"; }
-#endif
+RCSID("$Id: tc.func.c,v 3.4 1991/07/16 16:21:55 christos Exp $")
 
 #include "sh.h"
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
 #include "tw.h"
+#include "tc.h"
 
 extern time_t t_period;
+extern int do_logout;
 static bool precmd_active = 0;
 static bool periodic_active = 0;
 static bool cwdcmd_active = 0;	/* PWP: for cwd_cmd */
+static bool beepcmd_active = 0;
 
 static	void	Reverse		__P((Char *));
 static	void	auto_logout	__P((void));
@@ -172,9 +172,11 @@ Reverse(s)
 }
 
 
+/*ARGSUSED*/
 void
-dolist(v)
+dolist(v, c)
     register Char **v;
+    struct command *c;
 {
     int     i, k;
     struct stat st;
@@ -315,9 +317,11 @@ dolist(v)
 static char *defaulttell = "ALL";
 extern bool GotTermCaps;
 
+/*ARGSUSED*/
 void
-dotelltc(v)
+dotelltc(v, c)
     register Char **v;
+    struct command *c;
 {
 
     if (!GotTermCaps)
@@ -326,18 +330,22 @@ dotelltc(v)
     TellTC(v[1] ? short2str(v[1]) : defaulttell);
 }
 
+/*ARGSUSED*/
 void
-doechotc(v)
+doechotc(v, c)
     register Char **v;
+    struct command *c;
 {
     if (!GotTermCaps)
 	GetTermCaps();
     EchoTC(++v);
 }
 
+/*ARGSUSED*/
 void
-dosettc(v)
+dosettc(v, c)
     Char  **v;
+    struct command *c;
 {
     char    tv[2][BUFSIZ];
 
@@ -358,9 +366,11 @@ dosettc(v)
  * Thanks!!
  */
 
+/*ARGSUSED*/
 void
-dowhich(v)
+dowhich(v, c)
     register Char **v;
+    struct command *c;
 {
     struct wordent lex[3];
     struct varent *vp;
@@ -483,7 +493,7 @@ auto_logout()
 #ifdef TESLA
     do_logout = 1;
 #endif				/* TESLA */
-    goodbye();
+    goodbye(NULL, NULL);
 }
 
 sigret_t
@@ -492,6 +502,9 @@ alrmcatch(snum)
 int snum;
 {
     time_t  cl, nl;
+#if (SVID > 0) && (SVID < 3)
+    (void) sigset(SIGALRM, alrmcatch);
+#endif /* SVID > 0 && SVID < 3 */
 
     if ((nl = sched_next()) == -1)
 	auto_logout();		/* no other possibility - logout */
@@ -572,6 +585,39 @@ cwd_cmd()
 	aliasrun(1, STRcwdcmd, NULL);
 leave:
     cwdcmd_active = 0;
+#ifdef BSDSIGS
+    (void) sigsetmask(omask);
+#else
+    (void) sigrelse(SIGINT);
+#endif
+}
+
+/*
+ * Joachim Hoenig  07/16/91  Added beep_cmd, run every time tcsh wishes 
+ * to beep the terminal bell. Useful for playing nice sounds instead.
+ */
+void
+beep_cmd()
+{
+#ifdef BSDSIGS
+    sigmask_t omask;
+#endif
+
+#ifdef BSDSIGS
+    omask = sigblock(sigmask(SIGINT));
+#else
+    (void) sighold(SIGINT);
+#endif
+    if (beepcmd_active) {	/* an error must have been caught */
+	aliasrun(2, STRunalias, STRbeepcmd);
+	xprintf("Faulty alias 'beepcmd' removed.\n");
+    }
+    else {
+	beepcmd_active = 1;
+	if (!whyles && adrof1(STRbeepcmd, &aliases))
+	    aliasrun(1, STRbeepcmd, NULL);
+    }
+    beepcmd_active = 0;
 #ifdef BSDSIGS
     (void) sigsetmask(omask);
 #else
@@ -698,6 +744,8 @@ aliasrun(cnt, s1, s2)
 	 */
 	else if (cwdcmd_active)
 	    cwd_cmd();
+	else if (beepcmd_active)
+	    beep_cmd();
 	else if (periodic_active)
 	    period_cmd();
 #endif
@@ -1037,7 +1085,7 @@ inlist(list, name)
  * to expand tilde names to directories, but also
  * we can find users from their home directories for the tilde
  * prompt, on machines where yp lookup is slow this can be a big win...
- * As with any cache this can run out of sync...
+ * As with any cache this can run out of sync, rehash can sync it again.
  */
 static struct tildecache {
     Char   *user;
@@ -1113,6 +1161,7 @@ gettilde(us)
  * user's home directory in the tilde cache, otherwise return NULL
  * hm points to the place where the path became different.
  * Special case: Our own home directory.
+ * If we are passed a null pointer, then we flush the cache.
  */
 Char   *
 getusername(hm)
@@ -1121,6 +1170,17 @@ getusername(hm)
     Char   *h, *p;
     int     i, j;
 
+    if (hm == NULL) {
+	for (i = 0; i < tlength; i++) {
+	    xfree((ptr_t) tcache[i].home);
+	    xfree((ptr_t) tcache[i].user);
+	}
+	xfree((ptr_t) tcache);
+	tlength = 0;
+	tsize = TILINCR;
+	tcache = NULL;
+	return NULL;
+    }
     if (((h = value(STRhome)) != NULL) &&
 	(Strncmp(p = *hm, h, j = Strlen(h)) == 0) &&
 	(p[j] == '/' || p[j] == '\0')) {
@@ -1142,9 +1202,11 @@ getusername(hm)
  *  that saying "aliases > FILE" does not expand non-letters to printable
  *  sequences.
  */
+/*ARGSUSED*/
 void
-doaliases(v)
+doaliases(v, c)
     Char  **v;
+    struct command *c;
 {
     jmp_buf oldexit;
     Char  **vec, *lp;
@@ -1178,10 +1240,10 @@ doaliases(v)
     getexit(oldexit);
     if (setexit() == 0) {
 	for (;;) {
+	    Char   *p = NULL;
+	    int     n = 0;
 	    lp = line;
 	    for (;;) {
-		Char   *p = NULL;
-		int     n = 0;
 		if (n <= 0) {
 		    int     i;
 

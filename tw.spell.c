@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tw.spell.c,v 3.0 1991/07/04 21:49:28 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tw.spell.c,v 3.2 1991/07/15 19:37:24 christos Exp $ */
 /*
  * tw.spell.c: Spell check words
  */
@@ -35,10 +35,7 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-#ifndef lint
-static char *rcsid() 
-    { return "$Id: tw.spell.c,v 3.0 1991/07/04 21:49:28 christos Exp $"; }
-#endif
+RCSID("$Id: tw.spell.c,v 3.2 1991/07/15 19:37:24 christos Exp $")
 
 #include "sh.h"
 #include "tw.h"
@@ -89,8 +86,9 @@ spell_me(oldname, oldsize, looking_for_cmd)
 	 * far but there are later - or it will look for *all* commands
 	 */
 	/* (*should* say "looking for directory" whenever '/' is next...) */
-	if (t_search(guess, p, SPELL, FILSIZ,
-		     looking_for_cmd && (foundslash || *old != '/'), 1) >= 4)
+	retval = t_search(guess, p, SPELL, FILSIZ,
+			  looking_for_cmd && (foundslash || *old != '/'), 1);
+	if (retval >= 4 || retval < 0)
 	    return -1;		/* hopeless */
 	for (p = ws; *new = *p++;)
 	    new++;

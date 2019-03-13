@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tw.parse.c,v 3.0 1991/07/04 21:49:28 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tw.parse.c,v 3.5 1991/07/16 17:15:04 christos Exp $ */
 /*
  * tw.parse.c: Everyone has taken a shot in this futile effort to
  *	       lexically analyze a csh line... Well we cannot good
@@ -38,14 +38,12 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-#ifndef lint
-static char *rcsid() 
-    { return "$Id: tw.parse.c,v 3.0 1991/07/04 21:49:28 christos Exp $"; }
-#endif
+RCSID("$Id: tw.parse.c,v 3.5 1991/07/16 17:15:04 christos Exp $")
 
 #include "sh.h"
 #include "tw.h"
 #include "ed.h"
+#include "tc.h"
 
 /* #define TENEDEBUG */
 
@@ -76,7 +74,6 @@ static bool SearchNoDirErr = 0;	/* t_search returns -2 if dir is unreadable */
 extern Char NeedsRedraw;	/* from ed.h */
 extern int TermH;		/* from the editor routines */
 extern int lbuffed;		/* from sh.print.c */
-extern bool relatives_in_path;	/* set true if PATH has relative elements */
 
 static	void	 free_items		__P((Char **, int));
 static	void	 extract_dir_and_name	__P((Char *, Char *, Char *));
@@ -243,7 +240,7 @@ tenematch(inputline, inputline_size, num_read, command)
 
     case RECOGNIZE:
 	if (adrof(STRautocorrect)) {
-	    if ((slshp = Strrchr(word, '/')) != NULL && slshp[1] != NULL) {
+	    if ((slshp = Strrchr(word, '/')) != NULL && slshp[1] != '\0') {
 		SearchNoDirErr = 1;
 		for (bptr = word; bptr < slshp; bptr++) {
 		    /*
@@ -267,7 +264,7 @@ tenematch(inputline, inputline_size, num_read, command)
 
 	    (void) Strcpy(rword, slshp);
 	    if (slshp != STRNULL)
-		*slshp = NULL;
+		*slshp = '\0';
 	    if ((search_ret = spell_me(word, sizeof(word), is_a_cmd)) == 1) {
 		DeleteBack(str_end - word_start);/* get rid of old word */
 		(void) Strcat(word, rword);
@@ -645,10 +642,8 @@ t_search(word, wp, command, max_word_length, looking_for_command, list_max)
 			!looking_for_shellvar) || Strchr(word, '/');
 
     /* PWP: don't even bother when doing ALL of the commands */
-    if (looking_for_command && (*word == '\0')) {
-	Beep();
+    if (looking_for_command && (*word == '\0')) 
 	return (-1);
-    }
     tilded_dir[0] = '\0';
     dollar_dir[0] = '\0';
 
@@ -669,7 +664,7 @@ t_search(word, wp, command, max_word_length, looking_for_command, list_max)
 	    !(nd = dnormalize(*tilded_dir ? tilded_dir : STRdot)) ||
 	    ((dir_fd = opendir(short2str(nd))) == NULL)) {
 	    xfree((ptr_t) nd);
-	    if (SearchNoDirErr)
+	    if (command == SPELL || SearchNoDirErr)
 		return (-2);
 	    xprintf("\n%s unreadable\n",
 		    *tilded_dir ? short2str(tilded_dir) :
@@ -769,15 +764,21 @@ again:
 		    while (*pathv && pathv[0][0] == '/')
 			pathv++;
 		    if (*pathv) {
+			/*
+			 * We complete directories only on '.' should that
+			 * be changed?
+			 */
 			if (pathv[0][0] == '\0' ||
 			    (pathv[0][0] == '.' && pathv[0][1] == '\0')) {
 			    *tilded_dir = '\0';
 			    dir_fd = opendir(".");
+			    dir_ok = 1;	
 			}
 			else {
 			    copyn(tilded_dir, *pathv, FILSIZ);
 			    catn(tilded_dir, STRslash, FILSIZ);
 			    dir_fd = opendir(short2str(*pathv));
+			    dir_ok = 0;
 			}
 			pathv++;
 		    }
@@ -789,7 +790,6 @@ again:
 		 * conditional on recognize_only_executables?
 		 */
 		exec_check = 1;
-		dir_ok = 0;
 	    }
 	    else
 		next_command++;
@@ -852,7 +852,7 @@ again:
 		length++;
 
 	    /* safety check */
-	    items[numitems] = (Char *) xmalloc((size_t) (length * sizeof(Char)));
+	    items[numitems] = (Char *) xmalloc((size_t)(length * sizeof(Char)));
 
 	    copyn(items[numitems], entry, MAXNAMLEN);
 
@@ -959,16 +959,13 @@ again:
 				catn(word, STRspace, max_word_length);
 			}
 		    }
-		    else if (looking_for_file) {
+		    else if (looking_for_file || looking_for_command) {
 			if (isadirectory(tilded_dir, extended_name)) {
 			    catn(word, STRslash, max_word_length);
 			}
 			else {
 			    catn(word, STRspace, max_word_length);
 			}
-		    }
-		    else {	/* prob. looking for a command */
-			catn(word, STRspace, max_word_length);
 		    }
 		}
 	    }
@@ -1124,8 +1121,23 @@ getentry(dir_fd, looking_for_lognames)
     register struct dirent *dirp;
 
     if (looking_for_lognames) {	/* Is it login names we want? */
-
+	/*
+	 * We don't want to get interrupted inside getpwent()
+	 * because the yellow pages code is not interruptible,
+	 * and if we call endpwent() immediatetely after
+	 * (in pintr()) we may be freeing an invalid pointer
+	 */
+#ifdef BSDSIGS
+	sigmask_t omask = sigblock(sigmask(SIGINT));
+#else
+	(void) sighold(SIGINT);
+#endif /* BSDSIGS */
 	pw = getpwent();
+#ifdef BSDSIGS
+	(void) sigsetmask(omask);
+#else
+	(void) sigrelse(SIGINT);
+#endif /* BSDSIGS */
 
 	if (pw == NULL) {
 #ifdef YPBUGS

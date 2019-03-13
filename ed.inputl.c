@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.inputl.c,v 3.0 1991/07/04 21:49:28 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.inputl.c,v 3.3 1991/07/16 18:49:14 christos Exp $ */
 /*
  * ed.inputl.c: Input line handling.
  */
@@ -35,10 +35,7 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-#ifndef lint
-static char *rcsid()
-    { return "$Id: ed.inputl.c,v 3.0 1991/07/04 21:49:28 christos Exp $"; }
-#endif
+RCSID("$Id: ed.inputl.c,v 3.3 1991/07/16 18:49:14 christos Exp $")
 
 #include "sh.h"
 #include "ed.h"
@@ -108,7 +105,7 @@ Inputl()
 	Hist_num = HistWhich;
     }
     if (Expand) {
-	(void) e_up_hist();
+	(void) e_up_hist(0);
 	Expand = 0;
     }
     Refresh();			/* print the prompt */
@@ -254,7 +251,7 @@ Inputl()
 
 	case CC_COMPLETE:
 	    if (adrof(STRautoexpand))
-		(void) e_expand_history();
+		(void) e_expand_history(0);
 	    /*
 	     * Modified by Martin Boyer (gamin@ireq-robot.hydro.qc.ca):
 	     * A separate variable now controls beeping after
@@ -278,9 +275,11 @@ Inputl()
 		    Beep();
 		break;
 	    default:
-		if (matchval < 0)	/* Error from tenematch */
+		if (matchval < 0) {	/* Error from tenematch */
 		    Beep();
-		else if (matchbeep) {
+		    break;
+		}
+		if (matchbeep) {
 		    if ((Strcmp(*(matchbeep->vec), STRambiguous) == 0 ||
 			 Strcmp(*(matchbeep->vec), STRnotunique) == 0))
 			Beep();
@@ -312,14 +311,16 @@ Inputl()
 
 	case CC_LIST_CHOICES:
 	    /* should catch ^C here... */
-	    (void) tenematch(InputBuf, INBUFSIZ, Cursor - InputBuf, LIST);
+	    if (tenematch(InputBuf, INBUFSIZ, Cursor - InputBuf, LIST) < 0)
+		Beep();
 	    Refresh();
 	    Argument = 1;
 	    DoingArg = 0;
 	    break;
 
 	case CC_LIST_GLOB:
-	    (void) tenematch(InputBuf, INBUFSIZ, Cursor - InputBuf, GLOB);
+	    if (tenematch(InputBuf, INBUFSIZ, Cursor - InputBuf, LIST) < 0)
+		Beep();
 	    Refresh();
 	    Argument = 1;
 	    DoingArg = 0;
@@ -449,12 +450,10 @@ GetNextChar(cp)
     register Char *cp;
 {
     register int num_read;
-
 #if defined(EWOULDBLOCK) || (defined(POSIX) && defined(EAGAIN))
 # if defined(FIONBIO) || (defined(F_SETFL) && defined(O_NDELAY))
 #  define TRY_AGAIN
     int     tried = 0;
-
 # endif				/* FIONBIO || (F_SETFL && O_NDELAY) */
 #endif				/* EWOULDBLOCK || (POSIX && EAGAIN) */
     unsigned char tcp;
@@ -504,9 +503,9 @@ GetNextChar(cp)
 		tried = 1;
 		break;
 	    }
-#endif
 	    *cp = tcp;
 	    return (num_read);
+#endif /* TRY_AGAIN */
 #ifdef _SEQUENT_
 	case EBADF:
 #endif				/* _SEQUENT_ */

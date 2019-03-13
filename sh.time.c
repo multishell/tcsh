@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.time.c,v 3.0 1991/07/04 21:49:28 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.time.c,v 3.1 1991/07/15 19:37:24 christos Exp $ */
 /*
  * sh.time.c: Shell time keeping and printing.
  */
@@ -35,10 +35,7 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-#ifndef lint
-static char *rcsid() 
-    { return "$Id: sh.time.c,v 3.0 1991/07/04 21:49:28 christos Exp $"; }
-#endif
+RCSID("$Id: sh.time.c,v 3.1 1991/07/15 19:37:24 christos Exp $")
 
 #include "sh.h"
 #if defined(sun) && ! defined(MACH)
@@ -98,8 +95,11 @@ settimes()
  * dotime is only called if it is truly a builtin function and not a
  * prefix to another command
  */
+/*ARGSUSED*/
 void
-dotime()
+dotime(v, c)
+    Char **v;
+    struct command *c;
 {
 #ifdef BSDTIMES
     timeval_t timedol;
@@ -140,9 +140,11 @@ dotime()
 /*
  * donice is only called when it on the line by itself or with a +- value
  */
+/*ARGSUSED*/
 void
-donice(v)
+donice(v, c)
     register Char **v;
+    struct command *c;
 {
     register Char *cp;
     int     nval = 0;

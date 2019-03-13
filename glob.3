@@ -172,6 +172,13 @@ GLOB_QUOTE
 Use the backslash (``\e'') character for quoting: every occurrence of
 a backslash followed by a character in the pattern is replaced by that
 character, avoiding any special interpretation of the character.
+.TP
+GLOB_NOMAGIC
+Is the same as GLOB_NOCHECK but it only appends the
+.IR pattern
+if it does not contain any of the special characters ``*'', ``?'' or ``[''.
+GLOB_NOMAGIC is used to simplify implementing the globbing behavior in
+.IR csh(1).
 .PP
 If, during the search, a directory is encountered that cannot be opened
 or read and

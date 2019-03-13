@@ -1,3 +1,27 @@
+V6.00.01, 07/16/91
+17. added beepcmd, and fixed small tenematch bugs.
+16. Renamed DUP2 flag to HAVEDUP2 cause AIXPS2 defines DUP2 already.
+15. More ANSI fixes, and mit additions (load-average)
+14. don't clear ECHOE, background programs might need it.
+13. Refresh bug fix...
+12. getpwent() should not be interrupted (yellow pages), cause it might
+    leave dangling pointers, that endpwent() will trash.
+11. ChangeSize is now responsible to set the screen size to something
+    sane, but it should not affect the environment if the information
+    it received is not valid
+10. Find out if we are running under emacs using $TERM. It is more 
+    reliable.
+9.  tcsh was broken if SHORT_STRINGS was not defined (glob() problem)
+8.  If GetSize() fails it should always return reasonable screen sizes.
+7.  globbing should not fail if one or more patterns match.
+6.  increased the number of aliases in the loop detection code.
+5.  DGUX has size_t and pid_t defined now...
+4.  ESIX does not have EWOULDBLOCK or EAGAIN & POSIX... That was not handled
+    correctly.
+3.  rs6000 needs BSDWAIT.
+2.  Hpux susp key could not be changed.
+1.  Apollo fixes.
+
 V6.00.00, 07/04/91
 45. Fixed quoting of VSTART/VSTOP on termios
 44. Memory leak every time you pipe in or out.
@@ -32,7 +56,7 @@ V6.00.00, 07/04/91
 30. Glob fix. Quoted characters inside [] were not handled properly.
 29. Removed TELL and VMUNIX defines. I think we cannot compile on V6 anyway
 28. Overflow check for expansions.
-27. Added matchbeep, regular expression history searching.
+27. Added matchbeep, shell pattern history searching.
 26. Added code to handle /dev/std{in,out,err}
 25. Fixed POSIX speed handling in raw mode.
 24. Fixed a flushing bug in the filec code in sh.file.c

@@ -89,9 +89,9 @@
 #define SIGVOID 
 
 /*
- * DUP2		Define this if your system supports dup2().
+ * HAVEDUP2	Define this if your system supports dup2().
  */
-#undef DUP2
+#undef HAVEDUP2
 
 /*
  * UTHOST	Does the utmp file have a host field?
@@ -103,6 +103,7 @@
  */
 #define DIRENT
 /****************** local defines *********************/
+#define SCO
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"

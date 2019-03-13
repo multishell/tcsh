@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.hist.c,v 3.0 1991/07/04 21:49:28 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.hist.c,v 3.1 1991/07/15 19:37:24 christos Exp $ */
 /*
  * sh.hist.c: Shell history expansions and substitutions
  */
@@ -35,12 +35,10 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-#ifndef lint
-static char *rcsid() 
-    { return "$Id: sh.hist.c,v 3.0 1991/07/04 21:49:28 christos Exp $"; }
-#endif
+RCSID("$Id: sh.hist.c,v 3.1 1991/07/15 19:37:24 christos Exp $")
 
 #include "sh.h"
+#include "tc.h"
 
 extern bool histvalid;
 extern Char histline[];
@@ -126,9 +124,11 @@ hfree(hp)
     xfree((ptr_t) hp);
 }
 
+/*ARGSUSED*/
 void
-dohist(vp)
+dohist(vp, c)
     Char  **vp;
+    struct command *c;
 {
     int     n, rflg = 0, hflg = 0, tflg = 0;
 

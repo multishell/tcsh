@@ -10,7 +10,7 @@
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
  */
-#define POSIX
+#undef POSIX
 
 /*
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
@@ -65,7 +65,7 @@
  *		BSD uses sgttyb. POSIX systems should define this
  *		anyway, even though they use struct termios.
  */
-#define TERMIO
+#undef TERMIO
 
 /*
  * SVID		Your machine is SVID complient (Sys V, HPUX, A/UX)
@@ -79,7 +79,6 @@
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
  *		to send command output to /dev/null
- *		This is fixed in sunos 4.1, broken in 4.0..
  */
 #undef YPBUGS
 
@@ -87,7 +86,7 @@
  * SIGVOID	Define this if your signal handlers return void.  On older
  *		systems, signal returns int, but on newer ones, it returns void.
  */
-#define SIGVOID 
+#undef SIGVOID 
 
 /*
  * HAVEDUP2	Define this if your system supports dup2().
@@ -97,18 +96,15 @@
 /*
  * UTHOST	Does the utmp file have a host field?
  */
-#define UTHOST
+#undef UTHOST
 
 /*
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
  */
-#define DIRENT
+#undef DIRENT
 /****************** local defines *********************/
-/*
- * SUNOS4	You are runnig SunOS 4 (on a Sun 2, 3, 4, or 386i)
- */
-#define SUNOS4
-
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
+
+#undef NLS

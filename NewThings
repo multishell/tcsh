@@ -1,8 +1,11 @@
 This file contains visible (incompatible) changes to the users.
 This version of tcsh has the following new things:
 
+6.00 PL1
+* There is no more config.iris4d, use config.sgi instead
+
 6.00
-* History searching searches using regular expressions too.
+* History searching searches using shell patterns too.
 * The autolist values that controlled beeping are not supported any more;
   used matchbeep instead.
 * /etc/Login and /etc/Logout were renamed to /etc/csh.login /etc/csh.logout

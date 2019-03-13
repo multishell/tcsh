@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.err.c,v 3.0 1991/07/04 21:49:28 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.err.c,v 3.1 1991/07/15 19:37:24 christos Exp $ */
 /*
  * sh.err.c: Error printing routines. There are lots of them
  *	     and none does the right thing!
@@ -36,10 +36,7 @@
  * SUCH DAMAGE.
  */
 #include "config.h"
-#ifndef lint
-static char *rcsid() 
-    { return "$Id: sh.err.c,v 3.0 1991/07/04 21:49:28 christos Exp $"; }
-#endif
+RCSID("$Id: sh.err.c,v 3.1 1991/07/15 19:37:24 christos Exp $")
 
 #define _h_tc_err		/* Don't redefine the errors	 */
 #include "sh.h"
