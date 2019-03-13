@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.c,v 3.15 1991/10/22 06:52:57 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.c,v 3.20 1991/12/19 22:34:14 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -43,7 +43,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif				/* not lint */
 
-RCSID("$Id: sh.c,v 3.15 1991/10/22 06:52:57 christos Exp $")
+RCSID("$Id: sh.c,v 3.20 1991/12/19 22:34:14 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -296,25 +296,15 @@ main(argc, argv)
     fix_version();		/* publish the shell version */
 
     /*
-     * set the shell-level var to 1 or increment it.
+     * increment the shell level.
      */
-    if ((tcp = getenv("SHLVL")) != NULL) {
-	Char    buff[BUFSIZ];
-
-	Itoa(1 + atoi(tcp), buff);
-	set(STRshlvl, Strsave(buff));
-	Setenv(STRSHLVL, buff);
-    }
-    else {
-	set(STRshlvl, SAVE("1"));
-	Setenv(STRSHLVL, str2short("1"));
-    }
+    shlvl(1);
 
     if ((tcp = getenv("HOME")) != NULL)
 	cp = SAVE(tcp);
     else
-	cp = NOSTR;
-    if (cp == NOSTR)
+	cp = NULL;
+    if (cp == NULL)
 	fast = 1;		/* No home -> can't read scripts */
     else
 	set(STRhome, cp);
@@ -326,7 +316,7 @@ main(argc, argv)
      */
     {
 	char *cln, *cus;
-	Char    buff[BUFSIZ];
+	Char    buff[BUFSIZE];
 	struct passwd *pw;
 
 
@@ -602,6 +592,10 @@ main(argc, argv)
 		use_fork = 1;
 		break;
 #endif
+	    default:		/* Unknown command option */
+		exiterr = 1;
+		stderror(ERR_TCSHUSAGE, tcp-1);
+		break;
 
 	} while (*tcp);
 	tempv++, argc--;
@@ -738,8 +732,8 @@ main(argc, argv)
 	        (void) tcsetpgrp(f, shpgrp);
 	    }
 #endif /* NeXT */
-    retry:
 #ifdef BSDJOBS			/* if we have tty job control */
+    retry:
 	    if ((tpgrp = tcgetpgrp(f)) != -1) {
 		if (tpgrp != shpgrp) {
 		    sigret_t(*old) () = signal(SIGTTIN, SIG_DFL);
@@ -864,6 +858,7 @@ main(argc, argv)
 	/* Will have value(STRhome) here because set fast if don't */
 	{
 	    int     osetintr = setintr;
+	    sigret_t (*oparintr)() = parintr;
 
 #ifdef BSDSIGS
 	    sigmask_t omask = sigblock(sigmask(SIGINT));
@@ -871,6 +866,7 @@ main(argc, argv)
 	    sighold(SIGINT);
 #endif
 	    setintr = 0;
+	    parintr = SIG_IGN;	/* onintr in /etc/ files has no effect */
 #ifdef _PATH_DOTCSHRC
 	    (void) srcfile(_PATH_DOTCSHRC, 0, 0);
 #endif
@@ -886,6 +882,7 @@ main(argc, argv)
 	    (void) sigrelse(SIGINT);
 #endif
 	    setintr = osetintr;
+	    parintr = oparintr;
 	}
 #ifdef LOGINFIRST
 	if (loginsh)
@@ -915,7 +912,7 @@ main(argc, argv)
 	 */
 	{
 	    extern int bequiet;	/* make dirs shut up */
-	    Char    cshd[BUFSIZ];
+	    Char    cshd[BUFSIZE];
 	    struct stat st;
 
 	    (void) Strcpy(cshd, value(STRhome));
@@ -1227,7 +1224,7 @@ srcunit(unit, onlyown, hflg)
 void
 rechist()
 {
-    Char    buf[BUFSIZ], *hfile;
+    Char    buf[BUFSIZE], *hfile;
     int     fp, ftmp, oldidfds;
 
     if (!fast) {
@@ -1414,7 +1411,7 @@ pintr1(wantnl)
      * about that here.
      */
     if (gointr) {
-	search(T_GOTO, 0, gointr);
+	gotolab(gointr);
 	timflg = 0;
 	if (v = pargv)
 	    pargv = 0, blkfree(v);
@@ -1528,7 +1525,7 @@ process(catch)
 	    if (fseekp == feobp && aret == F_SEEK)
 		printprompt(0, NULL);
 	    flush();
-	    setalarm();
+	    setalarm(1);
 	}
 	if (seterr) {
 	    xfree((ptr_t) seterr);
@@ -1641,20 +1638,19 @@ dosource(t, c)
 {
     register Char *f;
     bool    hflg = 0;
-    Char    buf[BUFSIZ];
+    char    buf[BUFSIZE];
 
     t++;
     if (*t && eq(*t, STRmh)) {
-	if (*++t == NOSTR)
+	if (*++t == NULL)
 	    stderror(ERR_NAME | ERR_HFLAG);
 	hflg++;
     }
-    (void) Strcpy(buf, *t);
-    f = globone(buf, G_ERROR);
-    (void) strcpy((char *) buf, short2str(f));
+    f = globone(*t, G_ERROR);
+    (void) strcpy(buf, short2str(f));
     xfree((ptr_t) f);
-    if (!srcfile((char *) buf, 0, hflg) && !hflg)
-	stderror(ERR_SYSTEM, (char *) buf, strerror(errno));
+    if ((!srcfile(buf, 0, hflg)) && (!hflg))
+	stderror(ERR_SYSTEM, buf, strerror(errno));
 }
 
 /*

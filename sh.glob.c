@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.glob.c,v 3.11 1991/10/12 04:23:51 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.glob.c,v 3.14 1991/12/19 22:34:14 christos Exp $ */
 /*
  * sh.glob.c: Regular expression expansion
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.glob.c,v 3.11 1991/10/12 04:23:51 christos Exp $")
+RCSID("$Id: sh.glob.c,v 3.14 1991/12/19 22:34:14 christos Exp $")
 
 #include "tc.h"
 
@@ -230,6 +230,8 @@ globbrace(s, p, bl)
 		}
 	    }
 	    break;
+	default:
+	    break;
 	}
     *vl = NULL;
     *bl = nv;
@@ -381,6 +383,8 @@ handleone(str, vl, action)
     case G_IGNORE:
 	str = Strsave(strip(*vlp));
 	blkfree(vl);
+	break;
+    default:
 	break;
     }
     return (str);
@@ -599,7 +603,7 @@ dobackp(cp, literal)
     }
     pargsiz = GLOBSPACE;
     pargv = (Char **) xmalloc((size_t) sizeof(Char *) * pargsiz);
-    pargv[0] = NOSTR;
+    pargv[0] = NULL;
     pargcp = pargs = word;
     pargc = 0;
     pnleft = MAXPATHLEN - 4;
@@ -638,8 +642,8 @@ backeval(cp, literal)
     struct command faket;
     bool    hadnl;
     int     pvec[2], quoted;
-    Char   *fakecom[2], ibuf[BUFSIZ];
-    char    tibuf[BUFSIZ];
+    Char   *fakecom[2], ibuf[BUFSIZE];
+    char    tibuf[BUFSIZE];
 
     hadnl = 0;
     icnt = 0;
@@ -686,6 +690,15 @@ backeval(cp, literal)
 	arginp = cp;
 	while (*cp)
 	    *cp++ &= TRIM;
+
+        /*
+	 * In the child ``forget'' everything about current aliases or
+	 * eval vectors.
+	 */
+	alvec = NULL;
+	evalvec = NULL;
+	alvecp = NULL;
+	evalp = NULL;
 	(void) lex(&paraml);
 	if (seterr)
 	    stderror(ERR_OLD);
@@ -720,7 +733,7 @@ backeval(cp, literal)
 
 		ip = ibuf;
 		do
-		    icnt = read(pvec[0], tibuf, BUFSIZ);
+		    icnt = read(pvec[0], tibuf, BUFSIZE);
 		while (icnt == -1 && errno == EINTR);
 		if (icnt <= 0) {
 		    c = -1;
@@ -782,7 +795,7 @@ pword()
 				   (size_t) pargsiz * sizeof(Char *));
     }
     pargv[pargc++] = Strsave(pargs);
-    pargv[pargc] = NOSTR;
+    pargv[pargc] = NULL;
     pargcp = pargs;
     pnleft = MAXPATHLEN - 4;
 }

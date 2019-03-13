@@ -32,13 +32,13 @@ VERSION	:	6.00.01
 VENDOR	:	hp
 MODELS	:	hp9000s300, hp9000s700, hp9000s800
 COMPILER:	cc, gcc
-CFLAGS	:	normal
+CFLAGS	:	normal (-Aa -O3 hpux 8.0)
 LIBES	:	-ltermcap
 OS	:	hpux 6.5, 7.0.x, 8.0
 CONFIG	:	config.hpux
 ENVIRON	:	n/a
 NOTES	:	Don't use -lBSD; breaks getpgrp(). Config.hp-3.2 obsolete?
-VERSION	:	6.00.03
+VERSION	:	6.00.04
 
 VENDOR	:	hp
 MODELS	:	hp9000s500
@@ -57,11 +57,11 @@ MODELS	:	vax
 COMPILER:	cc, gcc
 CFLAGS	:	normal
 LIBES	:	-ltermcap
-OS	:	bsd4.3
-CONFIG	:	config.bsd 
+OS	:	bsd4.3, bsd4.4
+CONFIG	:	config.bsd*
 ENVIRON	:	n/a
 NOTES	:	cc broken: typedef void sigret_t;
-VERSION	:	6.00.00
+VERSION	:	6.00.03
 
 VENDOR	:	digital
 MODELS	:	vax
@@ -198,11 +198,9 @@ CFLAGS	:	normal
 LIBES	:	-ltermcap
 OS	:	bsd 4.3reno
 CONFIG	:	config.bsdreno
+NOTES	:	ttyname() is buggy. calls closedir() twice. See README
 ENVIRON	:	n/a
-NOTES	:	For early reno systems need to uncomment definition of
-NOTES	:	speed_t in sh.types.h and append "#undef NLS" and
-NOTES	:	"#define SYSMALLOC" to end of config.h
-VERSION	:	6.00.01
+VERSION	:	6.00.04
 
 VENDOR	:	Cray Research
 MODELS	:	Y-MP
@@ -314,3 +312,27 @@ ENVIRON	:	n/a
 NOTES	:	AUTOLOGOUT is probably best undef'ed
 NOTES	:	For 4.0, the NLS define in config.h can be enabled.
 VERSION	:	6.00.03
+
+VENDOR	:	ibm + compatibles
+MODELS	:	i386,i486
+COMPILER:	/bin/cc
+CFLAGS	:	normal
+LIBES	:	-lcurses -lc /usr/ucblib/libucb.a
+OS	:	SVR4 (DELL, ESIX, ISC, UHC)
+CONFIG	:	config.sysv4
+ENVIRON	:	n/a
+NOTES	:	none
+VERSION	:	6.00.04
+
+VENDOR	:	stardent
+MODELS	:	gs2600
+COMPILER:	/bin/cc
+CFLAGS	:	-O
+LIBES	:	-lcurses
+OS	:	stellix
+CONFIG	:	config.stellar
+ENVIRON	:	n/a
+NOTES	:	works but not worth compiling with -O4...
+NOTES	:	setpgrp() and SIGCHLD work the BSD way, not the way documented.
+NOTES	:	we need to define BACKPIPE		
+VERSION	:	6.00.04

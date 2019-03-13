@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.exec.c,v 3.5 1991/10/21 17:24:49 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.exec.c,v 3.9 1991/12/14 20:45:46 christos Exp $ */
 /*
  * sh.exec.c: Search, find, and execute a command!
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.exec.c,v 3.5 1991/10/21 17:24:49 christos Exp $")
+RCSID("$Id: sh.exec.c,v 3.9 1991/12/14 20:45:46 christos Exp $")
 
 #include "tc.h"
 #include "tw.h"
@@ -148,7 +148,7 @@ doexec(t)
     register Char *dp, **pv, **av, *sav;
     register struct varent *v;
     register bool slash;
-    register int hashval = 0, i;
+    register int hashval, i;
     Char   *blk[2];
 
     /*
@@ -252,8 +252,8 @@ doexec(t)
 #ifdef VFORK
     Vsav = sav;
 #endif
-    if (havhash)
-	hashval = hashname(*av);
+    hashval = havhash ? hashname(*av) : 0;
+
     i = 0;
 #ifdef VFORK
     hits++;
@@ -399,7 +399,7 @@ texec(sf, st)
 	if (v == 0) {
 	    vp = lastsh;
 	    vp[0] = adrof(STRshell) ? value(STRshell) : STR_SHELLPATH;
-	    vp[1] = NOSTR;
+	    vp[1] = NULL;
 #ifdef _PATH_BSHELL
 	    if (fd != -1 
 # ifndef ISC	/* Compatible with ISC's /bin/csh */
@@ -498,7 +498,7 @@ execash(t, kp)
     saveOUT = dcopy(SHOUT, -1);
     saveDIAG = dcopy(SHDIAG, -1);
     saveSTD = dcopy(OLDSTD, -1);
-
+	
     lshift(kp->t_dcom, 1);
 
     getexit(osetexit);
@@ -518,6 +518,10 @@ execash(t, kp)
 	didcch = 0;
 #endif /* FIOCLEX */
 	didfds = 0;
+	/*
+	 * Decrement the shell level
+	 */
+	shlvl(-1);
 	doexec(kp);
     }
 
@@ -673,11 +677,10 @@ hashstat(v, c)
 	      hashlength, hashwidth*8);
    if (hashdebug)
       xprintf("debug mask = 0x%08x\n", hashdebug);
-#else /* OLDHASH */
+#endif /* FASTHASH */
    if (hits + misses)
       xprintf("%d hits, %d misses, %d%%\n",
 	      hits, misses, 100 * hits / (hits + misses));
-#endif /* FASTHASH */
 }
 
 #endif
@@ -689,7 +692,7 @@ static int
 hashname(cp)
     register Char *cp;
 {
-    register long h = 0;
+    register long h;
 
     for (h = 0; *cp; cp++)
 	h = hash(h, *cp);
@@ -704,7 +707,7 @@ iscommand(name)
     register Char *sav;
     register struct varent *v;
     register bool slash = any(short2str(name), '/');
-    register int hashval = 0, i;
+    register int hashval, i;
 
     v = adrof(STRpath);
     if (v == 0 || v->vec[0] == 0 || slash)
@@ -712,8 +715,7 @@ iscommand(name)
     else
 	pv = v->vec;
     sav = Strspl(STRslash, name);	/* / command name for postpending */
-    if (havhash)
-	hashval = hashname(name);
+    hashval = havhash ? hashname(name) : 0;
     i = 0;
     do {
 	if (!slash && pv[0][0] == '/' && havhash) {
@@ -925,8 +927,7 @@ dowhere(v, c)
 
 	var = adrof(STRpath);
 
-	if (havhash)
-	    hashval = hashname(*v);
+	hashval = havhash ? hashname(*v) : 0;
 
 	sv = Strspl(STRslash, *v);
 

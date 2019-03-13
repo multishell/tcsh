@@ -105,7 +105,7 @@
 #define DIRENT
 /****************** local defines *********************/
 /*
- * SUNOS4	You are runnig SunOS 4 (on a Sun 2, 3, 4, or 386i)
+ * SUNOS4	You are running SunOS 4 (on a Sun 2, 3, 4, or 386i)
  */
 #define SUNOS4
 

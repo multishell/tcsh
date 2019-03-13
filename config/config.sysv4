@@ -116,6 +116,10 @@
 #ifndef BSDTIMES
 # define NEEDgethostname
 #endif
+/*
+ * Shadow passwd file
+ */
+#define PW_SHADOW
 
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */

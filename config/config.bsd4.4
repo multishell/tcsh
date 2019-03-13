@@ -31,7 +31,7 @@
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
  */
-#undef VFORK
+#define VFORK
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and
@@ -44,20 +44,20 @@
  *		Note: POSIX systems should not define this unless they
  *		have sigvec() and friends (ie: 4.3BSD-RENO, HP-UX).
  */
-#undef BSDSIGS
+#define BSDSIGS
 
 /*
  * BSDTIMES	You have BSD-style process time stuff (like rusage)
  *		This may or may not be true.  For example, Apple Unix
  *		(OREO) has BSDJOBS and BSDSIGS but not BSDTIMES.
  */
-#undef BSDTIMES
+#define BSDTIMES
 
 /*
  * BSDNICE	Your system uses setpriority() instead of nice, to
  *		change a processes scheduling priority
  */
-#undef BSDNICE
+#define BSDNICE
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
@@ -74,7 +74,7 @@
  *		Set SVID to 1, 2, 3, or 4, depending the version of System V
  *		you are running. Or set it to 0 if you are not SVID based
  */
-#define SVID	3
+#define SVID	0
 
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
@@ -103,10 +103,6 @@
  */
 #define DIRENT
 /****************** local defines *********************/
-#define BACKPIPE	/* fork pipelines backwards... */
-
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
-
-#undef NLS

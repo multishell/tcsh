@@ -3,7 +3,7 @@
  *
  * All source files should #include this FIRST.
  *
- * Edit this to match your system type.
+ * This is the config file for minix-386 systems
  */
 
 /****************** System dependant compilation flags ****************/
@@ -16,7 +16,7 @@
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
  *		job control facilities.
  */
-#define POSIXJOBS
+#undef POSIXJOBS
 
 /*
  * VFORK	This machine has a vfork().  
@@ -30,16 +30,14 @@
  *		that vfork isn't necessary.  (Besides, SGI's vfork is weird).
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
- *
- *		For SVR4 this is optional.
  */
-#define VFORK
+#undef VFORK
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and
  *		a tty that deals correctly
  */
-#define BSDJOBS
+#undef BSDJOBS
 
 /*
  * BSDSIGS	You have 4.2-style signals, rather than USG style.
@@ -52,8 +50,6 @@
  * BSDTIMES	You have BSD-style process time stuff (like rusage)
  *		This may or may not be true.  For example, Apple Unix
  *		(OREO) has BSDJOBS and BSDSIGS but not BSDTIMES.
- *
- *		This works with Esix SVR4.  Not sure about DELL SVR4.
  */
 #undef BSDTIMES
 
@@ -72,13 +68,13 @@
 #define TERMIO
 
 /*
- * SVID		Your machine is SVID complient (Sys V, HPUX, A/UX)
+ * SVID		Your machine is SVID compliant (Sys V, HPUX, A/UX)
  *		NOTE: don't do this if you are on a Pyramid -- tcsh is
  *		built in a BSD universe.
- *		Set SVID to 1, 2, 3, or 4, depending the version of System V
+ *		Set SVID to 1, 2, or 3, depending the version of System V
  *		you are running. Or set it to 0 if you are not SVID based
  */
-#define SVID	4
+#define SVID	0
 
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
@@ -90,7 +86,7 @@
  * SIGVOID	Define this if your signal handlers return void.  On older
  *		systems, signal returns int, but on newer ones, it returns void.
  */
-#define SIGVOID 
+#undef SIGVOID 
 
 /*
  * HAVEDUP2	Define this if your system supports dup2().
@@ -108,10 +104,13 @@
 #define DIRENT
 /****************** local defines *********************/
 
-/* Use xgethostname instead, since gethostname is only in libucb.a, and best
- */
-#define NEEDgethostname
+#define i386  /* gcc may define this for you already. */
+#define NEEDgetwd
+#define _POSIX_SOURCE
+#define _MINIX
 
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
+
+#undef NLS

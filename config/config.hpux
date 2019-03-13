@@ -16,6 +16,15 @@
 # undef POSIX
 #endif
 
+#if defined(__hpux) && !defined(hpux)
+# define hpux
+#endif /* __hpux && !hpux */
+
+#if __STDC__ && !defined(__GNUC__)
+# define _POSIX_SOURCE
+# define _HPUX_SOURCE
+#endif
+
 /*
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
  *		job control facilities.

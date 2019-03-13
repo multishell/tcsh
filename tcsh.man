@@ -1,5 +1,5 @@
-.\" $Id: tcsh.man,v 3.19 1991/10/21 17:24:49 christos Exp $
-.TH TCSH 1 "20 October 1991" "Cornell"
+.\" $Id: tcsh.man,v 3.26 1991/12/19 21:40:06 christos Exp $
+.TH TCSH 1 "19 December 1991" "Cornell"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
@@ -44,7 +44,7 @@ except for the added utilities of:
 8)  Enhanced history mechanism.
 .sp
 .ti -4
-9)  Automatic logout after long periods of idle time.
+9)  Automatic locking/logout after long periods of idle time.
 .sp
 .ti -4
 10) Automatic execution of a single command prior to printing each prompt.
@@ -146,7 +146,7 @@ There is a new shell command,
 that allows the user to redefine what any key does, or find out what
 any or all of the keys do.
 .PP
-Syntax: bindkey [ -a ] [ -s ] [ -v ] [ -e ] [ -d ] [ -l ] [ -r ] [ -- ] [ in-string [ out-string | command ]]
+Syntax: bindkey [ -a ] [ -c ] [ -s ] [ -v ] [ -e ] [ -d ] [ -l ] [ -r ] [ -- ] [ in-string [ out-string | command ]]
 .PP
 If no values are given all bindings are listed. If only in-string is given,
 bindings for the in-string is listed.
@@ -165,6 +165,8 @@ Options:
     -a    bind in-string in alternative key map.
 .br
     -s    bind an out-string instead of a command
+.br
+    -c    bind a unix command instead of a command
 .br
     -v    bind for default VI-mode
 .br
@@ -345,6 +347,8 @@ EMACS Multi-character and 8 bit bindings
 "^X$"	->  expand-variables
 "^XG"	->  list-glob
 "^Xg"	->  list-glob
+"^Xn	->  normalize-path
+"^XN	->  normalize-path
 .sp
 .PP
 VI Insert Mode functions
@@ -477,6 +481,29 @@ VI Multi-character bindings
 .DT
 .fi
 .sp
+.PP
+In 
+.I tcsh
+there are two input modes: 
+.I insert
+and
+.I overwrite.
+All characters that are bound to the 
+.I self-insert-command
+either get inserted or overwrite what was under the cursor depending
+on the input mode. In emacs one can toggle between modes using
+the
+.I overwrite-mode
+function, and in VI one can use any of the replace mode commands.
+By default the mode is preserved between input lines. To specify
+a default mode that can be enforced at the beginning of each command line,
+the variable 
+.I inputmode
+can be set
+to either
+.I insert
+or 
+.I overwrite.
 .PP
 There is also an older version of bindkey called 
 .I bind,
@@ -710,6 +737,9 @@ File name completion works equally well when other directories are addressed.
 Additionally, 
 .I tcsh 
 understands the C shell tilde (~) convention for home directories.
+In addition it caches tilde name references for fast access. This cache
+can be flushed by using the builtin 
+.I rehash.
 Thus,
 .sp
 .RS +.6i
@@ -807,7 +837,14 @@ If the
 .I autolist
 variable is set, invoking completion when several choices are possible
 will automatically list the choices, effectively merging the functionality
-described in the next section into the completion mechanism.
+described in the next section into the completion mechanism. If 
+.I autolist
+is set to "ambiguous", then 
+.I tcsh 
+will only list the choices if there were no new characters added in the
+completion operation.
+
+.PP
 The "noise level" can be controlled by the value that
 .I matchbeep
 is set to: With matchbeep=nomatch, completion will only beep if there are
@@ -818,7 +855,7 @@ completion will
 .I also
 beep when there is an exact match but there are other, longer, matches
 (see recexact).  With matchbeep=never or set to any other value completion 
-will never beep. If matchbeep is not set it defaults to ambiquous.
+will never beep. If matchbeep is not set it defaults to ambiguous.
 .PP
 If the
 .I autoexpand
@@ -1101,19 +1138,19 @@ only numeric arguments are treated as
 event numbers; therefore
 .I "!3d" 
 is interpreted as: repeat the last command that
-started with the string "3d". To mimick the 
+started with the string "3d". To mimic the 
 .I csh
 behavior
 .I "!3\ed" 
 can be used. 
 
 .PP
-.SH "9. AUTOMATIC LOGOUT"
-The automatic logout time is controlled by the variable
-.I autologout,
-the value of which is the number of minutes of inactivity will be
+.SH "9. AUTOMATIC LOGOUT/LOCKING"
+The automatic locking and logout time are controlled by the variable
+.I autologout.
+The value of the first word is the number of minutes of inactivity will be
 allowed before automatically logging the user out.  When that many
-minutes have been reached, the shell prints "autologout" and dies
+minutes have been reached, the shell prints "auto-logout" and dies
 (without executing ~/.logout).  The default for 
 .I tcsh 
 is to set
@@ -1121,6 +1158,11 @@ is to set
 for 60 minutes on login shells, and when the user is root.  To disable
 autologout (for instance in a window system), unset the shell variable
 .I autologout.
+.PP
+The value of the optional second word indicates the number of
+minutes of inactivity after which the user will be prompted for his login 
+password to continue working. Failure to enter the correct password 5 times, 
+results in auto-logout.
 .PP
 .SH "10. EXECUTION OF A COMMAND PRIOR TO EACH PROMPT"
 .I Tcsh
@@ -1274,7 +1316,7 @@ The
 .I prompt3
 variable is used when displaying the corrected command line when
 automatic spelling correction is in effect; it defaults to 
-"CORRECT>%R (y|n)? ".
+"CORRECT>%R (y|n|e)? ".
 
 .PP
 .SH "13. TIME-STAMPED HISTORY LIST"
@@ -1302,7 +1344,7 @@ Print entries in new lines so that the screen width is not exceeded
 Don't print \~ but print the whole path
 .TP 4
 .I "-v"
-Print the stack entries one in each line, preceeded by the stack number.
+Print the stack entries one in each line, preceded by the stack number.
 .PP 
 Note that popd +n can be used to pop out stack entries of directories that
 do not exist any more.
@@ -1707,10 +1749,10 @@ points to:
 .sp
 While setting 
 .I listlinks
-can be helpful while navigating around the filesystem, it slows down
+can be helpful while navigating around the file system, it slows down
 .I ls-F 
-and it causes mounting of filesystems if the symbolic links point
-to an NFS automounted partition.
+and it causes mounting of file systems if the symbolic links point
+to an NFS auto-mounted partition.
 .PP
 .SH "18. GLOBBING SYNTAX ADDITIONS"
 The syntax for any character in a range (for example ".[a-z]*") has
@@ -1819,6 +1861,8 @@ The current possible values are:
 \fIm88k\fR			an mc88000 CPU machine
 \fImac2\fR			an Apple Computer Macintosh II, running AUX
 \fImasscomp\fR			a Concurrent (Masscomp), running RTU
+\fIminix386\fR			an i386 running minix
+\fIminix\fR			a mac or an amiga running minix
 \fImips\fR			another mips CPU
 \fImultimax\fR		an Encore Computer Corp. Multimax (32000 based)
 \fInews\fR			a Sony NEWS 800 or 1700 workstation
@@ -1834,6 +1878,7 @@ The current possible values are:
 \fIrt\fR			an IBM PC/RT, running BSD (AOS 4.3) or mach
 \fIrtpc\fR			an IBM PC/RT, running aix
 \fIsco386\fR		an Intel 386, running SCO
+\fIstellar\fR		a stellar running stellix
 \fIsun\fR			a Sun workstation of none of the above types
 \fIsun2\fR			a Sun Microsystems series 2 workstation (68010 based)
 \fIsun3\fR			a Sun Microsystems series 3 workstation (68020 based)
@@ -1889,7 +1934,7 @@ incremental search.
 .PP
 History-search-backward (history-search-forward)
 searches backward (forward) through the history
-list for previous (next) occurrence of the beginnng of the input
+list for previous (next) occurrence of the beginning of the input
 buffer as a command.  That is, if the user types:
 .sp
 .nf
@@ -1937,7 +1982,7 @@ Delete	(or any character bound to \fIbackward-delete-char\fR)
 	deleting a character from the pattern if appropriate.
 ^G	Abort the search, back to the last successful one
 	if previous search failed, otherwise entire search.
-^Y	Append the rest of the current word to the pattern.
+^W	Append the rest of the current word to the pattern.
 ESC	Terminate the search, leaving current line in buffer.
 .RE
 .DT
@@ -2082,7 +2127,7 @@ which if set holds a command that will be executed after changing the
 value of $cwd.  For example, if the user is running on an X window
 system 
 .I xterm(1),
-and a reparenting window manager that supports title bars such
+and a re-parenting window manager that supports title bars such
 as 
 .I twm(1) and has done:
 .sp
@@ -2302,7 +2347,7 @@ In addition, jobs will print the site the job is executing.
 .PP
 .TP 
 .B inlib <shared-library> ...
-Inlib adds shared libraries to the current enviroment. There is no way
+Inlib adds shared libraries to the current environment. There is no way
 to remove them...
 .TP
 .B rootnode //<nodename>
@@ -2386,6 +2431,8 @@ if the shell was a login shell.
 .sp
 Note: On 
 .I convexos
+and
+.I stellix
 the names of the system default files are
 .I "/etc/cshrc",
 .I "/etc/login"
@@ -2397,9 +2444,10 @@ respectively. On the NeXT the names are also different:
 and
 .I "/etc/logout.std"
 Finally on
-.I irix
-or
+.I irix,
 .I A/UX
+and the
+.I cray
 only the file
 .I "/etc/cshrc"
 is executed if the shell is a login shell. 
@@ -2601,7 +2649,11 @@ invoke the expand-history function automatically on completion.
 list possibilities on an ambiguous completion.
 .TP 10
 .B autologout 
+The first word indicates
 number of minutes of inactivity before automatic logout.
+The optional second word indicates the number of minutes of inactivity
+after which the user will be prompted for his login password to enter a 
+command.
 .TP 10
 .B backslash_quote
 makes the backslash quote \\, \', and ". This option changes the
@@ -2640,7 +2692,7 @@ History lines saved at shell exit are also saved as this variable indicates.
 If set, it contains the full path-name where a history file is read/written.
 It defaults to $home/.history. This is useful when sharing the same home
 directory in different machines, or if one wants to save all the histories
-in the tty sessions. It is usually set in .cshrc for interractive shells,
+in the tty sessions. It is usually set in .cshrc for interactive shells,
 because history is sourced between .cshrc and .login so that it is available
 from .login.
 .TP 10
@@ -2783,7 +2835,7 @@ list of events to watch.
 format string for the printouts generated when \fIwatch\fR is set.
 .TP 10
 .B wordchars 
-list of nonalphanumeric characters considered part of a word for the purpose
+list of non-alphanumeric characters considered part of a word for the purpose
 of the forward-word, backward-word etc functions
 -- defaults to "*?_-.[]~=".
 .PP
@@ -2813,7 +2865,7 @@ I am certain that there are bugs.  Bugs (preferably with fixes)
 should be sent to Christos Zoulas (christos@ee.cornell.edu).
 .PP
 .SH VERSION
-This man page documents tcsh 6.00.03 (Cornell) 10/20/91.
+This man page documents tcsh 6.01.00 (Cornell) 12/19/91.
 .PP
 .SH AUTHORS
 Ken Greer, HP Labs, 1981
@@ -2865,6 +2917,10 @@ James J Dempsey, BBN, 1988, and Paul Placeway, OSU, 1988
 Re-ported tcsh to A/UX.
 .sp
 .SH "BUGFIXES AND ENHANCEMENTS"
+Scott Krotz, Motorola, 1991
+.br
+Minix port.
+.sp
 David Dawes, Sydney U. Australia, Physics dept., 1991
 .br
 SVR4 job control fixes. (reverse pipeline startup code, and signal fixes).
@@ -2924,7 +2980,7 @@ Added the wordchars variable.
 .sp
 George Hartzell, MCD Biology, University of Colorado-Boulder, 1988
 .br
-Fixed the always reseting to DEL bug.
+Fixed the always resetting to DEL bug.
 .sp
 Patrick Wolfe, Kuck and Associates, Inc., 1988
 .br

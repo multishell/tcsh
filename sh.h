@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.h,v 3.19 1991/10/22 06:52:57 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.h,v 3.26 1991/12/19 22:34:14 christos Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -93,16 +93,19 @@ typedef int sigret_t;
 /*
  * Fundamental definitions which may vary from system to system.
  *
- *	BUFSIZ		The i/o buffering size; also limits word size
+ *	BUFSIZE		The i/o buffering size; also limits word size
  *	MAILINTVL	How often to mailcheck; more often is more expensive
  */
-#ifndef BUFSIZ
-#define	BUFSIZ	1024		/* default buffer size */
-#endif /* BUFSIZ */
+#ifndef BUFSIZE
+#define	BUFSIZE	1024		/* default buffer size */
+#endif /* BUFSIZE */
 
 #define FORKSLEEP	10	/* delay loop on non-interactive fork failure */
 #define	MAILINTVL	600	/* 10 minutes */
 
+#ifndef INBUFSIZE
+# define INBUFSIZE	1024	/* Num input characters on the command line */
+#endif /* INBUFSIZE */
 /*
  * The shell moves std in/out/diag and the old std input away from units
  * 0, 1, and 2 so that it is easy to set up these standards for invoked
@@ -167,6 +170,12 @@ typedef int sigret_t;
 # endif /* TERMIO */
 #else /* POSIX */
 # include <termios.h>
+# if SVID > 3
+#  undef TIOCGLTC	/* we don't need those, since POSIX has them */
+#  undef TIOCSLTC
+#  undef CSWTCH
+#  define CSWTCH _POSIX_VDISABLE	/* So job control works */
+# endif /* SVID > 3 */
 #endif /* POSIX */
 
 #ifdef POSIX
@@ -201,13 +210,13 @@ extern int setpgrp();
 # include <limits.h>
 #endif /* POSIX */
 
-#if SVID > 0 || defined(_IBMR2)
-# if !defined(pyr) || !defined(aiws)
+#if SVID > 0 || defined(_IBMR2) || defined(_MINIX)
+# if !defined(pyr) && !defined(aiws) && !defined(stellar)
 #  include <time.h>
-# endif /* !aiws || !pyr */
+# endif /* !aiws && !pyr && !stellar */
 #endif /* SVID > 0 ||  _IBMR2 */
 
-#if !(defined(sun) && defined(TERMIO))
+#if !((defined(sun) || defined(_MINIX)) && defined(TERMIO))
 # include <sys/ioctl.h>
 #endif 
 
@@ -242,10 +251,13 @@ extern int setpgrp();
 # endif
 # define dirent direct
 #endif /* DIRENT */
-#ifdef hpux
+#if defined(hpux) || defined(sgi)
 # include <stdio.h>	/* So the fgetpwent() prototypes work */
 #endif 
 #include <pwd.h>
+#ifdef PW_SHADOW
+# include <shadow.h>
+#endif /* PW_SHADOW */
 #ifdef BSD
 # include <strings.h>
 # define strchr(a, b) index(a, b)
@@ -436,8 +448,11 @@ EXTERN int     opgrp,		/* Initial pgrp and tty pgrp */
                tpgrp;		/* Terminal process group */
 				/* If tpgrp is -1, leave tty alone! */
 
-EXTERN Char    PromptBuf[256];	/* buffer for the actual printed prompt. this
-				 * is used in tenex.c and sh.c for pegets.c */
+EXTERN Char    PromptBuf[INBUFSIZE*2]; /* buffer for the actual printed prompt.
+				       * this must be large enough to contain
+				       * the input line and the prompt, in
+				       * case a correction occured...
+				       */
 
 /*
  * To be able to redirect i/o for builtins easily, the shell moves the i/o
@@ -675,7 +690,12 @@ struct command {
 
 extern struct biltins {
     char   *bname;
+#if defined(hpux) && defined(__STDC__) && !defined(__GNUC__)
+    /* Avoid hpux ansi mode spurious warnings */
+    void    (*bfunct) ();
+#else
     void    (*bfunct) __P((Char **, struct command *));
+#endif /* hpux && __STDC__ && !__GNUC__ */
     int     minargs, maxargs;
 }       bfunc[];
 extern int nbfunc;
@@ -726,7 +746,7 @@ extern struct varent *adrof1();
  */
 EXTERN struct wordent *alhistp;	/* Argument list (first) */
 EXTERN struct wordent *alhistt;	/* Node after last in arg list */
-EXTERN Char  **alvec;		/* The (remnants of) alias vector */
+EXTERN Char  **alvec, *alvecp;	/* The (remnants of) alias vector */
 
 /*
  * Filename/command name expansion variables
@@ -831,7 +851,6 @@ extern int errno, sys_nerr;
 #define Strstr(a, b)		s_strstr(a, b)
 #endif 
 
-#define	NOSTR	((Char *) 0)
 /*
  * setname is a macro to save space (see sh.err.c)
  */

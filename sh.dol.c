@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.dol.c,v 3.6 1991/10/21 17:24:49 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.dol.c,v 3.9 1991/12/19 22:34:14 christos Exp $ */
 /*
  * sh.dol.c: Variable substitutions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.dol.c,v 3.6 1991/10/21 17:24:49 christos Exp $")
+RCSID("$Id: sh.dol.c,v 3.9 1991/12/19 22:34:14 christos Exp $")
 
 /*
  * C shell
@@ -66,7 +66,7 @@ static Char *Dcp, **Dvp;	/* Input vector for Dreadc */
  * words within this expansion, the count of remaining words, and the
  * information about any : modifier which is being applied.
  */
-#define MAXWLEN (BUFSIZ - 4)
+#define MAXWLEN (BUFSIZE - 4)
 #ifndef COMPAT
 #define MAXMOD MAXWLEN		/* This cannot overflow	*/
 #endif /* COMPAT */
@@ -132,7 +132,7 @@ Dfix1(cp)
     if (noexec)
 	return (0);
     Dv[0] = cp;
-    Dv[1] = NOSTR;
+    Dv[1] = NULL;
     Dfix2(Dv);
     if (gargc != 1) {
 	setname(short2str(cp));
@@ -216,7 +216,7 @@ static int
 Dword()
 {
     register int c, c1;
-    Char    wbuf[BUFSIZ];
+    Char    wbuf[BUFSIZE];
     register Char *wp = wbuf;
     register int i = MAXWLEN;
     register bool dolflg;
@@ -284,6 +284,9 @@ Dword()
 		    /* Leave all text alone for later */
 		    *wp++ = c;
 		    break;
+
+		default:
+		    break;
 		}
 	    }
 	    if (c1 == '`')
@@ -304,6 +307,9 @@ Dword()
 		break;
 	    }
 	    c |= QUOTE;
+	    break;
+
+	default:
 	    break;
 	}
 	if (done) {
@@ -397,7 +403,7 @@ Dgetdol()
     int     subscr = 0, lwb = 1, upb = 0;
     bool    dimen = 0, bitset = 0;
     char    tnp;
-    Char    wbuf[BUFSIZ];
+    Char    wbuf[BUFSIZE];
     static Char *dolbang = NULL;
 
 #ifdef COMPAT
@@ -437,7 +443,7 @@ Dgetdol()
 	    stderror(ERR_NOTALLOWED, "$?#");
 	for (np = wbuf; read(OLDSTD, &tnp, 1) == 1; np++) {
 	    *np = tnp;
-	    if (np >= &wbuf[BUFSIZ - 1])
+	    if (np >= &wbuf[BUFSIZE - 1])
 		stderror(ERR_LTOOLONG);
 	    if (SIGN_EXTEND_CHAR(tnp) <= 0 || tnp == '\n')
 		break;
@@ -556,7 +562,8 @@ Dgetdol()
 	if (Isdigit(*np)) {
 	    int     i;
 
-	    for (i = 0; Isdigit(*np); i = i * 10 + *np++ - '0');
+	    for (i = 0; Isdigit(*np); i = i * 10 + *np++ - '0')
+		continue;
 	    if ((i < 0 || i > upb) && !any("-*", *np)) {
 		dolerror(vp->v_name);
 		return;
@@ -771,9 +778,16 @@ setDolp(cp)
 
 	    do {
 		if ((dp = domod(cp, dolmod[i]))) {
-		    xfree((ptr_t) cp);
-		    cp = dp;
 		    didmod = 1;
+		    if (Strcmp(cp, dp) == 0) {
+			xfree((ptr_t) cp);
+			cp = dp;
+			break;
+		    }
+		    else {
+			xfree((ptr_t) cp);
+			cp = dp;
+		    }
 		}
 		else
 		    break;
@@ -852,7 +866,7 @@ heredoc(term)
 {
     register int c;
     Char   *Dv[2];
-    Char    obuf[BUFSIZ], lbuf[BUFSIZ], mbuf[BUFSIZ];
+    Char    obuf[BUFSIZE], lbuf[BUFSIZE], mbuf[BUFSIZE];
     int     ocnt, lcnt, mcnt;
     register Char *lbp, *obp, *mbp;
     Char  **vp;
@@ -871,19 +885,19 @@ heredoc(term)
     }
     (void) unlink(tmp);		/* 0 0 inode! */
     Dv[0] = term;
-    Dv[1] = NOSTR;
+    Dv[1] = NULL;
     gflag = 0;
     trim(Dv);
     rscan(Dv, Dtestq);
     quoted = gflag;
-    ocnt = BUFSIZ;
+    ocnt = BUFSIZE;
     obp = obuf;
     for (;;) {
 	/*
 	 * Read up a line
 	 */
 	lbp = lbuf;
-	lcnt = BUFSIZ - 4;
+	lcnt = BUFSIZE - 4;
 	for (;;) {
 	    c = readc(1);	/* 1 -> Want EOF returns */
 	    if (c < 0 || c == '\n')
@@ -902,7 +916,7 @@ heredoc(term)
 	 * Check for EOF or compare to terminator -- before expansion
 	 */
 	if (c < 0 || eq(lbuf, term)) {
-	    (void) write(0, short2str(obuf), (size_t) (BUFSIZ - ocnt));
+	    (void) write(0, short2str(obuf), (size_t) (BUFSIZE - ocnt));
 	    (void) lseek(0, 0l, L_SET);
 	    return;
 	}
@@ -916,9 +930,9 @@ heredoc(term)
 	    for (lbp = lbuf; c = *lbp++;) {
 		*obp++ = c;
 		if (--ocnt == 0) {
-		    (void) write(0, short2str(obuf), BUFSIZ);
+		    (void) write(0, short2str(obuf), BUFSIZE);
 		    obp = obuf;
-		    ocnt = BUFSIZ;
+		    ocnt = BUFSIZE;
 		}
 	    }
 	    continue;
@@ -931,7 +945,7 @@ heredoc(term)
 	Dcp = lbuf;
 	Dvp = Dv + 1;
 	mbp = mbuf;
-	mcnt = BUFSIZ - 4;
+	mcnt = BUFSIZE - 4;
 	for (;;) {
 	    c = DgetC(DODOL);
 	    if (c == DEOF)
@@ -968,7 +982,7 @@ heredoc(term)
 	}
 	else
 	    /* Setup trivial vector similar to return of dobackp */
-	    Dv[0] = mbp, Dv[1] = NOSTR, vp = Dv;
+	    Dv[0] = mbp, Dv[1] = NULL, vp = Dv;
 
 	/*
 	 * Resurrect the words from the command substitution each separated by
@@ -980,16 +994,16 @@ heredoc(term)
 	    for (mbp = *vp; *mbp; mbp++) {
 		*obp++ = *mbp & TRIM;
 		if (--ocnt == 0) {
-		    (void) write(0, short2str(obuf), BUFSIZ);
+		    (void) write(0, short2str(obuf), BUFSIZE);
 		    obp = obuf;
-		    ocnt = BUFSIZ;
+		    ocnt = BUFSIZE;
 		}
 	    }
 	    *obp++ = '\n';
 	    if (--ocnt == 0) {
-		(void) write(0, short2str(obuf), BUFSIZ);
+		(void) write(0, short2str(obuf), BUFSIZE);
 		obp = obuf;
-		ocnt = BUFSIZ;
+		ocnt = BUFSIZE;
 	    }
 	}
 	if (pargv)

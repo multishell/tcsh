@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.defns.c,v 3.8 1991/10/12 04:23:51 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/ed.defns.c,v 3.10 1991/11/26 04:28:26 christos Exp $ */
 /*
  * ed.defns.c: Editor function definitions and initialization
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.defns.c,v 3.8 1991/10/12 04:23:51 christos Exp $")
+RCSID("$Id: ed.defns.c,v 3.10 1991/11/26 04:28:26 christos Exp $")
 
 #include "ed.h"
 
@@ -249,8 +249,10 @@ PFCmd   CcFuncTbl[] = {		/* table of available commands */
 #define		V_CHARTO_FWD	101
     v_charto_back,
 #define		V_CHARTO_BACK	102
+    e_normalize_path,
+#define		F_PATH_NORM	103
     0				/* DUMMY VALUE */
-#define		F_NUM_FNS	103
+#define		F_NUM_FNS	104
 };
 
 KEYCMD  NumFuns = F_NUM_FNS;
@@ -1171,6 +1173,8 @@ struct KeyFuncs FuncNames[] = {
     "Expand history escapes and insert a space",
     "newline", F_NEWLINE,
     "Execute command",
+    "normalize-path", F_PATH_NORM,
+    "Expand pathnames, eliminating leading .'s and ..'s",
     "overwrite-mode", F_INSOVR,
     "Switch from insert to overwrite mode or vice versa",
     "prefix-meta", F_METANEXT,
@@ -1368,7 +1372,7 @@ ed_InitMetaBindings()
     for (i = 0200; i <= 0377; i++) {
 	if (map[i] != F_INSERT && map[i] != F_UNASSIGNED && map[i] != F_XKEY) {
 	    buf[1] = i & ASCII;
-	    AddXkeyCmd(buf, (Char) map[i]);
+	    AddXkey(buf, XmapCmd((int) map[i]), XK_CMD);
 	}
     }
     map[buf[0]] = F_XKEY;
@@ -1407,15 +1411,19 @@ ed_InitEmacsMaps()
     buf[0] = 030;
     buf[2] = 0;
     buf[1] = 030;
-    AddXkeyCmd(buf, F_EXCHANGE_MARK);
+    AddXkey(buf, XmapCmd(F_EXCHANGE_MARK), XK_CMD);
     buf[1] = '*';
-    AddXkeyCmd(buf, F_EXPAND_GLOB);
+    AddXkey(buf, XmapCmd(F_EXPAND_GLOB),   XK_CMD);
     buf[1] = '$';
-    AddXkeyCmd(buf, F_EXPAND_VARS);
+    AddXkey(buf, XmapCmd(F_EXPAND_VARS),   XK_CMD);
     buf[1] = 'G';
-    AddXkeyCmd(buf, F_LIST_GLOB);
+    AddXkey(buf, XmapCmd(F_LIST_GLOB),     XK_CMD);
     buf[1] = 'g';
-    AddXkeyCmd(buf, F_LIST_GLOB);
+    AddXkey(buf, XmapCmd(F_LIST_GLOB),     XK_CMD);
+    buf[1] = 'n';
+    AddXkey(buf, XmapCmd(F_PATH_NORM),     XK_CMD);
+    buf[1] = 'N';
+    AddXkey(buf, XmapCmd(F_PATH_NORM),     XK_CMD);
     BindArrowKeys();
 }
 

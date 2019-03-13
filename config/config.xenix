@@ -104,8 +104,6 @@
 #define DIRENT
 /****************** local defines *********************/
 
-#define _SIZE_T
-#define i386
 #define NEEDgethostname
 
 /****************** configurable hacks ****************/

@@ -1,5 +1,5 @@
 /**/#
-/**/# $Id: Imakefile,v 1.2 1991/10/18 16:27:13 christos Exp $
+/**/# $Id: Imakefile,v 1.5 1991/11/26 04:28:26 christos Exp $
 /**/#
 /**/# Imakefile for for tcsh 6.00
 /**/# Marc Horowitz, MIT SIPB
@@ -149,7 +149,7 @@ LIBSOCKET =
 #endif
 
 #if defined(SGIArchitecture) || defined(_IBMR2) || \
-	(defined(RtArchitecture) && defined(AIXArchitecture)) || \
+	(!defined(RtArchitecture) && defined(AIXArchitecture)) || \
 	defined(UseLibBSD)
 LIBBSD = -lbsd
 #else
@@ -255,7 +255,7 @@ PARALLEL=12				# Make the multi-max run fast.
 #endif
 
 DESTDIR = DestDir
-MANSECT = 1
+MANSUFFIX = 1
 #ifdef DestBin
 BINDIR = DestBin
 #else
@@ -264,7 +264,7 @@ BINDIR = $(DESTDIR)/bin
 #ifdef DestMan
 MANDIR = DestMan
 #else
-MANDIR = $(DESTDIR)/man/man$(MANSECT)
+MANDIR = $(DESTDIR)/man/man$(MANSUFFIX)
 #endif
 
 #ifndef MyCflags
@@ -312,12 +312,12 @@ SHSRCS=	sh.c sh.dir.c sh.dol.c sh.err.c sh.exec.c sh.char.c \
 	sh.exp.c sh.file.c sh.func.c sh.glob.c sh.hist.c sh.init.c \
 	sh.lex.c sh.misc.c sh.parse.c sh.print.c sh.proc.c sh.sem.c \
 	sh.set.c sh.time.c sh.char.h sh.dir.h sh.proc.h sh.h \
-	sh.decls.h glob.c glob.h
+	sh.decls.h glob.c glob.h mi.wait.h mi.termios.c
 SHOBJS=	sh.${SUF} sh.dir.${SUF} sh.dol.${SUF} sh.err.${SUF} sh.exec.${SUF} \
 	sh.char.${SUF} sh.exp.${SUF} sh.func.${SUF} sh.glob.${SUF} \
 	sh.hist.${SUF} sh.init.${SUF} sh.lex.${SUF} sh.misc.${SUF} \
 	sh.parse.${SUF} sh.print.${SUF} sh.proc.${SUF} sh.sem.${SUF} \
-	sh.set.${SUF} sh.time.${SUF} glob.${SUF}
+	sh.set.${SUF} sh.time.${SUF} glob.${SUF} mi.termios.${SUF}
 
 TWSRCS= tw.decls.h tw.h tw.help.c tw.init.c tw.parse.c tw.spell.c
 TWOBJS=	tw.help.${SUF} tw.init.${SUF} tw.parse.${SUF} tw.spell.${SUF}

@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.str.c,v 3.3 1991/10/12 04:23:51 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tc.str.c,v 3.3 1991/10/12 04:23:51 christos Exp $ */
 /*
  * tc.str.c: Short string package
  * 	     This has been a lesson of how to write buggy code!

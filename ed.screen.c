@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.screen.c,v 3.6 1991/10/12 04:23:51 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/ed.screen.c,v 3.11 1991/12/19 22:34:14 christos Exp $ */
 /*
  * ed.screen.c: Editor/termcap-curses interface
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.screen.c,v 3.6 1991/10/12 04:23:51 christos Exp $")
+RCSID("$Id: ed.screen.c,v 3.11 1991/12/19 22:34:14 christos Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -62,7 +62,7 @@ extern int tgetnum();
  * assumption...
  */
 
-#define TC_BUFSIZ 2048
+#define TC_BUFSIZE 2048
 
 #define GoodStr(a) (tstr[a].str != NULL && tstr[a].str[0] != '\0')
 #define Str(a) tstr[a].str
@@ -249,8 +249,8 @@ TCalloc(t, cap)
     struct termcapstr *t;
     char   *cap;
 {
-    static char termcap_alloc[TC_BUFSIZ];
-    char    termbuf[TC_BUFSIZ];
+    static char termcap_alloc[TC_BUFSIZE];
+    char    termbuf[TC_BUFSIZE];
     struct termcapstr *ts;
     static int tloc = 0;
     int     tlen, clen;
@@ -278,7 +278,7 @@ TCalloc(t, cap)
     /*
      * New string is longer; see if we have enough space to append
      */
-    if (tloc + 3 < TC_BUFSIZ) {
+    if (tloc + 3 < TC_BUFSIZE) {
 	(void) strcpy(t->str = &termcap_alloc[tloc], cap);
 	tloc += clen + 1;	/* one for \0 */
 	return;
@@ -296,9 +296,9 @@ TCalloc(t, cap)
 	    for (ptr = ts->str; *ptr != '\0'; termbuf[tlen++] = *ptr++);
 	    termbuf[tlen++] = '\0';
 	}
-    copy(termcap_alloc, termbuf, TC_BUFSIZ);
+    copy(termcap_alloc, termbuf, TC_BUFSIZE);
     tloc = tlen;
-    if (tloc + 3 >= TC_BUFSIZ) {
+    if (tloc + 3 >= TC_BUFSIZE) {
 	stderror(ERR_NAME | ERR_TCNOSTR);
 	return;
     }
@@ -352,7 +352,7 @@ ReBufferDisplay()
     }
     /* make this public, -1 to avoid wraps */
     TermH = Val(T_co) - 1;
-    TermV = (INBUFSIZ * 4) / TermH + 1;
+    TermV = (INBUFSIZE * 4) / TermH + 1;
     b = (Char **) xmalloc((size_t) (sizeof(Char *) * (TermV + 1)));
     for (i = 0; i < TermV; i++)
 	b[i] = (Char *) xmalloc((size_t) (sizeof(Char) * (TermH + 1)));
@@ -440,12 +440,12 @@ void
 EchoTC(v)
     Char  **v;
 {
-    char   *cap, *scap, cv[BUFSIZ];
+    char   *cap, *scap, cv[BUFSIZE];
     int     arg_need, arg_cols, arg_rows;
     int     verbose = 0, silent = 0;
     char   *area;
     static char *fmts = "%s\n", *fmtd = "%d\n";
-    char    buf[TC_BUFSIZ];
+    char    buf[TC_BUFSIZE];
 
     area = buf;
 
@@ -622,8 +622,8 @@ bool    GotTermCaps = 0;
 void
 BindArrowKeys()
 {
-    KEYCMD *map;
-    int     i;
+    KEYCMD *map, *dmap;
+    int     i, j;
     char   *p;
     static struct {
 	int     key, fun;
@@ -638,17 +638,27 @@ BindArrowKeys()
     if (!GotTermCaps)
 	return;
     map = VImode ? CcAltMap : CcKeyMap;
+    dmap = VImode ? CcViCmdMap : CcEmacsMap;
 
     for (i = 0; i < 4; i++) {
 	p = tstr[ar[i].key].str;
 	if (p && *p) {
-	    if (p[1]) {
-		AddXkeyCmd(str2short(p), ar[i].fun);
-		map[(unsigned char) *p] = F_XKEY;
+	    j = (unsigned char) *p;
+	    /*
+	     * Assign the arrow keys only if:
+	     *
+	     * 1. They are multi-character arrow keys and the user 
+	     *    has not re-assigned the leading character, or 
+	     *    has re-assigned the leading character to be F_XKEY
+	     * 2. They are single arrow keys pointing to an unassigned key.
+	     */
+	    if (p[1] && (dmap[j] == map[j] || map[j] == F_XKEY)) {
+		AddXkey(str2short(p), XmapCmd(ar[i].fun), XK_CMD);
+		map[j] = F_XKEY;
 	    }
-	    else if (map[(unsigned char) *p] == F_UNASSIGNED) {
+	    else if (map[j] == F_UNASSIGNED) {
 		ClearXkey(map, str2short(p));
-		map[(unsigned char) *p] = ar[i].fun;
+		map[j] = ar[i].fun;
 	    }
 	}
     }
@@ -1035,8 +1045,8 @@ GetTermCaps()
 {				/* read in the needed terminal capabilites */
     register int i;
     char   *ptr;
-    char    buf[TC_BUFSIZ];
-    static char bp[TC_BUFSIZ];
+    char    buf[TC_BUFSIZE];
+    static char bp[TC_BUFSIZE];
     char   *area;
     extern char *getenv();
     struct termcapstr *t;
@@ -1075,7 +1085,7 @@ GetTermCaps()
     if (!ptr || !ptr[0])
 	ptr = "dumb";
 
-    setzero(bp, TC_BUFSIZ);
+    setzero(bp, TC_BUFSIZE);
 
     i = tgetent(bp, ptr);
     if (i <= 0) {
@@ -1171,6 +1181,7 @@ GetSize(lins, cols)
     *lins = Val(T_li);
 
 #ifdef TIOCGWINSZ
+# define KNOWsize
 # ifndef lint
     {
 	struct winsize ws;	/* from 4.3 */
@@ -1185,6 +1196,7 @@ GetSize(lins, cols)
 # endif /* !lint */
 #else /* TIOCGWINSZ */
 # ifdef TIOCGSIZE
+#  define KNOWsize
     {
 	struct ttysize ts;	/* from Sun */
 
@@ -1213,7 +1225,7 @@ ChangeSize(lins, cols)
     Val(T_co) = (cols < 2) ? 80 : cols;
     Val(T_li) = (lins < 1) ? 24 : lins;
 
-#ifdef SIG_WINDOW
+#ifdef KNOWsize
     /*
      * We want to affect the environment only when we have a valid
      * setup, not when we get bad settings. Consider the following scenario:
@@ -1284,7 +1296,7 @@ ChangeSize(lins, cols)
 	    Setenv(STRTERMCAP, termcap);
 	}
     }
-#endif /* SIG_WINDOW */
+#endif /* KNOWsize */
 
     ReBufferDisplay();		/* re-make display buffers */
     ClearDisp();

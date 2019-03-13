@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.init.c,v 3.16 1991/10/21 17:24:49 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/ed.init.c,v 3.23 1991/12/19 22:34:14 christos Exp $ */
 /*
  * ed.init.c: Editor initializations
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.init.c,v 3.16 1991/10/21 17:24:49 christos Exp $")
+RCSID("$Id: ed.init.c,v 3.23 1991/12/19 22:34:14 christos Exp $")
 
 #include "ed.h"
 #include "ed.term.h"
@@ -50,6 +50,8 @@ int     Tty_raw_mode = 0;	/* Last tty change was to raw mode */
 int     MacroLvl = -1;		/* pointer to current macro nesting level; */
 				/* (-1 == none) */
 static int Tty_quote_mode = 0;	/* Last tty change was to quote mode */
+static unsigned char vdisable;	/* The value of _POSIX_VDISABLE from 
+				 * pathconf(2) */
 
 int     Tty_eight_bit = -1;	/* does the tty handle eight bits */
 
@@ -65,18 +67,20 @@ static unsigned char ttychars[NN_IO][C_NCC] = {
     {
 	CINTR,		 CQUIT, 	 CERASE, 	   CKILL,	
 	CEOF, 		 CEOL, 		 CEOL2, 	   CSWTCH, 
-	CERASE2,	 CSTART, 	 CSTOP,		   CWERASE,
-	CSUSP, 		 CDSUSP, 	 CREPRINT, 	   CDISCARD, 	   
-	CLNEXT,		 CSTATUS,	 CPAGE,		   CPGOFF,
-	CBRK, 		 CMIN, 		 CTIME
+	CDSWTCH,	 CERASE2,	 CSTART, 	   CSTOP,
+	CWERASE, 	 CSUSP, 	 CDSUSP, 	   CREPRINT,
+	CDISCARD, 	 CLNEXT,	 CSTATUS,	   CPAGE,
+	CPGOFF,		 CKILL2, 	 CBRK, 		   CMIN,
+	CTIME
     },
     {
 	CINTR, 		 CQUIT, 	  CERASE, 	   CKILL, 
 	_POSIX_VDISABLE, _POSIX_VDISABLE, _POSIX_VDISABLE, _POSIX_VDISABLE, 
-	CERASE2,	 CSTART, 	  CSTOP, 	   _POSIX_VDISABLE, 
-	_POSIX_VDISABLE, _POSIX_VDISABLE, _POSIX_VDISABLE, CDISCARD, 	   
+	_POSIX_VDISABLE, CERASE2,	  CSTART, 	   CSTOP, 	   
 	_POSIX_VDISABLE, _POSIX_VDISABLE, _POSIX_VDISABLE, _POSIX_VDISABLE, 
-	_POSIX_VDISABLE, 1, 		 0
+	CDISCARD, 	 _POSIX_VDISABLE, _POSIX_VDISABLE, _POSIX_VDISABLE, 
+	_POSIX_VDISABLE, _POSIX_VDISABLE, _POSIX_VDISABLE, 1,
+	0
     },
     {	
 	0,		 0,		  0,		   0,
@@ -84,7 +88,8 @@ static unsigned char ttychars[NN_IO][C_NCC] = {
 	0,		 0,		  0,		   0,
 	0,		 0,		  0,		   0,
 	0,		 0,		  0,		   0,
-	0,		 0,		  0
+	0,		 0,		  0,		   0,
+	0
     }
 };
 
@@ -168,7 +173,27 @@ ed_Setup(rst)
     if (havesetup) 	/* if we have never been called */
 	return(0);
 
-    replacemode = 0;	/* start out in insert mode */
+#if defined(POSIX) && defined(_PC_VDISABLE) && !defined(BSD4_4)
+    { 
+	long pcret;
+
+	if ((pcret = fpathconf(SHTTY, _PC_VDISABLE)) == -1L)
+	    vdisable = _POSIX_VDISABLE;
+	else 
+	    vdisable = pcret;
+	if (vdisable != _POSIX_VDISABLE && rst != 0)
+	    for (rst = 0; rst < C_NCC - 2; rst++) {
+		if (ttychars[ED_IO][rst] == _POSIX_VDISABLE)
+		    ttychars[ED_IO][rst] = vdisable;
+		if (ttychars[EX_IO][rst] == _POSIX_VDISABLE)
+		    ttychars[EX_IO][rst] = vdisable;
+	    }
+    }
+#else /* ! POSIX || !_PC_VDISABLE && !defined(BSD4_4) */
+    vdisable = _POSIX_VDISABLE;
+#endif /* POSIX && _PC_VDISABLE */
+	
+    inputmode = MODE_INSERT;	/* start out in insert mode */
     ed_InitMaps();
     Hist_num = 0;
     Expand = 0;
@@ -229,11 +254,11 @@ ed_Setup(rst)
 	     * Don't affect CMIN and CTIME
 	     */
 	    for (rst = 0; rst < C_NCC - 2; rst++) {
-		if (ttychars[TS_IO][rst] != _POSIX_VDISABLE &&
-		    ttychars[EX_IO][rst] != _POSIX_VDISABLE)
+		if (ttychars[TS_IO][rst] != vdisable &&
+		    ttychars[EX_IO][rst] != vdisable)
 		    ttychars[EX_IO][rst] = ttychars[TS_IO][rst];
-		if (ttychars[TS_IO][rst] != _POSIX_VDISABLE &&
-		    ttychars[ED_IO][rst] != _POSIX_VDISABLE)
+		if (ttychars[TS_IO][rst] != vdisable &&
+		    ttychars[ED_IO][rst] != vdisable)
 		    ttychars[ED_IO][rst] = ttychars[TS_IO][rst];
 	    }
 	}
@@ -406,9 +431,9 @@ Rawmode()
 
 	if ((tstty.d_t.c_oflag != extty.d_t.c_oflag) &&
 	    (tstty.d_t.c_oflag != edtty.d_t.c_oflag)) {
-	    tstty.d_t.c_oflag = tstty.d_t.c_oflag;
-	    tstty.d_t.c_oflag &= ~ttylist[EX_IO][M_OUTPUT].t_clrmask;
-	    tstty.d_t.c_oflag |=  ttylist[EX_IO][M_OUTPUT].t_setmask;
+	    extty.d_t.c_oflag = tstty.d_t.c_oflag;
+	    extty.d_t.c_oflag &= ~ttylist[EX_IO][M_OUTPUT].t_clrmask;
+	    extty.d_t.c_oflag |=  ttylist[EX_IO][M_OUTPUT].t_setmask;
 
 	    edtty.d_t.c_oflag = tstty.d_t.c_oflag;
 	    edtty.d_t.c_oflag &= ~ttylist[ED_IO][M_OUTPUT].t_clrmask;
@@ -492,7 +517,7 @@ Rawmode()
 			(ttychars[TS_IO][i] != ttychars[EX_IO][i]))
 			ttychars[ED_IO][i] = ttychars[TS_IO][i];
 		    if (ttylist[ED_IO][M_CHAR].t_clrmask & C_SH(i))
-			ttychars[ED_IO][i] = _POSIX_VDISABLE;
+			ttychars[ED_IO][i] = vdisable;
 		}
 		tty_setchar(&edtty, ttychars[ED_IO]);
 
@@ -501,7 +526,7 @@ Rawmode()
 			(ttychars[TS_IO][i] != ttychars[EX_IO][i]))
 			ttychars[EX_IO][i] = ttychars[TS_IO][i];
 		    if (ttylist[EX_IO][M_CHAR].t_clrmask & C_SH(i))
-			ttychars[EX_IO][i] = _POSIX_VDISABLE;
+			ttychars[EX_IO][i] = vdisable;
 		}
 		tty_setchar(&extty, ttychars[EX_IO]);
 	    }
@@ -557,7 +582,7 @@ ResetInLine()
 {
     Cursor = InputBuf;		/* reset cursor */
     LastChar = InputBuf;
-    InputLim = &InputBuf[INBUFSIZ - 2];
+    InputLim = &InputBuf[INBUFSIZE - 2];
     Mark = InputBuf;
     MetaNext = 0;
     CurrentKeyMap = CcKeyMap;
@@ -588,9 +613,9 @@ Load_input_line()
 #ifdef FIONREAD
     (void) ioctl(SHIN, FIONREAD, &chrs);
     if (chrs > 0) {
-	char    buf[BUFSIZ];
+	char    buf[BUFSIZE];
 
-	chrs = read(SHIN, buf, (size_t) min(chrs, BUFSIZ - 1));
+	chrs = read(SHIN, buf, (size_t) min(chrs, BUFSIZE - 1));
 	if (chrs > 0) {
 	    buf[chrs] = '\0';
 	    Input_Line = Strsave(str2short(buf));

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.5 1991/10/18 16:27:13 christos Exp $
+# $Id: Makefile,v 1.15 1991/12/19 22:05:32 christos Exp $
 #	Makefile	4.3	6/11/83
 #
 # C Shell with process control; VM/UNIX VAX Makefile
@@ -8,7 +8,7 @@
 # things; Paul Placeway, CIS Dept., Ohio State University
 #
 SHELL=/bin/sh
-VERSION=6.00
+VERSION=6.01
 BUILD=tcsh
 
 ################################################################
@@ -22,8 +22,9 @@ SUF=o
 CF=-c
 
 INCLUDES=-I. -I..
+
 LFLAGS=$(INCLUDES)
-#LFLAGS=-Zn10000			# hpux lint
+#LFLAGS=$(INCLUDES) -Zn10000		# hpux lint
 
 
 #CFLAGS= $(INCLUDES) -g			# debug
@@ -40,10 +41,13 @@ LFLAGS=$(INCLUDES)
 CFLAGS=-O $(INCLUDES) -fcombine-regs -finline-functions -fstrength-reduce 
 # add -msoft-float for 68881 machines.
 
-#CFLAGS= -O $(INCLUDES) -fvolatile
+#hpux 8.0
+
+#CFLAGS=  $(INCLUDES) +O3 -Aa
 
 # for silicon graphics (and other mips compilers) -- use the
 # global optimizer! (-O3).
+# On SGI 4.0+ you need to add -D__STDC__ too.
 #CFLAGS= -O3 $(INCLUDES) 
 #CF=-j
 #SUF=u
@@ -60,6 +64,9 @@ CFLAGS=-O $(INCLUDES) -fcombine-regs -finline-functions -fstrength-reduce
 
 # Stardent Titan
 #CFLAGS = $(INCLUDES) -O -43
+
+# Stardent Stellar
+#CFLAGS = $(INCLUDES) -O4
 
 # Apollo's with cc [apollo builtins don't work with gcc]
 # and apollo should not define __STDC__ if it does not have
@@ -111,6 +118,8 @@ LIBES= -ltermcap		## BSD style things, hpux
 #LIBES= -lcurses -lsocket	## Intel's hypercube and ns32000 based Opus.
 #LIBES= -ldirent -lcurses       ## att3b1 stk cc w/o shared lib & directory lib
 #LIBES= -shlib -ldirent -lcurses ## att3b1 gcc1.40 w/ shared lib & directory lib
+#LIBES=				## Minix.
+#LIBES= -lcurses		## For a stellar
 
 
 # The difficult choice of a c-compiler...
@@ -122,7 +131,7 @@ LIBES= -ltermcap		## BSD style things, hpux
 CC=	gcc -Wall 
 #CC=	cc
 #CC=	occ
-#CC=	/bin/cc
+#CC=	/bin/cc	# For suns, w/o gcc and SVR4
 #CC=	/usr/lib/sun.compile/cc  # FPS 500 (+FPX) with Sun C compiler
 ED=	-ed
 AS=	-as
@@ -145,13 +154,13 @@ ASSRCS=	sh.c sh.dir.c sh.dol.c sh.err.c sh.exec.c sh.char.c \
 	sh.exp.c sh.file.c sh.func.c sh.glob.c sh.hist.c sh.init.c \
 	sh.lex.c sh.misc.c sh.parse.c sh.print.c sh.proc.c sh.sem.c \
 	sh.set.c sh.time.c sh.char.h sh.dir.h sh.proc.h sh.h 
-PSSRCS= sh.decls.h glob.c glob.h
+PSSRCS= sh.decls.h glob.c glob.h mi.termios.c mi.wait.h
 SHSRCS= ${ASSRCS} ${PSSRCS}
 SHOBJS=	sh.${SUF} sh.dir.${SUF} sh.dol.${SUF} sh.err.${SUF} sh.exec.${SUF} \
 	sh.char.${SUF} sh.exp.${SUF} sh.func.${SUF} sh.glob.${SUF} \
 	sh.hist.${SUF} sh.init.${SUF} sh.lex.${SUF} sh.misc.${SUF} \
 	sh.parse.${SUF} sh.print.${SUF} sh.proc.${SUF} sh.sem.${SUF} \
-	sh.set.${SUF} sh.time.${SUF} glob.${SUF}
+	sh.set.${SUF} sh.time.${SUF} glob.${SUF} mi.termios.${SUF}
 
 TWSRCS= tw.decls.h tw.h tw.help.c tw.init.c tw.parse.c tw.spell.c
 TWOBJS=	tw.help.${SUF} tw.init.${SUF} tw.parse.${SUF} tw.spell.${SUF}
@@ -177,7 +186,7 @@ AVSRCS= Fixes MAKEDIFFS MAKESHAR NewThings README FAQ \
 	README.imake
 VHSRCS=${PVSRCS} ${AVSRCS}
 
-CONFSRCS=config/config.*
+CONFSRCS=config/config.* 
 
 ALLSRCS=  ${SHSRCS} ${TWSRCS} ${EDSRCS} ${TCSRCS} ${VHSRCS}
 DISTSRCS= ${PSSRCS} ${TWSRCS} ${EDSRCS} ${TCSRCS} ${AVSRCS}
@@ -315,7 +324,7 @@ tar:
 shar:	
 	rm -f tcsh-*.shar
 	rm -rf tcsh-${VERSION} 
-	mkdir tcsh-${VERSION} tcsh-${VERSION}/config
+	mkdir tcsh-${VERSION} tcsh-${VERSION}/config 
 	cp ${ALLSRCS} tcsh-${VERSION}
 	cp ${CONFSRCS} tcsh-${VERSION}/config
 	MAKESHAR ${VERSION} tcsh-${VERSION}/* tcsh-${VERSION}/config/*

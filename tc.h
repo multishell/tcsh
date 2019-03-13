@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.h,v 3.0 1991/07/04 23:38:58 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tc.h,v 3.0 1991/07/04 23:38:58 christos Exp $ */
 /*
  * tc.h: Tcsh includes
  */

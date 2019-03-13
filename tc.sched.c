@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.sched.c,v 3.4 1991/10/12 04:23:51 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tc.sched.c,v 3.6 1991/11/26 04:41:23 christos Exp $ */
 /*
  * tc.sched.c: Scheduled command execution
  *
@@ -38,7 +38,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.sched.c,v 3.4 1991/10/12 04:23:51 christos Exp $")
+RCSID("$Id: tc.sched.c,v 3.6 1991/11/26 04:41:23 christos Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -76,9 +76,17 @@ dosched(v, c)
     char   *timeline;
     char   *ctime();
 
+/* This is a major kludge because of a gcc linker  */
+/* Problem.  It may or may not be needed for you   */
+#ifdef _MINIX
+    char kludge[10];
+    extern char *sprintf();
+    sprintf(kludge,"kludge");
+#endif /* _MINIX */
+
     v++;
     cp = *v++;
-    if (cp == NOSTR) {
+    if (cp == NULL) {
 	/* print list of scheduled events */
 	for (count = 1, tp = sched_ptr; tp; count++, tp = tp->t_next) {
 	    timeline = ctime(&tp->t_when);

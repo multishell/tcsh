@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.decls.h,v 3.9 1991/10/20 01:38:14 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/ed.decls.h,v 3.11 1991/11/26 04:28:26 christos Exp $ */
 /*
  * ed.decls.h: Editor external definitions
  */
@@ -213,6 +213,7 @@ extern	CCRETVAL	v_rchar_fwd		__P((int));
 extern	CCRETVAL	v_rchar_back		__P((int));
 extern  CCRETVAL        v_charto_fwd		__P((int));
 extern  CCRETVAL        v_charto_back		__P((int));
+extern  CCRETVAL        e_normalize_path	__P((int));
 
 /*
  * ed.inputl.c
@@ -234,12 +235,13 @@ extern	void	PastBottom		__P((void));
 /*
  * ed.xmap.c
  */
-extern	void	AddXkeyCmd		__P((Char *, int));
-extern	void	AddXkey			__P((Char *, Char *));
-extern	void	ClearXkey		__P((KEYCMD *, Char *));
-extern	int	GetXkey			__P((Char *, Char **));
-extern	void	ResetXmap		__P((int));
-extern	int	DeleteXkey		__P((Char *));
-extern	void	PrintXkey		__P((Char *));
+extern  XmapVal *XmapStr		__P((Char *));
+extern  XmapVal *XmapCmd		__P((int));
+extern	void	 AddXkey		__P((Char *, XmapVal *, int));
+extern	void	 ClearXkey		__P((KEYCMD *, Char *));
+extern	int	 GetXkey		__P((Char *, XmapVal *));
+extern	void	 ResetXmap		__P((int));
+extern	int	 DeleteXkey		__P((Char *));
+extern	void	 PrintXkey		__P((Char *));
 
 #endif /* _h_ed_decls */

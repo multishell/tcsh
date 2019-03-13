@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.sem.c,v 3.7 1991/10/18 16:27:13 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.sem.c,v 3.14 1991/12/19 22:34:14 christos Exp $ */
 /*
  * sh.sem.c: I/O redirections and job forking. A touchy issue!
  *	     Most stuff with builtins is incorrect
@@ -37,16 +37,16 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.sem.c,v 3.7 1991/10/18 16:27:13 christos Exp $")
+RCSID("$Id: sh.sem.c,v 3.14 1991/12/19 22:34:14 christos Exp $")
 
 #include "tc.h"
 
 #ifdef FIOCLEX
-# ifndef sun
+# ifndef SUNOS4
 #  ifndef CLEX_DUPS
 #   define CLEX_DUPS
 #  endif /* CLEX_DUPS */
-# endif /* sun */
+# endif /* !SUNOS4 */
 #endif /* FIOCLEX */
 
 #ifdef sparc
@@ -56,8 +56,9 @@ RCSID("$Id: sh.sem.c,v 3.7 1991/10/18 16:27:13 christos Exp $")
 #ifdef VFORK
 static	sigret_t	vffree	__P((int));
 #endif 
-static	void		doio	__P((struct command *, int *, int *));
-static	void		chkclob	__P((char *));
+static	Char		*splicepipe	__P((struct command *, Char *));
+static	void		 doio		__P((struct command *, int *, int *));
+static	void		 chkclob	__P((char *));
 
 /*
  * C shell
@@ -290,7 +291,7 @@ execute(t, wanttty, pipein, pipeout)
 #endif /* BSDSIGS */
 		    nosigchld = 0;
 		}
-		else if (t->t_dflg & F_AMPERSAND)
+		else if (pid != 0 && (t->t_dflg & F_AMPERSAND))
 		    backpid = pid;
 	    }
 
@@ -464,12 +465,13 @@ execute(t, wanttty, pipein, pipeout)
 			    (void) signal(SIGINT,  vffree);
 			    (void) signal(SIGQUIT, SIG_DFL);
 			}
-
+# ifdef BSDJOBS
 			if (wanttty >= 0) {
 			    (void) signal(SIGTSTP, SIG_DFL);
 			    (void) signal(SIGTTIN, SIG_DFL);
 			    (void) signal(SIGTTOU, SIG_DFL);
 			}
+# endif /* BSDJOBS */
 
 			(void) signal(SIGTERM, parterm);
 		    }
@@ -480,6 +482,13 @@ execute(t, wanttty, pipein, pipeout)
 		    }
 
 # ifdef _SEQUENT_
+		    /*
+		     * On some machines (POSIX) the process group leader
+		     * cannot be a zombie. On those machines, the following
+		     * might help. Note that BACKPIPE will break if the
+		     * last process exits too soon.
+		     * (From Jaap)
+		     */
 		    pgetty(wanttty ? wanttty : 1, pgrp);
 # else /* _SEQUENT_ */
 		    pgetty(wanttty, pgrp);
@@ -640,6 +649,9 @@ execute(t, wanttty, pipein, pipeout)
 	    execute(t->t_dcdr, wanttty, NULL, NULL);
 	}
 	break;
+
+    default:
+	break;
     }
     /*
      * Fall through for all breaks from switch
@@ -677,6 +689,63 @@ int snum;
 #endif /* VFORK */
 
 /*
+ * Expand and glob the words after an i/o redirection.
+ * If more than one word is generated, then update the command vector.
+ *
+ * This is done differently in all the shells:
+ * 1. in the bourne shell and ksh globbing is not performed
+ * 2. Bash/csh say ambiguous
+ * 3. zsh does i/o to/from all the files
+ * 4. itcsh concatenates the words.
+ *
+ * I don't know what is best to do. I think that Ambiguous is better
+ * than restructuring the command vector, because the user can get
+ * unexpected results. In any case, the command vector restructuring 
+ * code is present and the user can choose it by setting noambiguous
+ */
+static Char *
+splicepipe(t, cp)
+    register struct command *t;
+    Char *cp;	/* word after < or > */
+{
+    Char *blk[2];
+
+    if (adrof(STRnoambiguous)) {
+	Char **pv;
+
+	blk[0] = Dfix1(cp); /* expand $ */
+	blk[1] = NULL;
+
+	gflag = 0, tglob(blk);
+	if (gflag) {
+	    pv = globall(blk);
+	    if (pv == NULL) {
+		setname(short2str(blk[0]));
+		xfree((ptr_t) blk[0]);
+		stderror(ERR_NAME | ERR_NOMATCH);
+	    }
+	    gargv = NULL;
+	    if (pv[1] != NULL) { /* we need to fix the command vector */
+		Char **av = blkspl(t->t_dcom, &pv[1]);
+		xfree((ptr_t) t->t_dcom);
+		t->t_dcom = av;
+	    }
+	    xfree((ptr_t) blk[0]);
+	    blk[0] = pv[0];
+	    xfree((ptr_t) pv);
+	}
+    }
+    else {
+	Char buf[BUFSIZE];
+
+	(void) Strcpy(buf, blk[1] = Dfix1(cp));
+	xfree((ptr_t) blk[1]);
+	blk[0] = globone(buf, G_ERROR);
+    }
+    return(blk[0]);
+}
+    
+/*
  * Perform io redirection.
  * We may or maynot be forked here.
  */
@@ -686,13 +755,13 @@ doio(t, pipein, pipeout)
     int    *pipein, *pipeout;
 {
     register int fd;
-    register Char *cp, *dp;
+    register Char *cp;
     register int flags = t->t_dflg;
 
     if (didfds || (flags & F_REPEAT))
 	return;
     if ((flags & F_READ) == 0) {/* F_READ already done */
-	if (cp = t->t_dlef) {
+	if (t->t_dlef) {
 	    char    tmp[MAXPATHLEN+1];
 
 	    /*
@@ -701,11 +770,10 @@ doio(t, pipein, pipeout)
 	    (void) dcopy(SHIN, 0);
 	    (void) dcopy(SHOUT, 1);
 	    (void) dcopy(SHDIAG, 2);
-	    cp = globone(dp = Dfix1(cp), G_IGNORE);
+	    cp = splicepipe(t, t->t_dlef);
 	    (void) strncpy(tmp, short2str(cp), MAXPATHLEN);
 	    tmp[MAXPATHLEN] = '\0';
 	    xfree((ptr_t) cp);
-	    xfree((ptr_t) dp);
 	    if ((fd = open(tmp, O_RDONLY)) < 0)
 		stderror(ERR_SYSTEM, tmp, strerror(errno));
 	    (void) dmove(fd, 0);
@@ -736,13 +804,12 @@ doio(t, pipein, pipeout)
 #endif /* FIONCLEX */
 	}
     }
-    if (cp = t->t_drit) {
+    if (t->t_drit) {
 	char    tmp[MAXPATHLEN+1];
 
-	cp = globone(dp = Dfix1(cp), G_IGNORE);
+	cp = splicepipe(t, t->t_drit);
 	(void) strncpy(tmp, short2str(cp), MAXPATHLEN);
 	tmp[MAXPATHLEN] = '\0';
-	xfree((ptr_t) dp);
 	xfree((ptr_t) cp);
 	/*
 	 * so > /dev/std{out,err} work

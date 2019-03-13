@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.const.c,v 3.4 1991/10/12 04:23:51 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tc.const.c,v 3.7 1991/11/22 02:28:12 christos Exp $ */
 /*
  * sh.const.c: String constants for tcsh.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.const.c,v 3.4 1991/10/12 04:23:51 christos Exp $")
+RCSID("$Id: tc.const.c,v 3.7 1991/11/22 02:28:12 christos Exp $")
 
 Char STRlogout[]        = { 'l', 'o', 'g', 'o', 'u', 't', '\0' };
 Char STRautologout[]    = { 'a', 'u', 't', 'o', 'l', 'o', 'g', 'o', 'u', 't', 
@@ -152,6 +152,8 @@ Char STRspand2sp[]	= { ' ', '&', '&', ' ', '\0' };
 Char STRsporsp[]	= { ' ', '|', ' ', '\0' };
 Char STRsemisp[]	= { ';', ' ', '\0' };
 Char STRsemi[]		= { ';', '\0' };
+Char STRQQ[]		= { '"', '"', '\0' };
+Char STRBB[]		= { '[', ']', '\0' };
 Char STRspLarrow2sp[]	= { ' ', '<', '<', ' ', '\0' };
 Char STRspLarrowsp[]	= { ' ', '<', ' ', '\0' };
 Char STRspRarrow2[]	= { ' ', '>', '>', '\0' };
@@ -206,18 +208,22 @@ Char STRautocorrect[]	= { 'a', 'u', 't', 'o', 'c', 'o', 'r', 'r', 'e', 'c',
 Char STRautolist[]	= { 'a', 'u', 't', 'o', 'l', 'i', 's', 't', '\0' };
 Char STRbeepcmd[]	= { 'b', 'e', 'e', 'p', 'c', 'm', 'd', '\0' };
 Char STRmatchbeep[]	= { 'm', 'a', 't', 'c', 'h', 'b', 'e', 'e', 'p', '\0' };
-Char STRnever[]		= { 'n', 'e', 'v', 'e', 'r', '\0' };
 Char STRnomatch[]	= { 'n', 'o', 'm', 'a', 't', 'c', 'h', '\0' };
 Char STRambiguous[]	= { 'a', 'm', 'b', 'i', 'g', 'u', 'o', 'u', 's', '\0' };
 Char STRnotunique[]	= { 'n', 'o', 't', 'u', 'n', 'i', 'q', 'u', 'e', '\0' };
 Char STRret[]		= { '\n', '\0' };
 Char STRnobeep[]	= { 'n', 'o', 'b', 'e', 'e', 'p', '\0' };
+Char STRnoambiguous[]	= { 'n', 'o', 'a', 'm', 'b', 'i', 'g', 'u', 'o', 'u', 
+			    's', '\0' };
 Char STRvisiblebell[]	= { 'v', 'i', 's', 'i', 'b', 'l', 'e', 'b', 'e', 'l', 
 			    'l', '\0' };
 Char STRrecognize_only_executables[] = { 'r', 'e', 'c', 'o', 'g', 'n', 'i', 'z',
 					 'e', '_', 'o', 'n', 'l', 'y', '_', 'e',
 					 'x', 'e', 'c', 'u', 't', 'a', 'b', 'l',
 					 'e', 's', '\0' };
+Char STRinputmode[]	= { 'i', 'n', 'p', 'u', 't', 'm', 'o', 'd', 'e', '\0' };
+Char STRoverwrite[]	= { 'o', 'v', 'e', 'r', 'w', 'r', 'i', 't', 'e', '\0' };
+Char STRinsert[]	= { 'i', 'n', 's', 'e', 'r', 't', '\0' };
 Char STRnohup[]		= { 'n', 'o', 'h', 'u', 'p', '\0' };
 Char STRnice[]		= { 'n', 'i', 'c', 'e', '\0' };
 Char STRlistpathnum[]	= { 'l', 'i', 's', 't', 'p', 'a', 't', 'h', 'n', 'u', 

@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.proc.c,v 3.14 1991/10/20 01:38:14 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.proc.c,v 3.19 1991/11/26 04:28:26 christos Exp $ */
 /*
  * sh.proc.c: Job manipulations
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.proc.c,v 3.14 1991/10/20 01:38:14 christos Exp $")
+RCSID("$Id: sh.proc.c,v 3.19 1991/11/26 04:28:26 christos Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -45,6 +45,9 @@ RCSID("$Id: sh.proc.c,v 3.14 1991/10/20 01:38:14 christos Exp $")
 #if !defined(NSIG) && defined(SIGMAX)
 # define NSIG (SIGMAX+1)
 #endif /* !NSIG && SIGMAX */
+#if !defined(NSIG) && defined(_NSIG)
+# define NSIG _NSIG
+#endif /* !NSIG && _NSIG */
 
 #ifdef aiws
 # undef HZ
@@ -222,6 +225,7 @@ loop:
 # endif	/* !BSDTIMES */
 #else /* !BSDJOBS */
 # ifdef BSDTIMES
+#  define HAVEwait3
     /* both a wait3 and rusage */
 #  ifdef hpux
     pid = wait3(&w.w_status, WNOHANG, 0);
@@ -230,20 +234,24 @@ loop:
 #  endif /* !hpux */
 # else /* !BSDTIMES */
 # ifdef ODT  /* For Sco Unix 3.2.0 or ODT 1.0 */
-#  define HAVEwait
+#  define HAVEwait3
     pid = waitpid(-1, &w,
 	    (setintr && (intty || insource) ? WNOHANG | WUNTRACED : WNOHANG));
 # endif /* ODT */	    
-# ifdef aiws
-#  define HAVEwait
+# if defined(aiws) || defined(uts)
+#  define HAVEwait3
     pid = wait3(&w.w_status, 
 	(setintr && (intty || insource) ? WNOHANG | WUNTRACED : WNOHANG), 0);
-# endif /* aiws */
-# ifndef HAVEwait
+# endif /* aiws || uts */
+# ifndef HAVEwait3
 #  ifdef UNRELSIGS
     /* no wait3, therefore no rusage */
     /* on Sys V, this may hang.  I hope it's not going to be a problem */
+#   ifdef _MINIX
+    pid = wait(&w);
+#   else /* !_MINIX */
     pid = ourwait(&w.w_status);
+#   endif /* _MINIX */
 #  else	/* UNRELSIGS */
     /* 
      * XXX: for greater than 3 we should use waitpid(). 
@@ -251,7 +259,7 @@ loop:
      */
     pid = wait(&w.w_status);
 #  endif /* SVID >= 3 */
-# endif /* HAVEwait */
+# endif /* HAVEwait3 */
 # endif	/* BSDTIMES */
 # ifndef BSDSIGS
     (void) sigset(SIGCHLD, pchild);
@@ -283,8 +291,8 @@ loop:
 	return;
 #endif /* SIGVOID */
     }
-    for (pp = proclist.p_next; pp != PNULL; pp = pp->p_next)
-	if (pid == pp->p_pid)
+    for (pp = proclist.p_next; pp != NULL; pp = pp->p_next)
+	if (pid == pp->p_procid)
 	    goto found;
 #ifndef BSDJOBS
     /* this should never have happened */
@@ -372,7 +380,7 @@ found:
 	    if (fp->p_flags & PSTOPPED)
 		fp->p_flags |= PREPORTED;
 	} while ((fp = fp->p_friends) != pp);
-	while (fp->p_pid != fp->p_jobid)
+	while (fp->p_procid != fp->p_jobid)
 	    fp = fp->p_friends;
 	if (jobflags & PSTOPPED) {
 	    if (pcurrent && pcurrent != fp)
@@ -429,9 +437,9 @@ found:
 	    }
 	}
     }
-#if defined(BSDJOBS) || defined(WNOHANG)
+#if defined(BSDJOBS) || defined(HAVEwait3)
     goto loop;
-#endif /* BSDJOBS || WNOHANG */
+#endif /* BSDJOBS || HAVEwait3 */
 }
 
 void
@@ -444,7 +452,7 @@ pnote()
 #endif /* BSDSIGS */
 
     neednote = 0;
-    for (pp = proclist.p_next; pp != PNULL; pp = pp->p_next) {
+    for (pp = proclist.p_next; pp != NULL; pp = pp->p_next) {
 	if (pp->p_flags & PNEEDNOTE) {
 #ifdef BSDSIGS
 	    omask = sigblock(sigmask(SIGCHLD));
@@ -484,8 +492,8 @@ pwait()
 #else /* !BSDSIGS */
     (void) sighold(SIGCHLD);
 #endif /* !BSDSIGS */
-    for (pp = (fp = &proclist)->p_next; pp != PNULL; pp = (fp = pp)->p_next)
-	if (pp->p_pid == 0) {
+    for (pp = (fp = &proclist)->p_next; pp != NULL; pp = (fp = pp)->p_next)
+	if (pp->p_procid == 0) {
 	    fp->p_next = pp->p_next;
 	    xfree((ptr_t) pp->p_command);
 	    if (pp->p_cwd && --pp->p_cwd->di_count == 0)
@@ -524,7 +532,7 @@ pjwait(pp)
     sigret_t (*inthandler)();
 #endif /* UNRELSIGS */
 
-    while (pp->p_pid != pp->p_jobid)
+    while (pp->p_procid != pp->p_jobid)
 	pp = pp->p_friends;
     fp = pp;
 
@@ -555,7 +563,7 @@ pjwait(pp)
 	if ((jobflags & PRUNNING) == 0)
 	    break;
 #ifdef JOBDEBUG
-	xprintf("starting to sigpause for  SIGCHLD on %d\n", fp->p_pid);
+	xprintf("starting to sigpause for  SIGCHLD on %d\n", fp->p_procid);
 #endif /* JOBDEBUG */
 #ifdef BSDSIGS
 	/* sigpause(sigblock((sigmask_t) 0) &~ sigmask(SIGCHLD)); */
@@ -648,7 +656,7 @@ loop:
     (void) sighold(SIGCHLD);
 #endif /* !BSDSIGS */
     for (pp = proclist.p_next; pp; pp = pp->p_next)
-	if (pp->p_pid &&	/* pp->p_pid == pp->p_jobid && */
+	if (pp->p_procid &&	/* pp->p_procid == pp->p_jobid && */
 	    pp->p_flags & PRUNNING) {
 #ifdef BSDSIGS
 	    (void) sigpause((sigmask_t) 0);
@@ -673,8 +681,8 @@ pflushall()
 {
     register struct process *pp;
 
-    for (pp = proclist.p_next; pp != PNULL; pp = pp->p_next)
-	if (pp->p_pid)
+    for (pp = proclist.p_next; pp != NULL; pp = pp->p_next)
+	if (pp->p_procid)
 	    pflush(pp);
 }
 
@@ -690,11 +698,11 @@ pflush(pp)
     register struct process *np;
     register int idx;
 
-    if (pp->p_pid == 0) {
+    if (pp->p_procid == 0) {
 	xprintf("BUG: process flushed twice");
 	return;
     }
-    while (pp->p_pid != pp->p_jobid)
+    while (pp->p_procid != pp->p_jobid)
 	pp = pp->p_friends;
     pclrcurr(pp);
     if (pp == pcurrjob)
@@ -702,7 +710,7 @@ pflush(pp)
     idx = pp->p_index;
     np = pp;
     do {
-	np->p_index = np->p_pid = 0;
+	np->p_index = np->p_procid = 0;
 	np->p_flags &= ~PNEEDNOTE;
     } while ((np = np->p_friends) != pp);
     if (idx == pmaxindex) {
@@ -722,7 +730,7 @@ pclrcurr(pp)
     register struct process *pp;
 {
     if (pp == pcurrent)
-	if (pprevious != PNULL) {
+	if (pprevious != NULL) {
 	    pcurrent = pprevious;
 	    pprevious = pgetcurr(pp);
 	}
@@ -752,7 +760,7 @@ palloc(pid, t)
     int     i;
 
     pp = (struct process *) xcalloc(1, (size_t) sizeof(struct process));
-    pp->p_pid = pid;
+    pp->p_procid = pid;
     pp->p_flags = t->t_dflg & F_AMPERSAND ? PRUNNING : PRUNNING | PFOREGND;
     if (t->t_dflg & F_TIME)
 	pp->p_flags |= PPTIME;
@@ -773,7 +781,7 @@ palloc(pid, t)
 	pp->p_cwd = 0;
 	pp->p_index = pcurrjob->p_index;
 	pp->p_friends = pcurrjob;
-	pp->p_jobid = pcurrjob->p_pid;
+	pp->p_jobid = pcurrjob->p_procid;
 	for (fp = pcurrjob; fp->p_friends != pcurrjob; fp = fp->p_friends);
 	fp->p_friends = pp;
     }
@@ -799,9 +807,9 @@ palloc(pid, t)
 	tryagain:;
 	    }
 	}
-	if (pcurrent == PNULL)
+	if (pcurrent == NULL)
 	    pcurrent = pp;
-	else if (pprevious == PNULL)
+	else if (pprevious == NULL)
 	    pprevious = pp;
     }
     pp->p_next = proclist.p_next;
@@ -863,9 +871,14 @@ padd(t)
 	case NODE_LIST:
 	    pads(STRsemisp);
 	    break;
+	default:
+	    break;
 	}
 	padd(t->t_dcdr);
 	return;
+
+    default:
+	break;
     }
     if ((t->t_dflg & F_PIPEIN) == 0 && t->t_dlef) {
 	pads((t->t_dflg & F_READ) ? STRspLarrow2sp : STRspLarrowsp);
@@ -917,7 +930,7 @@ void
 psavejob()
 {
     pholdjob = pcurrjob;
-    pcurrjob = PNULL;
+    pcurrjob = NULL;
 }
 
 /*
@@ -928,7 +941,7 @@ void
 prestjob()
 {
     pcurrjob = pholdjob;
-    pholdjob = PNULL;
+    pholdjob = NULL;
 }
 
 /*
@@ -942,12 +955,12 @@ pendjob()
 
     if (pcurrjob && (pcurrjob->p_flags & (PFOREGND | PSTOPPED)) == 0) {
 	pp = pcurrjob;
-	while (pp->p_pid != pp->p_jobid)
+	while (pp->p_procid != pp->p_jobid)
 	    pp = pp->p_friends;
 	xprintf("[%d]", pp->p_index);
 	tp = pp;
 	do {
-	    xprintf(" %d", pp->p_pid);
+	    xprintf(" %d", pp->p_procid);
 	    pp = pp->p_friends;
 	} while (pp != tp);
 	xprintf("\n");
@@ -982,7 +995,7 @@ pprint(pp, flag)
     int inpipe = 0;
 #endif /* BACKPIPE */
 
-    while (pp->p_pid != pp->p_jobid)
+    while (pp->p_procid != pp->p_jobid)
 	pp = pp->p_friends;
     if (pp == pp->p_friends && (pp->p_flags & PPTIME)) {
 	pp->p_flags &= ~PPTIME;
@@ -1044,9 +1057,9 @@ pprint(pp, flag)
 		extern char *sitename();
 
 #endif /* TCF */
-		xprintf("%5d ", pp->p_pid);
+		xprintf("%5d ", pp->p_procid);
 #ifdef TCF
-		xprintf("%11s ", sitename(pp->p_pid));
+		xprintf("%11s ", sitename(pp->p_procid));
 #endif /* TCF */
 	    }
 	    if (flag & (REASON | AREASON)) {
@@ -1301,7 +1314,7 @@ dojobs(v, c)
     }
     for (i = 1; i <= pmaxindex; i++)
 	for (pp = proclist.p_next; pp; pp = pp->p_next)
-	    if (pp->p_index == i && pp->p_pid == pp->p_jobid) {
+	    if (pp->p_index == i && pp->p_procid == pp->p_jobid) {
 		pp->p_flags &= ~PNEEDNOTE;
 		if (!(pprint(pp, flag) & (PRUNNING | PSTOPPED)))
 		    pflush(pp);
@@ -1522,6 +1535,8 @@ pkill(v, signum)
 	    case SIGCONT:
 		pstart(pp, 0);
 		goto cont;
+	    default:
+		break;
 	    }
 #endif /* BSDJOBS */
 	    if (killpg(pp->p_jobid, signum) < 0) {
@@ -1629,12 +1644,12 @@ pfind(cp)
     register struct process *pp, *np;
 
     if (cp == 0 || cp[1] == 0 || eq(cp, STRcent2) || eq(cp, STRcentplus)) {
-	if (pcurrent == PNULL)
+	if (pcurrent == NULL)
 	    stderror(ERR_NAME | ERR_JOBCUR);
 	return (pcurrent);
     }
     if (eq(cp, STRcentminus) || eq(cp, STRcenthash)) {
-	if (pprevious == PNULL)
+	if (pprevious == NULL)
 	    stderror(ERR_NAME | ERR_JOBPREV);
 	return (pprevious);
     }
@@ -1642,13 +1657,13 @@ pfind(cp)
 	int     idx = atoi(short2str(cp + 1));
 
 	for (pp = proclist.p_next; pp; pp = pp->p_next)
-	    if (pp->p_index == idx && pp->p_pid == pp->p_jobid)
+	    if (pp->p_index == idx && pp->p_procid == pp->p_jobid)
 		return (pp);
 	stderror(ERR_NAME | ERR_NOSUCHJOB);
     }
-    np = PNULL;
+    np = NULL;
     for (pp = proclist.p_next; pp; pp = pp->p_next)
-	if (pp->p_pid == pp->p_jobid) {
+	if (pp->p_procid == pp->p_jobid) {
 	    if (cp[1] == '?') {
 		register Char *dp;
 
@@ -1682,14 +1697,14 @@ pgetcurr(pp)
     register struct process *pp;
 {
     register struct process *np;
-    register struct process *xp = PNULL;
+    register struct process *xp = NULL;
 
     for (np = proclist.p_next; np; np = np->p_next)
-	if (np != pcurrent && np != pp && np->p_pid &&
-	    np->p_pid == np->p_jobid) {
+	if (np != pcurrent && np != pp && np->p_procid &&
+	    np->p_procid == np->p_jobid) {
 	    if (np->p_flags & PSTOPPED)
 		return (np);
-	    if (xp == PNULL)
+	    if (xp == NULL)
 		xp = np;
 	}
     return (xp);
@@ -1782,7 +1797,7 @@ pfork(t, wanttty)
 	settimes();
 	pgrp = pcurrjob ? pcurrjob->p_jobid : getpid();
 	pflushall();
-	pcurrjob = PNULL;
+	pcurrjob = NULL;
 #if !defined(BSDTIMES) && !defined(_SEQUENT_) 
 	timesdone = 0;
 #endif /* !defined(BSDTIMES) && !defined(_SEQUENT_) */

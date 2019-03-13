@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tw.decls.h,v 3.0 1991/07/04 21:49:28 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tw.decls.h,v 3.0 1991/07/04 21:49:28 christos Exp $ */
 /*
  * tw.decls.h: Tenex external declarations
  */

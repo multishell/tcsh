@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.dir.h,v 3.1 1991/10/20 01:38:14 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.dir.h,v 3.1 1991/10/20 01:38:14 christos Exp $ */
 /*
  * sh.dir.h: Directory data structures and globals
  */

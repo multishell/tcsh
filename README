@@ -1,4 +1,4 @@
-This is tcsh version tcsh 6.00.  Tcsh is a version of the Berkeley
+This is tcsh version tcsh 6.01.  Tcsh is a version of the Berkeley
 C-Shell, with the addition of: a command line editor, command and file
 name completion, listing, etc. and a bunch of small additions to the
 shell itself.
@@ -24,11 +24,6 @@ To install tcsh:
 1)  Look at the Makefile and make sure that you are using the right
     compilation flags.
 
-    NOTES:
-	On a vax using the good ol' BSD compiler 'typedef void sigret_t;' 
-	fails in sh.os.h replace with '#define sigret_t void'. No I will not 
-	change sh.sig.h. (Both ultrix and 4.3BSD)
- 
 2)  Copy the appropriate for your machine and OS config file from the
     config subdirectory into config.h. If you are trying to compile
     tcsh on a machine for which there is no config file yet, you will
@@ -73,7 +68,9 @@ To install tcsh:
     jobs works. Make sure you can ^C in the middle of the input line.
     Also make sure that pipelines work correctly and there
     are no races. Try 'echo | cat | cat | cat | cat | more' a couple
-    of times. Also make sure that the ioctl() modes are preserved.
+    of times. If you have job control, try this command in the background
+    and bring it in the foreground when it stops for tty output. 
+    Also make sure that the ioctl() modes are preserved.
     Get into vi, enter and exit input mode and suspend it, background
     it and foreground it again. After all that, lastly make sure that
     the tty process group manipulation is happening correctly. Try
@@ -97,7 +94,71 @@ To install tcsh:
 
 Various:
 
-On sysv versions < 3.0 (not hpux) the public domain directory 
-manipulation library has to be installed.
+***************************************************************************
+
+On sysv versions < 3.0 (not hpux) Doug Gwyn's public domain directory 
+manipulation library has to be installed. This library is available
+for anonymous ftp from prep.ai.mit.edu:/pub/gnu/libdirent.tar.Z
 If the network is not installed, then there is a gethostname()
-routine is tc.os.c.
+routine is tc.os.c, enabled by defining NEEDgethostname
+
+***************************************************************************
+
+On BSDreno, in ttyname() closedir() is called twice and so the same
+pointer gets free'd twice. tcsh's malloc is picky and it prints an
+error message to that effect. If you don't like the message:
+
+1. Apply the following patch:
+
+*** /usr/src/lib/libc/gen/ttyname.c.orig	Fri Jun  1 17:17:15 1990
+--- /usr/src/lib/libc/gen/ttyname.c	Tue Oct 29 16:33:12 1991
+***************
+*** 51,57 ****
+  		if (stat(buf, &sb2) < 0 || sb1.st_dev != sb2.st_dev ||
+  		    sb1.st_ino != sb2.st_ino)
+  			continue;
+- 		closedir(dp);
+  		rval = buf;
+  		break;
+  	}
+--- 51,56 ----
+
+Or: Comment the error printing out in tc.alloc.c
+Or: Compile -DSYSMALLOC
+
+
+***************************************************************************
+
+Tcsh has been ported to minix by  Scott Krotz (krotz@honey.rtsg.mot.com).
+Unfortunately the minix sed is broken, so you'll have to find a way to
+make tc.const.h, sh.err.h, ed.defns.h which are automatically generated.
+The easiest way to create them is to make a copy from unix, copying 
+config.minix to config.h, and then 'make sh.err.h tc.const.h ed.defns.h'
+
+The OS/dependent files are in mi.termios.h and mi.wait.h
+
+You will get some warnings, but dont worry about them, just ignore
+them.  After tcsh has compiled and the gcc binary is converted to a
+minix binary, remember to chmem it to give it more memory - it will
+need it!  How much you need depends on how many aliases you have, etc..
+Add at least 50000 to it.
+
+One last thing.  You might have to make some links for include files so
+that they are in the directories that tcsh is expecting while compiling.
+I forget if I had to do this or not, but it should be fairly easy to sort
+out.  If it cant find any include files this is probably the reason.
+
+If you have any problems, please tell me.  I can be contacted through
+e-mail at:
+
+krotz@honey.rtsg.mot.com
+
+I also read comp.os.minix on a regular basis, so a note there will get
+my attention also.
+
+Have fun!
+
+Scott Krotz
+
+ps.  The termios functions are provided by Magnus Doell and Bruce Evans.
+     Thanks, guys!

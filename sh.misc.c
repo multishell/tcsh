@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.misc.c,v 3.7 1991/10/12 04:23:51 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.misc.c,v 3.7 1991/10/12 04:23:51 christos Exp $ */
 /*
  * sh.misc.c: Miscelaneous functions
  */

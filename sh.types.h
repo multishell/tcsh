@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.types.h,v 3.12 1991/10/18 16:27:13 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.types.h,v 3.16 1991/12/14 20:45:46 christos Exp $ */
 /* sh.types.h: Do the necessary typedefs for each system.
  *             Up till now I avoided making this into a separate file
  *	       But I just wanted to eliminate the whole mess from sh.h
@@ -77,22 +77,17 @@
 # ifndef _SPEED_T
 #  define _SPEED_T
 # endif /* _SPEED_T */
-# ifdef notdef
-/*
- * This is what sun's lint wants, but the .h file disagree
- */
-extern char *getwd();
-extern time_t time();
-extern int getuid(), geteuid();
-extern int getgid(), getguid();
-extern int _exit();
-extern int abort();
-extern int alarm();
-extern void endpwent();
-extern char *sbrk();
-extern int sleep();
-# endif /* notdef */
-#endif /*sun */
+# ifndef SUNOS4
+#  ifndef _UID_T
+#   define _UID_T
+     typedef int uid_t;
+#  endif /* _UID_T */
+#  ifndef _GID_T
+#   define _GID_T
+     typedef int gid_t;
+#  endif /* _GID_T */
+# endif /* !SUNOS4 */
+#endif /* sun */
 
 
 /***
@@ -105,7 +100,7 @@ extern int sleep();
 # endif /* _SIZE_T */
 
 # ifndef _PTR_T
-# define _PTR_T 
+#  define _PTR_T 
     typedef void * ptr_t;
 # endif /* _PTR_T */
 
@@ -152,13 +147,17 @@ extern char *sbrk();
 #endif
 #endif /* __hpux */
 
+#ifdef _MINIX
+typedef char * caddr_t;
+#endif /* _MINIX */
+
 /***
  *** hp9000s500 running hpux-5.2
  ***/
 #ifdef hp9000s500
 # ifndef _PTR_T
 #  define _PTR_T
-   typedef char * ptr_t;
+    typedef char * ptr_t;
 # endif /* _PTR_T */
 #endif /* hp9000s500 */
 
@@ -207,6 +206,14 @@ extern char *sbrk();
 # endif /* _SIZE_T */
 #endif /* SXA */
 
+/***
+ *** a stellar 2600, running stellix 2.3
+ ***/
+#ifdef stellar
+# ifndef _SIZE_T
+#  define _SIZE_T
+# endif /* _SIZE_T */
+#endif /* stellar */
 
 /***
  *** BSD systems, pre and post 4.3
@@ -218,12 +225,12 @@ extern char *sbrk();
 #endif /* BSD */
 /***
  *** BSD RENO advertises itself as POSIX, but
- *** it is missing speed_t (newer versions of RENO have it)
+ *** it is missing speed_t 
  ***/
 #ifdef RENO
 # ifndef _SPEED_T
 #  define _SPEED_T
-/*   typedef unsigned int speed_t; */
+   typedef unsigned int speed_t; 
 # endif /* _SPEED_T */
 #endif /* RENO */
 
@@ -403,23 +410,23 @@ extern char *sbrk();
 
 # ifndef _PID_T
 #  define _PID_T
-   typedef int pid_t;
+    typedef int pid_t;
 # endif /* _PID_T */
 
 # ifndef _SPEED_T
 #  define _SPEED_T
-   typedef unsigned int speed_t;
+    typedef unsigned int speed_t;
 # endif /* _SPEED_T */
 
-#ifndef _PTR_T
-# define _PTR_T 
+# ifndef _PTR_T
+#  define _PTR_T 
     typedef char * ptr_t;
 #endif /* _PTR_T */
 
-#ifndef _IOCTL_T
-# define _IOCTL_T
+# ifndef _IOCTL_T
+#  define _IOCTL_T
     typedef char * ioctl_t;	/* Third arg of ioctl */
-#endif /* _IOCTL_T */
+# endif /* _IOCTL_T */
 
 #endif /* ! POSIX */
 

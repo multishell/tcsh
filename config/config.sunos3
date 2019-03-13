@@ -104,6 +104,7 @@
  */
 #undef DIRENT
 /****************** local defines *********************/
+#define BSD	/* We really look like BSD 4.2 */
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"

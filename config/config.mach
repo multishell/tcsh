@@ -110,12 +110,14 @@
 #undef DIRENT
 /****************** local defines *********************/
 #ifdef NeXT
-#define environ _environ
+# define environ _environ
 /* strcoll() on the NeXT appears to have 3 args, but only 2 args in tcsh src */
 #define NOSTRCOLL
 #else
-#define SETENV_IN_LIB
-#define setenv(x,y) Setenv(x,y)
+# ifdef notdef
+#  define SETENV_IN_LIB		/* read comment in sh.func.c */
+#  define setenv(x,y) Setenv(x,y)
+# endif
 #endif
 
 /****************** configurable hacks ****************/

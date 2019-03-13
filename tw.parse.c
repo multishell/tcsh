@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tw.parse.c,v 3.13 1991/10/18 16:27:13 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tw.parse.c,v 3.18 1991/12/19 21:40:06 christos Exp $ */
 /*
  * tw.parse.c: Everyone has taken a shot in this futile effort to
  *	       lexically analyze a csh line... Well we cannot good
@@ -39,7 +39,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tw.parse.c,v 3.13 1991/10/18 16:27:13 christos Exp $")
+RCSID("$Id: tw.parse.c,v 3.18 1991/12/19 21:40:06 christos Exp $")
 
 #include "tw.h"
 #include "ed.h"
@@ -155,15 +155,15 @@ tenematch(inputline, inputline_size, num_read, command)
 	}
 	if (skp)
 	    continue;
-	if ((ismeta(word_start[-1]) || isaset(cmd_st, word_start)) &&
-	    (word_start[-1] != '#') && (word_start[-1] != '$') &&
+	if ((ismetahash(word_start[-1]) || isaset(cmd_st, word_start)) &&
+	    (word_start[-1] != '$') &&
 	    ((word_start - 1 == inputline) || (word_start[-2] != '\\')))
 	    break;
     }
 
 
 
-#ifdef	masscomp
+#ifdef masscomp
     /*
      * Avoid a nasty message from the RTU 4.1A & RTU 5.0 compiler concerning
      * the "overuse of registers". According to the compiler release notes,
@@ -356,6 +356,18 @@ tenematch(inputline, inputline_size, num_read, command)
 	}
 	return (0);
 
+    case PATH_NORMALIZE:
+	if ((bptr = dnormalize(word)) != NULL) {
+	    (void) Strcpy(buffer, bptr);
+	    xfree((ptr_t) bptr);
+	    DeleteBack(str_end - word_start);
+	    if (InsertStr((in_single || in_double) ?
+			  buffer : quote_meta(buffer, 0)) < 0)
+		return (-1);
+	    return (1);
+	}
+	return (0);
+
     case LIST:
 	search_ret = t_search(word, wp, command, space_left, is_a_cmd, 1);
 	return search_ret;
@@ -415,7 +427,8 @@ quote_meta(word, trail_space)
     for (bptr = buffer, wptr = word; *wptr != '\0';) {
 	if ((cmap(*wptr, _META | _DOL | _Q | _ESC | _GLOB) || *wptr == HIST ||
 	     *wptr == HISTSUB) &&
-	    (*wptr != ' ' || !trail_space || *(wptr + 1) != '\0'))
+	    (*wptr != ' ' || !trail_space || 
+	     *(wptr + 1) != '\0') && *wptr != '#')
 	    *bptr++ = '\\';
 	*bptr++ = *wptr++;
     }
@@ -676,9 +689,15 @@ t_search(word, wp, command, max_word_length, looking_for_command, list_max)
 	    xfree((ptr_t) nd);
 	    if (command == SPELL || SearchNoDirErr)
 		return (-2);
-	    xprintf("\n%s unreadable\n",
+	    /*
+	     * From: Amos Shapira <amoss@cs.huji.ac.il>
+	     * Print a better message when completion fails
+	     */
+	    xprintf("\n%s %s\n",
 		    *tilded_dir ? short2str(tilded_dir) :
-		    (*dollar_dir ? short2str(dollar_dir) : short2str(dir)));
+		    (*dollar_dir ? short2str(dollar_dir) : short2str(dir)),
+		    (errno == ENOTDIR ? "not a directory" :
+		    (errno == ENOENT ? "not found" : "unreadable")));
 	    NeedsRedraw = 1;
 	    return (-1);
 	}
@@ -1240,24 +1259,26 @@ tilde(new, old)
 {
     register Char *o, *p;
 
-    if ((old[0] != '~') && (old[0] != '=')) {
+    if ((old[0] != '~') &&
+	(old[0] != '=' || (!Isdigit(old[1]) && old[1] != '-'))) {
 	(void) Strcpy(new, old);
 	return (new);
     }
 
-    new[0] = '\0';
     for (p = new, o = &old[1]; *o && *o != '/'; *p++ = *o++);
     *p = '\0';
 
     if (old[0] == '~') {
-	if (gethdir(new))
+	if (gethdir(new)) {
+	    new[0] = '\0';
 	    return (NULL);
+	}
     }
     else {			/* '=' stack expansion */
-	if (!Isdigit(old[1]) && old[1] != '-')
+	if (!getstakd(new, (old[1] == '-') ? -1 : old[1] - '0')) {
+	    new[0] = '\0';
 	    return (NULL);
-	if (!getstakd(new, (old[1] == '-') ? -1 : old[1] - '0'))
-	    return (NULL);
+	}
     }
     (void) Strcat(new, o);
     return (new);

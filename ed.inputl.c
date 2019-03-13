@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.inputl.c,v 3.6 1991/10/20 01:38:14 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/ed.inputl.c,v 3.15 1991/12/19 22:34:14 christos Exp $ */
 /*
  * ed.inputl.c: Input line handling.
  */
@@ -36,13 +36,13 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.inputl.c,v 3.6 1991/10/20 01:38:14 christos Exp $")
+RCSID("$Id: ed.inputl.c,v 3.15 1991/12/19 22:34:14 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
 #include "tw.h"			/* for twenex stuff */
 
-#define OKCMD (INBUFSIZ+INBUFSIZ)
+#define OKCMD (INBUFSIZE+INBUFSIZE)
 extern CCRETVAL e_up_hist();
 extern CCRETVAL e_expand_history();
 
@@ -57,6 +57,8 @@ static Char mismatch[] = {'!', '\\', '^', '-', '%', '\0'};
 
 static	int	GetNextCommand	__P((KEYCMD *, Char *));
 static	int	SpellLine	__P((int));
+static	void	RunCommand	__P((Char *));
+static void 	doeval1		__P((Char **));
 
 /* CCRETVAL */
 int
@@ -68,10 +70,13 @@ Inputl()
     unsigned char tch;		/* the place where read() goes */
     Char    ch;
     int     num;		/* how many chars we have read at NL */
+    int	    expnum;
     struct varent *crct = adrof(STRcorrect);
+    struct varent *autol = adrof(STRautolist);
     struct varent *matchbeep = adrof(STRmatchbeep);
+    struct varent *imode = adrof(STRinputmode);
     Char   *SaveChar, *CorrChar;
-    Char    Origin[INBUFSIZ], Change[INBUFSIZ];
+    Char    Origin[INBUFSIZE], Change[INBUFSIZE];
     int     matchval;		/* from tenematch() */
 
     if (!MapsAreInited)		/* double extra just in case */
@@ -98,7 +103,7 @@ Inputl()
     NeedsRedraw = 0;
 
     if (tellwhat) {
-	copyn(InputBuf, WhichBuf, INBUFSIZ);
+	copyn(InputBuf, WhichBuf, INBUFSIZE);
 	LastChar = InputBuf + (LastWhich - WhichBuf);
 	Cursor = InputBuf + (CursWhich - WhichBuf);
 	tellwhat = 0;
@@ -120,8 +125,8 @@ Inputl()
 	    xprintf("Cursor > InputLim\r\n");
 	if (LastChar > InputLim)
 	    xprintf("LastChar > InputLim\r\n");
-	if (InputLim != &InputBuf[INBUFSIZ - 2])
-	    xprintf("InputLim != &InputBuf[INBUFSIZ-2]\r\n");
+	if (InputLim != &InputBuf[INBUFSIZE - 2])
+	    xprintf("InputLim != &InputBuf[INBUFSIZE-2]\r\n");
 	if ((!DoingArg) && (Argument != 1))
 	    xprintf("(!DoingArg) && (Argument != 1)\r\n");
 	if (CcKeyMap[0] == 0)
@@ -169,7 +174,7 @@ Inputl()
 
 	case CC_WHICH:		/* tell what this command does */
 	    tellwhat = 1;
-	    copyn(WhichBuf, InputBuf, INBUFSIZ);
+	    copyn(WhichBuf, InputBuf, INBUFSIZE);
 	    LastWhich = WhichBuf + (LastChar - InputBuf);
 	    CursWhich = WhichBuf + (Cursor - InputBuf);
 	    *LastChar++ = '\n';	/* for the benifit of CSH */
@@ -184,10 +189,10 @@ Inputl()
 	case CC_NEWLINE:	/* normal end of line */
 	    if (crct && (!Strcmp(*(crct->vec), STRcmd) ||
 			 !Strcmp(*(crct->vec), STRall))) {
-		(void) Strcpy(Origin, InputBuf);
+		copyn(Origin, InputBuf, INBUFSIZE);
 		SaveChar = LastChar;
 		if (SpellLine(!Strcmp(*(crct->vec), STRcmd)) == 1) {
-		    (void) Strcpy(Change, InputBuf);
+		    copyn(Change, InputBuf, INBUFSIZE);
 		    *Strchr(Change, '\n') = '\0';
 		    CorrChar = LastChar;	/* Save the corrected end */
 		    LastChar = InputBuf;	/* Null the current line */
@@ -201,12 +206,13 @@ Inputl()
 			xprintf("yes\n");
 		    }
 		    else {
-			(void) Strcpy(InputBuf, Origin);
+			(void) copyn(InputBuf, Origin, INBUFSIZE);
 			LastChar = SaveChar;
 			if (ch == 'e') {
 			    xprintf("edit\n");
 			    *LastChar-- = '\0';
-			    printprompt(0, NULL);
+			    Cursor = LastChar;
+			    printprompt(3, NULL);
 			    Refresh();
 			    break;
 			}
@@ -221,6 +227,12 @@ Inputl()
 	    /*
 	     * For continuation lines, we set the prompt to prompt 2
 	     */
+	    if (imode) {
+		if (!Strcmp(*(imode->vec), STRinsert))
+		    inputmode = MODE_INSERT;
+		else if (!Strcmp(*(imode->vec), STRoverwrite))
+		    inputmode = MODE_REPLACE;
+	    }
 	    printprompt(1, NULL);
 #ifdef notdef
 	    ResetInLine();	/* reset the input pointers */
@@ -229,7 +241,7 @@ Inputl()
 	    break;
 
 	case CC_CORRECT:
-	    if (tenematch(InputBuf, INBUFSIZ, Cursor - InputBuf,
+	    if (tenematch(InputBuf, INBUFSIZE, Cursor - InputBuf,
 			  SPELL) < 0)
 		Beep();		/* Beep = No match/ambiguous */
 	    if (NeedsRedraw) {
@@ -264,8 +276,9 @@ Inputl()
 	     * A separate variable now controls beeping after
 	     * completion, independently of autolisting.
 	     */
+	    expnum = Cursor - InputBuf;
 	    switch (matchval = 
-		    tenematch(InputBuf, INBUFSIZ, Cursor-InputBuf, RECOGNIZE)) {
+		    tenematch(InputBuf, INBUFSIZE, Cursor-InputBuf, RECOGNIZE)) {
 	    case 1:
 		if (non_unique_match && matchbeep &&
 		    (Strcmp(*(matchbeep->vec), STRnotunique) == 0))
@@ -299,9 +312,10 @@ Inputl()
 		 * (PWP: this is the best feature addition to tcsh I have 
 		 * seen in many months.)
 		 */
-		if (adrof(STRautolist)) {
+		if (autol && (Strcmp(*(autol->vec), STRambiguous) != 0 || 
+				     expnum == Cursor - InputBuf)) {
 		    PastBottom();
-		    (void) tenematch(InputBuf, INBUFSIZ, Cursor-InputBuf, LIST);
+		    (void) tenematch(InputBuf, INBUFSIZE, Cursor-InputBuf, LIST);
 		}
 		break;
 	    }
@@ -318,7 +332,7 @@ Inputl()
 
 	case CC_LIST_CHOICES:
 	    /* should catch ^C here... */
-	    if (tenematch(InputBuf, INBUFSIZ, Cursor - InputBuf, LIST) < 0)
+	    if (tenematch(InputBuf, INBUFSIZE, Cursor - InputBuf, LIST) < 0)
 		Beep();
 	    Refresh();
 	    Argument = 1;
@@ -326,7 +340,7 @@ Inputl()
 	    break;
 
 	case CC_LIST_GLOB:
-	    if (tenematch(InputBuf, INBUFSIZ, Cursor - InputBuf, GLOB) < 0)
+	    if (tenematch(InputBuf, INBUFSIZE, Cursor - InputBuf, GLOB) < 0)
 		Beep();
 	    Refresh();
 	    Argument = 1;
@@ -334,7 +348,7 @@ Inputl()
 	    break;
 
 	case CC_EXPAND_GLOB:
-	    if (tenematch(InputBuf, INBUFSIZ, Cursor - InputBuf,
+	    if (tenematch(InputBuf, INBUFSIZE, Cursor - InputBuf,
 			  GLOB_EXPAND) <= 0)
 		Beep();		/* Beep = No match */
 	    if (NeedsRedraw) {
@@ -347,8 +361,22 @@ Inputl()
 	    DoingArg = 0;
 	    break;
 
+	case CC_NORMALIZE_PATH:
+	    if (tenematch(InputBuf, INBUFSIZE, Cursor - InputBuf,
+			  PATH_NORMALIZE) <= 0)
+		Beep();		/* Beep = No match */
+	    if (NeedsRedraw) {
+		ClearLines();
+		ClearDisp();
+		NeedsRedraw = 0;
+	    }
+	    Refresh();
+	    Argument = 1;
+	    DoingArg = 0;
+	    break;
+
 	case CC_EXPAND_VARS:
-	    if (tenematch(InputBuf, INBUFSIZ, Cursor - InputBuf,
+	    if (tenematch(InputBuf, INBUFSIZE, Cursor - InputBuf,
 			  VARS_EXPAND) <= 0)
 		Beep();		/* Beep = No match */
 	    if (NeedsRedraw) {
@@ -364,7 +392,7 @@ Inputl()
 	case CC_HELPME:
 	    xputchar('\n');
 	    /* should catch ^C here... */
-	    (void) tenematch(InputBuf, INBUFSIZ, LastChar - InputBuf,
+	    (void) tenematch(InputBuf, INBUFSIZE, LastChar - InputBuf,
 			     PRINT_HELP);
 	    Refresh();
 	    Argument = 1;
@@ -412,6 +440,87 @@ PushMacro(str)
     }
 }
 
+/*
+ * Like eval, only using the current file descriptors
+ */
+static Char **gv = NULL;
+
+static void
+doeval1(v)
+    Char **v;
+{
+    Char  **oevalvec;
+    Char   *oevalp;
+    int     my_reenter;
+    Char  **savegv;
+    jmp_buf osetexit;
+
+    oevalvec = evalvec;
+    oevalp = evalp;
+    savegv = gv;
+
+
+    gflag = 0, tglob(v);
+    if (gflag) {
+	gv = v = globall(v);
+	gargv = 0;
+	if (v == 0)
+	    stderror(ERR_NOMATCH);
+	v = copyblk(v);
+    }
+    else {
+	gv = NULL;
+	v = copyblk(v);
+	trim(v);
+    }
+
+    getexit(osetexit);
+
+    /* PWP: setjmp/longjmp bugfix for optimizing compilers */
+#ifdef cray
+    my_reenter = 1;             /* assume non-zero return val */
+    if (setexit() == 0) {
+        my_reenter = 0;         /* Oh well, we were wrong */
+#else /* !cray */
+    if ((my_reenter = setexit()) == 0) {
+#endif /* cray */
+	evalvec = v;
+	evalp = 0;
+	process(0);
+    }
+
+    evalvec = oevalvec;
+    evalp = oevalp;
+    doneinp = 0;
+
+    if (gv)
+	blkfree(gv);
+
+    gv = savegv;
+    resexit(osetexit);
+    if (my_reenter)
+	stderror(ERR_SILENT);
+}
+
+static void
+RunCommand(str)
+    Char *str;
+{
+    Char *cmd[2];
+
+    xprintf("\n");	/* Start on a clean line */
+
+    cmd[0] = str;
+    cmd[1] = NULL;
+
+    doeval1(cmd);
+    
+    ClearLines();
+    ClearDisp();
+    NeedsRedraw = 1;
+    Refresh();
+}
+
 static int
 GetNextCommand(cmdnum, ch)
     KEYCMD *cmdnum;
@@ -419,9 +528,8 @@ GetNextCommand(cmdnum, ch)
 {
     KEYCMD  cmd = 0;
     int     num;
-    Char   *str;
 
-    for (; cmd == 0 || cmd == F_XKEY;) {
+    while (cmd == 0 || cmd == F_XKEY) {
 	if ((num = GetNextChar(ch)) != 1) {	/* if EOF or error */
 	    return num;
 	}
@@ -439,14 +547,24 @@ GetNextCommand(cmdnum, ch)
 	}
 	cmd = CurrentKeyMap[(unsigned char) *ch];
 	if (cmd == F_XKEY) {
-	    if (GetXkey(ch, &str))
-		cmd = (KEYCMD) *str;
-	    else
-		PushMacro(str);
+	    XmapVal val;
+	    switch (GetXkey(ch, &val)) {
+	    case XK_CMD:
+		cmd = val.cmd;
+		break;
+	    case XK_STR:
+		PushMacro(val.str);
+		break;
+	    case XK_EXE:
+		RunCommand(val.str);
+		break;
+	    default:
+		abort();
+		break;
+	    }
 	}
-	if (!AltKeyMap) {
+	if (!AltKeyMap) 
 	    CurrentKeyMap = CcKeyMap;
-	}
     }
     *cmdnum = cmd;
     return OKCMD;
@@ -513,9 +631,6 @@ GetNextChar(cp)
 	    *cp = tcp;
 	    return (num_read);
 #endif /* TRY_AGAIN */
-#ifdef _SEQUENT_
-	case EBADF:
-#endif /* _SEQUENT_ */
 	case EINTR:
 	    break;
 	default:
@@ -551,10 +666,10 @@ SpellLine(cmdonly)
     endflag = 1;
     matchval = 0;
     do {
-	while (ismeta(*argptr) || iscmdmeta(*argptr))
+	while (ismetahash(*argptr) || iscmdmeta(*argptr))
 	    argptr++;
 	for (Cursor = argptr;
-	     *Cursor != '\0' && !ismeta(*Cursor) && !iscmdmeta(*Cursor);
+	     *Cursor != '\0' && !ismetahash(*Cursor) && !iscmdmeta(*Cursor);
 	     Cursor++);
 	if (*Cursor == '\0') {
 	    Cursor = LastChar;
@@ -564,7 +679,7 @@ SpellLine(cmdonly)
 	}
 	if (!Strchr(mismatch, *argptr) &&
 	    (!cmdonly || starting_a_command(argptr, InputBuf))) {
-	    switch (tenematch(InputBuf, INBUFSIZ, Cursor - InputBuf, SPELL)) {
+	    switch (tenematch(InputBuf, INBUFSIZE, Cursor - InputBuf, SPELL)) {
 	    case 1:		/* corrected */
 		matchval = 1;
 		break;

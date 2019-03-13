@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/sh.func.c,v 3.12 1991/10/20 01:38:14 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.func.c,v 3.20 1991/12/19 22:34:14 christos Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.func.c,v 3.12 1991/10/20 01:38:14 christos Exp $")
+RCSID("$Id: sh.func.c,v 3.20 1991/12/19 22:34:14 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -45,7 +45,6 @@ RCSID("$Id: sh.func.c,v 3.12 1991/10/20 01:38:14 christos Exp $")
 /*
  * C shell
  */
-
 extern int just_signaled;
 extern char **environ;
 
@@ -59,9 +58,10 @@ static	void	islogin		__P((void));
 static	void	reexecute	__P((struct command *));
 static	void	preread		__P((void));
 static	void	doagain		__P((void));
+static  char   *isrchx		__P((int));
+static	void	search		__P((int, int, Char *));
 static	int	getword		__P((Char *));
 static	int	keyword		__P((Char *));
-static	void	Unsetenv	__P((Char *));
 static	void	toend		__P((void));
 static	void	xecho		__P((int, Char **));
 
@@ -315,7 +315,7 @@ doif(v, kp)
     v++;
     i = expr(&v);
     vv = v;
-    if (*vv == NOSTR)
+    if (*vv == NULL)
 	stderror(ERR_NAME | ERR_EMPTYIF);
     if (eq(*vv, STRthen)) {
 	if (*++vv)
@@ -326,7 +326,7 @@ doif(v, kp)
 	 * following code.
 	 */
 	if (!i)
-	    search(T_IF, 0, NOSTR);
+	    search(T_IF, 0, NULL);
 	return;
     }
     /*
@@ -364,7 +364,7 @@ doelse (v, c)
     Char **v;
     struct command *c;
 {
-    search(T_ELSE, 0, NOSTR);
+    search(T_ELSE, 0, NULL);
 }
 
 /*ARGSUSED*/
@@ -373,9 +373,17 @@ dogoto(v, c)
     Char  **v;
     struct command *c;
 {
-    register struct whyle *wp;
     Char   *lp;
 
+    gotolab(lp = globone(v[1], G_ERROR));
+    xfree((ptr_t) lp);
+}
+
+void
+gotolab(lab)
+    Char *lab;
+{
+    register struct whyle *wp;
     /*
      * While we still can, locate any unknown ends of existing loops. This
      * obscure code is the WORST result of the fact that we don't really parse.
@@ -383,14 +391,13 @@ dogoto(v, c)
     zlast = T_GOTO;
     for (wp = whyles; wp; wp = wp->w_next)
 	if (wp->w_end.type == F_SEEK && wp->w_end.f_seek == 0) {
-	    search(T_BREAK, 0, NOSTR);
+	    search(T_BREAK, 0, NULL);
 	    btell(&wp->w_end);
 	}
 	else {
 	    bseek(&wp->w_end);
 	}
-    search(T_GOTO, 0, lp = globone(v[1], G_ERROR));
-    xfree((ptr_t) lp);
+    search(T_GOTO, 0, lab);
     /*
      * Eliminate loops which were exited.
      */
@@ -550,7 +557,7 @@ preread()
 #else /* !BSDSIGS */
 	(void) sigrelse (SIGINT);
 #endif /* BSDSIGS */
-    search(T_BREAK, 0, NOSTR);		/* read the expression in */
+    search(T_BREAK, 0, NULL);		/* read the expression in */
     if (setintr)
 #ifdef BSDSIGS
 	(void) sigblock(sigmask(SIGINT));
@@ -649,7 +656,7 @@ doswbrk(v, c)
     Char **v;
     struct command *c;
 {
-    search(T_BRKSW, 0, NOSTR);
+    search(T_BRKSW, 0, NULL);
 }
 
 int
@@ -692,13 +699,13 @@ isrchx(n)
 static Char Stype;
 static Char *Sgoal;
 
-void
+static void
 search(type, level, goal)
     int     type;
     register int level;
     Char   *goal;
 {
-    Char    wordbuf[BUFSIZ];
+    Char    wordbuf[BUFSIZE];
     register Char *aword = wordbuf;
     register Char *cp;
 
@@ -791,7 +798,7 @@ search(type, level, goal)
 		level = -1;
 	    break;
 	}
-	(void) getword(NOSTR);
+	(void) getword(NULL);
     } while (level >= 0);
 }
 
@@ -872,6 +879,9 @@ past:
     case T_GOTO:
 	setname(short2str(Sgoal));
 	stderror(ERR_NAME | ERR_NOTFOUND, "label");
+
+    default:
+	break;
     }
     /* NOTREACHED */
     return (0);
@@ -908,7 +918,7 @@ static void
 toend()
 {
     if (whyles->w_end.type == F_SEEK && whyles->w_end.f_seek == 0) {
-	search(T_BREAK, 0, NOSTR);
+	search(T_BREAK, 0, NULL);
 	btell(&whyles->w_end);
 	whyles->w_end.f_seek--;
     }
@@ -923,18 +933,47 @@ wfree()
 {
     struct Ain    o;
     struct whyle *nwp;
+
+#ifdef FDEBUG
+    static char foo[] = "IAFE";
+#endif /* FDEBUG */
+
     btell(&o);
-    if (o.type != F_SEEK)
-	return;
+
+#ifdef FDEBUG
+    xprintf("o->type %c o->a_seek %d o->f_seek %d\n", 
+	    foo[o.type + 1], o.a_seek, o.f_seek);
+#endif /* FDEBUG */
 
     for (; whyles; whyles = nwp) {
 	register struct whyle *wp = whyles;
 	nwp = wp->w_next;
-	if (wp->w_start.type != F_SEEK || wp->w_end.type != F_SEEK) 
-	    break;
-	if (o.f_seek >= wp->w_start.f_seek && 
-	    (wp->w_end.f_seek == 0 || o.f_seek < wp->w_end.f_seek))
-	    break;
+
+#ifdef FDEBUG
+	xprintf("start->type %c start->a_seek %d start->f_seek %d\n", 
+		foo[wp->w_start.type+1], 
+		wp->w_start.a_seek, wp->w_start.f_seek);
+	xprintf("end->type %c end->a_seek %d end->f_seek %d\n", 
+		foo[wp->w_end.type + 1], wp->w_end.a_seek, wp->w_end.f_seek);
+#endif /* FDEBUG */
+
+	/*
+	 * XXX: We free loops that have different seek types.
+	 */
+	if (wp->w_end.type != I_SEEK && wp->w_start.type == wp->w_end.type &&
+	    wp->w_start.type == o.type) {
+	    if (wp->w_end.type == F_SEEK) {
+		if (o.f_seek >= wp->w_start.f_seek && 
+		    (wp->w_end.f_seek == 0 || o.f_seek < wp->w_end.f_seek))
+		    break;
+	    }
+	    else {
+		if (o.a_seek >= wp->w_start.a_seek && 
+		    (wp->w_end.a_seek == 0 || o.a_seek < wp->w_end.a_seek))
+		    break;
+	    }
+	}
+
 	if (wp->w_fe0)
 	    blkfree(wp->w_fe0);
 	if (wp->w_fename)
@@ -1199,8 +1238,14 @@ Setenv(name, val)
     Char   *name, *val;
 {
 #ifdef SETENV_IN_LIB
+/*
+ * XXX: This does not work right, since tcsh cannot track changes to
+ * the environment this way. (the builtin setenv without arguments does
+ * not print the right stuff neither does unsetenv). This was for Mach,
+ * it is not needed anymore.
+ */
 #undef setenv
-    char    nameBuf[BUFSIZ];
+    char    nameBuf[BUFSIZE];
     char   *cname = short2str(name);
 
     if (cname == NULL)
@@ -1238,7 +1283,7 @@ Setenv(name, val)
 #endif /* SETENV_IN_LIB */
 }
 
-static void
+void
 Unsetenv(name)
     Char   *name;
 {
@@ -1548,9 +1593,13 @@ badscal:
 # if defined(convex) || defined(__convex__)
     return ((RLIM_TYPE) restrict_limit((f + 0.5)));
 # else
-    if ((f + 0.5) >= (float) lmax || (f + 0.5) < (float) lmin)
-	stderror(ERR_NAME | ERR_SCALEF);
-    return ((RLIM_TYPE) (f + 0.5));
+    f += 0.5;
+    if (f > (float) lmax)
+	return lmax;
+    else if (f < (float) lmin)
+	return lmin;
+    else
+	return ((RLIM_TYPE) f);
 # endif /* convex */
 }
 
@@ -1749,12 +1798,8 @@ doeval(v, c)
     jmp_buf osetexit;
     int     my_reenter;
     Char  **savegv;
-    int     saveIN;
-    int     saveOUT;
-    int     saveDIAG;
-    int     oSHIN;
-    int     oSHOUT;
-    int     oSHDIAG;
+    int     saveIN, saveOUT, saveDIAG;
+    int     oSHIN, oSHOUT, oSHDIAG;
 
     oevalvec = evalvec;
     oevalp = evalp;
@@ -1795,7 +1840,7 @@ doeval(v, c)
 #ifdef cray
     my_reenter = 1;             /* assume non-zero return val */
     if (setexit() == 0) {
-        my_reenter = 0;         /* Oh well, we were wrong */
+	my_reenter = 0;         /* Oh well, we were wrong */
 #else /* !cray */
     if ((my_reenter = setexit()) == 0) {
 #endif /* cray */

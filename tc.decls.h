@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.decls.h,v 3.7 1991/10/21 17:24:49 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tc.decls.h,v 3.10 1991/12/14 20:45:46 christos Exp $ */
 /*
  * tc.decls.h: Function declarations from all the tcsh modules
  */
@@ -59,7 +59,7 @@ extern	void		  showall	__P((Char **, struct command *));
  */
 extern	void		  dobindkey	__P((Char **, struct command *));
 extern	int		  parseescape	__P((Char **));
-extern	unsigned char    *unparsestring	__P((Char *, unsigned char *));
+extern	unsigned char    *unparsestring	__P((Char *, unsigned char *, Char *));
 extern	void		  dobind	__P((Char **, struct command *));
 
 
@@ -89,12 +89,13 @@ extern	void		  cwd_cmd	__P((void));
 extern	void		  beep_cmd	__P((void));
 extern	void		  period_cmd	__P((void));
 extern	void		  aliasrun	__P((int, Char *, Char *));
-extern	void		  setalarm	__P((void));
+extern	void		  setalarm	__P((int));
 extern	void		  rmstar	__P((struct wordent *));
 extern	void		  continue_jobs	__P((struct wordent *));
 extern	Char		 *gettilde	__P((Char *));
 extern	Char		 *getusername	__P((Char **));
 extern	void		  doaliases	__P((Char **, struct command *));
+extern	void		  shlvl		__P((int));
 
 
 /*

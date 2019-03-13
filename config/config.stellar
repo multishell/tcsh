@@ -3,20 +3,20 @@
  *
  * All source files should #include this FIRST.
  *
- * Edited for DELL System V Release 4 v2.01 - Kimmo Suominen, Oct 14 1991
+ * Edit this to match your system type.
  */
 
 /****************** System dependant compilation flags ****************/
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
  */
-#define POSIX
+#undef POSIX
 
 /*
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
  *		job control facilities.
  */
-#define POSIXJOBS
+#undef POSIXJOBS
 
 /*
  * VFORK	This machine has a vfork().  
@@ -31,14 +31,7 @@
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
  */
-
-/* According to the manual page on DELL SVR4 (v2.01) vfork will be eliminated
- * in a future release, because it's efficiency can be gained in some other
- * way.  They didn't tell how and when, though ;-)  So for the time being
- * defining VFORK might be best.  However, TCSH works without this just fine.
- * Kimmo Suominen, Oct 14 1991
- */
-#define VFORK
+#undef VFORK
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and
@@ -64,7 +57,7 @@
  * BSDNICE	Your system uses setpriority() instead of nice, to
  *		change a processes scheduling priority
  */
-#undef BSDNICE
+#define BSDNICE
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
@@ -81,7 +74,7 @@
  *		Set SVID to 1, 2, or 3, depending the version of System V
  *		you are running. Or set it to 0 if you are not SVID based
  */
-#define SVID	4
+#define SVID	3
 
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
@@ -101,30 +94,17 @@
 #define HAVEDUP2
 
 /*
- * HAVEUTMPX	Define if you have extended utmp (utmpx).
- *		(common for svr4 systems)
- */
-#define HAVEUTMPX
-
-/*
  * UTHOST	Does the utmp file have a host field?
  */
-#ifdef HAVEUTMPX
-# define UTHOST
-#else
-# undef UTHOST
-#endif /* HAVEUTMPX */
+#define UTHOST
 
 /*
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
  */
 #define DIRENT
 /****************** local defines *********************/
-#ifndef BSDTIMES
-# define NEEDgethostname
-#endif
-
+#define BACKPIPE
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
-
+#undef NLS

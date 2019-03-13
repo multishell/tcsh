@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.h,v 3.7 1991/10/20 01:38:14 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/ed.h,v 3.12 1991/12/19 22:34:14 christos Exp $ */
 /*
  * ed.h: Editor declarations and globals
  */
@@ -42,7 +42,6 @@
 #endif
 
 #define TABSIZE		8	/* usually 8 spaces/tab */
-#define	INBUFSIZ	BUFSIZ	/* size of input buffer */
 #define MAXMACROLEVELS	10	/* max number of nested kbd macros */
 
 extern int errno;
@@ -92,16 +91,27 @@ extern KEYCMD NumFuns;		/* number of KEYCMDs in above table */
 #define CC_CORRECT_L		13
 #define CC_REFRESH		14
 #define CC_EXPAND_VARS		15
+#define CC_NORMALIZE_PATH	16
+
+typedef union Xmapval {		/* value passed to the Xkey routines */
+    KEYCMD cmd;
+    Char *str;
+} XmapVal;
+
+#define XK_NOD	-1		/* Internal tree node */
+#define XK_CMD	 0		/* X-key was an editor command */
+#define XK_STR	 1		/* X-key was a string macro */
+#define XK_EXE	 2		/* X-key was a unix command */
 
 /****************************/
 /* Editor state and buffers */
 /****************************/
 
 EXTERN KEYCMD *CurrentKeyMap;	/* current command key map */
-EXTERN int replacemode;		/* true if in overwrite mode */
+EXTERN int inputmode;		/* insert, replace, replace1 mode */
 EXTERN Char GettingInput;	/* true if getting an input line (mostly) */
 EXTERN Char NeedsRedraw;	/* for editor and twenex error messages */
-EXTERN Char InputBuf[INBUFSIZ];	/* the real input data */
+EXTERN Char InputBuf[INBUFSIZE];	/* the real input data */
 EXTERN Char *LastChar, *Cursor;	/* point to the next open space */
 EXTERN Char *InputLim;		/* limit of size of InputBuf */
 EXTERN Char MetaNext;		/* flags for ^V and ^[ functions */
@@ -111,18 +121,18 @@ EXTERN Char *Mark;		/* the emacs "mark" (dot is Cursor) */
 EXTERN Char DoingArg;		/* true if we have an argument */
 EXTERN int Argument;		/* "universal" argument value */
 EXTERN KEYCMD LastCmd;		/* previous command executed */
-EXTERN Char KillBuf[INBUFSIZ];	/* kill buffer */
+EXTERN Char KillBuf[INBUFSIZE];	/* kill buffer */
 EXTERN Char *LastKill;		/* points to end of kill buffer */
 
-EXTERN Char UndoBuf[INBUFSIZ];
+EXTERN Char UndoBuf[INBUFSIZE];
 EXTERN Char *UndoPtr;
 EXTERN int  UndoSize;
 EXTERN int  UndoAction;
 
-EXTERN Char HistBuf[INBUFSIZ];	/* history buffer */
+EXTERN Char HistBuf[INBUFSIZE];	/* history buffer */
 EXTERN Char *LastHist;		/* points to end of history buffer */
 EXTERN int Hist_num;		/* what point up the history we are at now. */
-EXTERN Char WhichBuf[INBUFSIZ];	/* buffer for which command */
+EXTERN Char WhichBuf[INBUFSIZE];	/* buffer for which command */
 EXTERN Char *LastWhich;		/* points to end of which buffer */
 EXTERN Char *CursWhich;		/* points to the cursor point in which buf */
 EXTERN int HistWhich;		/* Hist_num is saved in this */
@@ -191,6 +201,10 @@ typedef struct {
     struct ltchars d_ltc;
 #endif /* TIOCGLTC */
 } ttydata_t;
+
+#define MODE_INSERT	0
+#define MODE_REPLACE	1
+#define MODE_REPLACE_1	2
 
 #define EX_IO	0	/* while we are executing	*/
 #define ED_IO	1	/* while we are editing		*/

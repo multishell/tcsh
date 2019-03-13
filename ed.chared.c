@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.chared.c,v 3.12 1991/10/21 17:24:49 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/ed.chared.c,v 3.18 1991/12/19 22:34:14 christos Exp $ */
 /*
  * ed.chared.c: Character editing functions.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.chared.c,v 3.12 1991/10/21 17:24:49 christos Exp $")
+RCSID("$Id: ed.chared.c,v 3.18 1991/12/19 22:34:14 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -59,7 +59,7 @@ static int  ActionFlag = NOP;	   /* What delayed action to take */
  * Word search state
  */
 static int  searchdir = F_UP_SEARCH_HIST; 	/* Direction of last search */
-static Char patbuf[INBUFSIZ];			/* Search target */
+static Char patbuf[INBUFSIZE];			/* Search target */
 static int patlen = 0;
 /*
  * Char search state
@@ -155,8 +155,15 @@ c_delafter(num)
 		*cp = cp[num];
 	LastChar -= num;
     }
-    else
-	replacemode = 0;
+#ifdef notdef
+    else {
+	/* 
+	 * XXX: We don't want to do that. In emacs mode overwrite should be
+	 * sticky. I am not sure how that affects vi mode 
+	 */
+	inputmode = MODE_INSERT;
+    }
+#endif /* notdef */
 }
 
 static void
@@ -347,7 +354,7 @@ c_expand(p)
     bool    all_dig;
     bool    been_once = 0;
     Char   *op = p;
-    Char    buf[INBUFSIZ];
+    Char    buf[INBUFSIZE];
     Char   *bend = buf;
     Char   *modbuf, *omodbuf;
 
@@ -357,22 +364,22 @@ excl_sw:
     switch (*(q = p + 1)) {
 
     case '^':
-	bend = expand_lex(buf, INBUFSIZ, &h->Hlex, 1, 1);
+	bend = expand_lex(buf, INBUFSIZE, &h->Hlex, 1, 1);
 	break;
 
     case '$':
 	if ((l = (h->Hlex).prev))
-	    bend = expand_lex(buf, INBUFSIZ, l->prev->prev, 0, 0);
+	    bend = expand_lex(buf, INBUFSIZE, l->prev->prev, 0, 0);
 	break;
 
     case '*':
-	bend = expand_lex(buf, INBUFSIZ, &h->Hlex, 1, NCARGS);
+	bend = expand_lex(buf, INBUFSIZE, &h->Hlex, 1, NCARGS);
 	break;
 
     default:
 	if (been_once) {	/* unknown argument */
 	    /* assume it's a modifier, e.g. !foo:h, and get whole cmd */
-	    bend = expand_lex(buf, INBUFSIZ, &h->Hlex, 0, NCARGS);
+	    bend = expand_lex(buf, INBUFSIZE, &h->Hlex, 0, NCARGS);
 	    q -= 2;
 	    break;
 	}
@@ -471,10 +478,10 @@ excl_sw:
 	    }
 	    if (from < 0 || to < from)
 		goto excl_err;
-	    bend = expand_lex(buf, INBUFSIZ, &h->Hlex, from, to);
+	    bend = expand_lex(buf, INBUFSIZE, &h->Hlex, from, to);
 	}
 	else {			/* get whole cmd */
-	    bend = expand_lex(buf, INBUFSIZ, &h->Hlex, 0, NCARGS);
+	    bend = expand_lex(buf, INBUFSIZE, &h->Hlex, 0, NCARGS);
 	}
 	break;
     }
@@ -485,7 +492,7 @@ excl_sw:
     if (q[1] == ':') {
 	*bend = '\0';
 	omodbuf = buf;
-	while (q[1] == ':' && (modbuf = domod(omodbuf, (int) q[2])) != NOSTR) {
+	while (q[1] == ':' && (modbuf = domod(omodbuf, (int) q[2])) != NULL) {
 	    if (omodbuf != buf)
 		xfree((ptr_t) omodbuf);
 	    omodbuf = modbuf;
@@ -669,7 +676,7 @@ c_get_histline()
     int     h;
 
     if (Hist_num == 0) {	/* if really the current line */
-	copyn(InputBuf, HistBuf, INBUFSIZ);
+	copyn(InputBuf, HistBuf, INBUFSIZE);
 	LastChar = InputBuf + (LastHist - HistBuf);
 
 #ifdef KSHVI
@@ -695,7 +702,7 @@ c_get_histline()
     }
 
     if (HistLit && hp->histline) {
-	copyn(InputBuf, hp->histline, INBUFSIZ);
+	copyn(InputBuf, hp->histline, INBUFSIZE);
 	CurrentHistLit = 1;
     }
     else {
@@ -791,7 +798,8 @@ e_inc_search(dir)
 	switch (CurrentKeyMap[(unsigned char) ch]) {
 	case F_INSERT:
 	case F_DIGIT:
-	    if (patlen > INBUFSIZ - 3)
+	case F_MAGIC_SPACE:
+	    if (patlen > INBUFSIZE - 3)
 		Beep();
 	    else {
 		patbuf[patlen++] = ch;
@@ -832,7 +840,7 @@ e_inc_search(dir)
 			Cursor += patlen - 1;
 			cp = c_next_word(Cursor, LastChar, 1);
 			while (Cursor < cp && *Cursor != '\n') {
-			    if (patlen > INBUFSIZ - 3) {
+			    if (patlen > INBUFSIZE - 3) {
 				Beep();
 				break;
 			    }
@@ -949,7 +957,7 @@ v_search(dir)
     int dir;
 {
     Char ch;
-    Char tmpbuf[INBUFSIZ];
+    Char tmpbuf[INBUFSIZE];
     int tmplen;
 
     tmplen = 0;
@@ -991,7 +999,7 @@ v_search(dir)
 	    break;
 
 	default:
-	    if (tmplen >= INBUFSIZ)
+	    if (tmplen >= INBUFSIZE)
 		Beep();
 	    else {
 		tmpbuf[tmplen++] = ch;
@@ -1071,7 +1079,7 @@ v_cmd_mode(c)
     else
 	UndoSize = (int)(Cursor - UndoPtr);
 
-    replacemode = 0;
+    inputmode = MODE_INSERT;
     c_alternativ_key_map(1);
 #ifdef notdef
     /*
@@ -1112,7 +1120,7 @@ e_insert(c)
 
     if (Argument == 1) {  	/* How was this optimized ???? */
 
-	if ((replacemode == 1) || (replacemode == 2)) {
+	if (inputmode != MODE_INSERT) {
 	    UndoBuf[UndoSize++] = *Cursor;
 	    UndoBuf[UndoSize] = '\0';
 	    c_delafter(1);   /* Do NOT use the saving ONE */
@@ -1125,7 +1133,7 @@ e_insert(c)
 	RefPlusOne();		/* fast refresh for one char. */
     }
     else {
-	if ((replacemode == 1) || (replacemode == 2)) {
+	if (inputmode != MODE_INSERT) {
 
 	    for(i=0;i<Argument;i++) 
 		UndoBuf[UndoSize++] = *(Cursor+i);
@@ -1141,7 +1149,7 @@ e_insert(c)
 	Refresh();
     }
 
-    if (replacemode == 2)
+    if (inputmode == MODE_REPLACE_1)
 	(void) v_cmd_mode(0);
 
     return(CC_NORM);
@@ -1199,6 +1207,11 @@ e_digit(c)			/* gray magic here */
 	if (LastChar + 1 >= InputLim)
 	    return CC_ERROR;	/* end of buffer space */
 
+	if (inputmode != MODE_INSERT) {
+	    UndoBuf[UndoSize++] = *Cursor;
+	    UndoBuf[UndoSize] = '\0';
+	    c_delafter(1);   /* Do NOT use the saving ONE */
+    	}
 	c_insert(1);
 	*Cursor++ = c;
 	DoingArg = 0;		/* just in case */
@@ -1319,7 +1332,7 @@ e_toggle_hist(c)
 
     if (!CurrentHistLit) {
 	if (hp->histline) {
-	    copyn(InputBuf, hp->histline, INBUFSIZ);
+	    copyn(InputBuf, hp->histline, INBUFSIZE);
 	    CurrentHistLit = 1;
 	}
 	else {
@@ -1362,7 +1375,7 @@ e_up_hist(c)
     *LastChar = '\0';		/* just in case */
 
     if (Hist_num == 0) {	/* save the current buffer away */
-	copyn(HistBuf, InputBuf, INBUFSIZ);
+	copyn(HistBuf, InputBuf, INBUFSIZE);
 	LastHist = HistBuf + (LastChar - InputBuf);
     }
 
@@ -1420,7 +1433,7 @@ c_hsetpat()
 {
     if (LastCmd != F_UP_SEARCH_HIST && LastCmd != F_DOWN_SEARCH_HIST) {
 	patlen = Cursor - InputBuf;
-	if (patlen >= INBUFSIZ) patlen = INBUFSIZ -1;
+	if (patlen >= INBUFSIZE) patlen = INBUFSIZE -1;
 	if (patlen >= 0)  {
 	    (void) Strncpy(patbuf, InputBuf, patlen);
 	    patbuf[patlen] = '\0';
@@ -1458,7 +1471,7 @@ e_up_search_hist(c)
 
     if (Hist_num == 0)
     {
-	copyn(HistBuf, InputBuf, INBUFSIZ);
+	copyn(HistBuf, InputBuf, INBUFSIZE);
 	LastHist = HistBuf + (LastChar - InputBuf);
     }
 
@@ -1474,7 +1487,7 @@ e_up_search_hist(c)
 
     while (hp != NULL) {
 	if (hp->histline == NULL) {
-	    Char sbuf[BUFSIZ];
+	    Char sbuf[BUFSIZE];
 	    hp->histline = Strsave(sprlex(sbuf, &hp->Hlex));
 	}
 #ifdef SDEBUG
@@ -1524,7 +1537,7 @@ e_down_search_hist(c)
 
     for (h = 1; h < Hist_num && hp; h++) {
 	if (hp->histline == NULL) {
-	    Char sbuf[BUFSIZ];
+	    Char sbuf[BUFSIZE];
 	    hp->histline = Strsave(sprlex(sbuf, &hp->Hlex));
 	}
 #ifdef SDEBUG
@@ -1585,10 +1598,10 @@ e_run_fg_editor(c)
     register struct process *pp;
     extern bool tellwhat;
 
-    if ((pp = find_stop_ed()) != PNULL) {
+    if ((pp = find_stop_ed()) != NULL) {
 	/* save our editor state so we can restore it */
 	tellwhat = 1;
-	copyn(WhichBuf, InputBuf, INBUFSIZ);
+	copyn(WhichBuf, InputBuf, INBUFSIZE);
 	LastWhich = WhichBuf + (LastChar - InputBuf);
 	CursWhich = WhichBuf + (Cursor - InputBuf);
 	HistWhich = Hist_num;
@@ -1637,6 +1650,14 @@ e_expand_glob(c)
     return(CC_EXPAND_GLOB);
 }
 
+/*ARGSUSED*/
+CCRETVAL
+e_normalize_path(c)
+    int c;
+{
+    *LastChar = '\0';		/* just in case */
+    return(CC_NORMALIZE_PATH);
+}
 /*ARGSUSED*/
 CCRETVAL
 e_expand_vars(c)
@@ -2537,7 +2558,7 @@ v_replone(c)
     int c;
 {				/* vi mode overwrite one character */
     c_alternativ_key_map(0);
-    replacemode = 2;
+    inputmode = MODE_REPLACE_1;
     UndoAction = CHANGE;	/* Set Up for VI undo command */
     UndoPtr = Cursor;
     UndoSize = 0;
@@ -2550,7 +2571,7 @@ v_replmode(c)
     int c;
 {				/* vi mode start overwriting */
     c_alternativ_key_map(0);
-    replacemode = 1;
+    inputmode = MODE_REPLACE;
     UndoAction = CHANGE;	/* Set Up for VI undo command */
     UndoPtr = Cursor;
     UndoSize = 0;
@@ -2709,17 +2730,25 @@ e_cleardisp(c)
 CCRETVAL
 e_tty_int(c)
     int c;
-{
+{			
+#ifdef _MINIX
+    /* SAK PATCH: erase all of current line, start again */
+    ResetInLine();		/* reset the input pointers */
+    xputchar('\n');
+    ClearDisp();
+    return (CC_REFRESH);
+#else /* !_MINIX */
     /* do no editing */
-    return(CC_NORM);
+    return (CC_NORM);
+#endif /* _MINIX */
 }
-
+  
 /*ARGSUSED*/
 CCRETVAL
 e_insovr(c)
     int c;
 {
-    replacemode = !replacemode;
+    inputmode = (inputmode == MODE_INSERT ? MODE_REPLACE : MODE_INSERT);
     return(CC_NORM);
 }
 

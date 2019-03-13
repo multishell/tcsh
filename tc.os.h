@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.os.h,v 3.17 1991/10/21 17:24:49 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tc.os.h,v 3.22 1991/11/26 04:28:26 christos Exp $ */
 /*
  * tc.os.h: Shell os dependent defines
  */
@@ -47,14 +47,6 @@
 # define BACKPIPE
 #endif /* SVID > 3 */
 
-
-#if SVID > 0 && SVID < 3 && !defined(BSDSIGS)
-/*
- * If we have unreliable signals...
- */
-# define UNRELSIG
-#endif /* SVID > 0 && SVID < 3 && !BSDSIGS */
-
 #ifdef OREO
 # include <sys/time.h>
 # include <sys/resource.h>
@@ -71,9 +63,14 @@
 # ifdef ARG_MAX
 #  define NCARGS ARG_MAX
 # else
-#  define NCARGS 1024
+#  ifdef _MINIX
+#   define NCARGS 80
+#  else /* !_MINIX */
+#   define NCARGS 1024
+#  endif /* _MINIX */
 # endif /* ARG_MAX */
 #endif /* NCARGS */
+
 #ifdef titan
 extern int end;
 #endif /* titan */
@@ -172,6 +169,23 @@ struct ucred {
 # endif /* S_IFMT */
 #endif /* ISC */
 
+#ifdef uts
+/*
+ * The uts 2.1.2 macros (Amdahl) are busted!
+ * You should fix <sys/stat.h>, cause other programs will break too!
+ *
+ * From: creiman@ncsa.uiuc.edu (Charlie Reiman)
+ */
+# undef S_ISDIR
+# undef S_ISCHR
+# undef S_ISBLK
+# undef S_ISREG
+# undef S_ISFIFO
+# undef S_ISNAM
+# undef S_ISLNK
+# undef S_ISSOCK
+#endif /* uts */
+
 #ifdef S_IFMT
 # if !defined(S_ISDIR) && defined(S_IFDIR)
 #  define S_ISDIR(a)	(((a) & S_IFMT) == S_IFDIR)
@@ -188,9 +202,6 @@ struct ucred {
 # if !defined(S_ISFIFO) && defined(S_IFIFO)
 #  define S_ISFIFO(a)	(((a) & S_IFMT) == S_IFIFO)
 # endif	/* ! S_ISFIFO && S_IFIFO */
-# if !defined(S_ISNAM) && defined(S_IFNAM)
-#  define S_ISNAM(a)	(((a) & S_IFMT) == S_IFNAM)
-# endif	/* ! S_ISNAM && S_IFNAM */
 # if !defined(S_ISNAM) && defined(S_IFNAM)
 #  define S_ISNAM(a)	(((a) & S_IFMT) == S_IFNAM)
 # endif	/* ! S_ISNAM && S_IFNAM */
@@ -284,12 +295,12 @@ struct ucred {
 # define NEEDtcgetpgrp
 #endif /* BSDJOBS && !(POSIX && POSIXJOBS) */
 
-#ifdef notdef /* RENO */
+#ifdef RENO 
 /*
- * Older versions of RENO had this broken. It is fixed now. 
+ * RENO has this broken. It is fixed on 4.4BSD
  */
 # define NEEDtcgetpgrp
-#endif /* notdef */ /* RENO */
+#endif /* RENO */
 
 #ifdef DGUX
 # define setpgrp(a, b) setpgrp2(a, b)
@@ -308,6 +319,19 @@ struct ucred {
 #  define	NOFILE	64
 # endif	/* NOFILE */
 #endif /* SXA */
+
+#ifdef _MINIX
+# ifndef NOFILE
+#  define NOFILE 64
+# endif /* NOFILE */
+/*
+ * Minix does not have these, so...
+ */
+# define nice(a)		/**/
+# define ulimit(a, b)		(0x003fffff)
+# define getpgrp()		getpid()
+# define gethostname(a, b)	(strncpy((a), "minix") == NULL)
+#endif /* _MINIX */
 
 #ifndef POSIX
 # define mygetpgrp()    getpgrp(0)
@@ -443,6 +467,9 @@ extern void endpwent();
 
 #ifndef __STDC__
 extern struct passwd *getpwuid(), *getpwnam(), *getpwent();
+#ifdef PW_SHADOW
+extern struct spwd *getspnam(), *getspent();
+#endif /* PW_SHADOW */
 #endif /* __STDC__ */
 
 # ifndef getwd
@@ -458,9 +485,6 @@ extern char *getwd();
 extern char *ttyname();   
 # endif /* SCO */
 
-# ifdef RENO
-extern void perror();		/* Reno declares that in stdio.h :-( */
-# endif	/* RENO */
 #endif /* POSIX */
 
 #endif /* _h_tc_os */

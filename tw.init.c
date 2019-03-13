@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tw.init.c,v 3.2 1991/10/12 04:23:51 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tw.init.c,v 3.2 1991/10/12 04:23:51 christos Exp $ */
 /*
  * tw.init.c: TwENEX initializations
  */

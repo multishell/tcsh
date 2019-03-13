@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.vers.c,v 3.8 1991/10/13 23:44:48 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tc.vers.c,v 3.12 1991/12/19 22:34:14 christos Exp $ */
 /*
  * tc.vers.c: Version dependent stuff
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.vers.c,v 3.8 1991/10/13 23:44:48 christos Exp $")
+RCSID("$Id: tc.vers.c,v 3.12 1991/12/19 22:34:14 christos Exp $")
 
 #include "patchlevel.h"
 
@@ -49,10 +49,10 @@ gethosttype()
 #ifdef HOSTTYPE	/* Override any system determined hosttypes */
     hosttype = str2short(HOSTTYPE);
 #else
-# ifdef vax
+# if defined(vax) || defined(__vax)
 #  define _havehosttype_
     hosttype = str2short("vax");
-# endif /* vax */
+# endif /* vax || __vax */
 
 # ifdef hp9000 /* hp9000 running MORE/bsd */
 #  ifdef hp300
@@ -180,6 +180,15 @@ gethosttype()
     hosttype = str2short("att3b2");
 # endif /* u3b2 */
 
+#ifdef _MINIX
+# define _havehosttype_
+# ifdef i386
+    hosttype = str2short("minix386");
+# else /* minix ? amoeba or mac? */
+    hosttype = str2short("minix");
+# endif /* i386 */
+#endif /* _MINIX */
+
 # if defined(i386) && SVID > 0
 
 #  if !defined(_havehosttype_) && (defined(ISC) || defined(ISC202))
@@ -278,17 +287,17 @@ gethosttype()
 #  endif 
 # endif /* sony_news */
 
-# ifdef mips
+# if defined(mips) || defined(__mips)
 #  define _havehosttype_
-#  ifdef MIPSEL
-#   ifdef ultrix
+#  if defined(MIPSEL) || defined(__MIPSEL)
+#   if defined(ultrix) || defined(__ultrix)
     hosttype = str2short("decstation");
 #   else
     hosttype = str2short("mips");
-#   endif /* ultrix */
-#  endif /* MIPSEL */
-#  ifdef MIPSEB
-#   ifdef ultrix
+#   endif /* ultrix || __ultrix */
+#  endif /* MIPSEL || __MIPSEL */
+#  if defined(MIPSEB) || defined(__MIPSEB)
+#   if defined(ultrix) || defined(__ultrix)
     hosttype = str2short("decmips");
 #   else
 #    ifdef sgi /* sgi iris 4d */
@@ -300,9 +309,9 @@ gethosttype()
     hosttype = str2short("mips");
 #     endif /* sony_news */
 #    endif /* sgi */
-#   endif /* ultrix */
-#  endif /* MIPSEB */
-# endif /* mips */
+#   endif /* ultrix || __ultrix */
+#  endif /* MIPSEB || __MIPSEB */
+# endif /* mips || __mips */
 
 # ifdef m88k
 #  define _havehosttype_
@@ -338,6 +347,11 @@ gethosttype()
     /* Ken Laprade <laprade@trantor.harris-atd.com> */
     hosttype = str2short("titan");
 # endif /* titan */
+
+# ifdef stellar
+#  define _havehosttype_
+    hosttype = str2short("stellar");
+# endif /* stellar */
 
 # ifdef sgi
 /* Iris 4D is in the mips section; these are the 68k machines. */
@@ -393,7 +407,7 @@ gethosttype()
 void
 fix_version()
 {
-    char    version[BUFSIZ];
+    char    version[BUFSIZE];
 
 #ifdef SHORT_STRINGS
 # define SSSTR "8b"

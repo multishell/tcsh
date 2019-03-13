@@ -1,3 +1,76 @@
+V6.01.00, 12/19/91 [for comp.sources.unix]
+22. Restore the original prompt in automatic correction when the user
+    asks to re-edit the command.
+21. Better error for unreadable files in tw.parse.c
+20. Sequent patches.
+19. (V6.00.08 beta 12/14/91)
+18. Filenames containing # were spelled/expanded incorrectly.
+17. Stellar/stellix port.
+16. Hpux 8.0 has SIGWINDOW but we cannot get the window size. Protect
+    against window changes updating $LINES and $COLUMNS.
+15. Mach setpath did not work right.
+14. Mach does not need setenv in lib; in fact that does not work right.
+13. shell level gets decremented when we exec.
+12. restart_fg_editor picked the wrong editor if arg contained a slash.
+    e.g vi ~/.cshrc
+11. (V6.00.07 beta 12/08/91)
+10. Allow use of vfork() on systems that do not have job control.
+9.  Avoid NUMCC from being defined twice.
+8.  (V6.00.06 beta 12/05/91)
+7.  SunOS3's FIOCLEX dups...
+6.  Yet another globbing bug fix from Michael (echo .[^.])
+5.  Ultrix now wants __ before cpp symbols.
+4.  Workaround sun's header files inconsistency so tcsh can be compiled
+    with #undef POSIX
+3.  Fixed limit stuff so that large values don't cause errors.
+2.  Fixed =1 and ~user error messages (Per)
+1.  (beta-5 6.00.04 == 6.00.05)
+
+$#*
+$#* New numbering scheme (The last 2 digits are reserved for beta releases
+$#* from now on. So we start at 6.00.06 which is 6.00.04 beta 6, and we are
+$#* going to release 6.01.00...
+$#*
+
+V6.00.04, (never released)
+34. (beta-5 11/25/91)
+33. Simplify code in BindArrowKeys()
+32. Get rid of the PNULL's
+31. Support for shadow password in locking code. (From Kimmo)
+30. Normalize-path editor function.
+29. (beta-4 11/21/91)
+28. minix additions
+27. bindkey fixes (-c addition, casting cleanups)
+26. (beta-3 11/16/91)
+25. Prompt length checking. 
+24. Michael's fixes for the watching code. Tcsh could core dump when using
+    a corrupted utmp.
+23. overwrite mode flag, and autologout locking code.
+22. overwrite mode would still insert digits!
+21. Get the value of _POSIX_VDISABLE from pathconf...
+20. Hpux 8.0 fixes. Sigstack botches with shared libraries. Ansi mode
+    static initialization of structures with prototyped function pointers
+    gives spurious warnings...
+19. Onintr in /etc rc files is disabled.
+18. (beta-2 11/03/91)
+17. Multi-line aliases with `` bug fix.
+16. Sticky emacs overwrite mode.
+15. Autolist option.
+14. Fix for redirection with wildcard filanames.
+13. No error correction for multi-line commands.
+12. Esix-4 re-defines p_pid. Argh...
+11. (beta-1 10/28/91)
+10. Foreach loops were broken again.
+9.  SUNOS localtime() bug does not only happen on the 8th byte. [Michael]
+8.  sh.dir.c, memory corruption in dinit(). Thanks Michael.
+7.  uts broken <sys/stat.h> work-around, and has a wait3()
+6.  SGI (-t filename) extension, returns true when filename is a tty.
+5.  'default:' addition in all switch() statements.
+4.  oflag was not being updated correctly in Rawmode()
+3.  missing 'break;' in prompt code '%y'.
+2.  infinite loop in :a<mod> code.
+1.  hashstat was not reporting hits+misses
+
 V6.00.03, 10/21/91
 31. watch code now accepts shell patterns.
 30. new hashing code portability fixes.

@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.term.h,v 1.1 1991/10/12 04:23:51 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/ed.term.h,v 1.6 1991/12/14 20:45:46 christos Exp $ */
 /*
  * ed.term.h: Local terminal header
  */
@@ -181,14 +181,17 @@
 #ifndef CSWTCH
 # define CSWTCH		_POSIX_VDISABLE
 #endif /* CSWTCH */
+#ifndef CDSWTCH
+# define CDSWTCH	_POSIX_VDISABLE
+#endif /* CDSWTCH */
 #ifndef CERASE2
 # define CERASE2	_POSIX_VDISABLE
 #endif /* CERASE2 */
 #ifndef CSTART
-# define CSTART		CONTROL('s')
+# define CSTART		CONTROL('q')
 #endif /* CSTART */
 #ifndef CSTOP
-# define CSTOP		CONTROL('q')
+# define CSTOP		CONTROL('s')
 #endif /* CSTOP */
 #ifndef CSUSP
 # define CSUSP		CONTROL('z')
@@ -238,6 +241,9 @@
 #ifndef CPGOFF
 # define CPGOFF		CONTROL('m')
 #endif /* CPGOFF */
+#ifndef CKILL2
+# define CKILL2		_POSIX_VDISABLE
+#endif /* CKILL2 */
 #ifndef CBRK
 # ifndef masscomp
 #  define CBRK		0377
@@ -252,6 +258,147 @@
 # define CTIME		CEOL
 #endif /* CTIME */
 
+/*
+ * Fix for sun inconsistency. On termio VSUSP and the rest of the
+ * ttychars > NCC are defined. So we undefine them.
+ */
+#if defined(TERMIO) || defined(POSIX)
+# if defined(POSIX) && defined(NCCS)
+#  define NUMCC		NCCS
+# else
+#  ifdef NCC
+#   define NUMCC	NCC
+#  endif /* NCC */
+# endif /* POSIX && NCCS */
+# ifdef NUMCC
+#  ifdef VINTR
+#   if NUMCC <= VINTR
+#    undef VINTR
+#   endif /* NUMCC <= VINTR */
+#  endif /* VINTR */
+#  ifdef VQUIT
+#   if NUMCC <= VQUIT
+#    undef VQUIT
+#   endif /* NUMCC <= VQUIT */
+#  endif /* VQUIT */
+#  ifdef VERASE
+#   if NUMCC <= VERASE
+#    undef VERASE
+#   endif /* NUMCC <= VERASE */
+#  endif /* VERASE */
+#  ifdef VKILL
+#   if NUMCC <= VKILL
+#    undef VKILL
+#   endif /* NUMCC <= VKILL */
+#  endif /* VKILL */
+#  ifdef VEOF
+#   if NUMCC <= VEOF
+#    undef VEOF
+#   endif /* NUMCC <= VEOF */
+#  endif /* VEOF */
+#  ifdef VEOL
+#   if NUMCC <= VEOL
+#    undef VEOL
+#   endif /* NUMCC <= VEOL */
+#  endif /* VEOL */
+#  ifdef VEOL2
+#   if NUMCC <= VEOL2
+#    undef VEOL2
+#   endif /* NUMCC <= VEOL2 */
+#  endif /* VEOL2 */
+#  ifdef VSWTCH
+#   if NUMCC <= VSWTCH
+#    undef VSWTCH
+#   endif /* NUMCC <= VSWTCH */
+#  endif /* VSWTCH */
+#  ifdef VDSWTCH
+#   if NUMCC <= VDSWTCH
+#    undef VDSWTCH
+#   endif /* NUMCC <= VDSWTCH */
+#  endif /* VDSWTCH */
+#  ifdef VERASE2
+#   if NUMCC <= VERASE2
+#    undef VERASE2
+#   endif /* NUMCC <= VERASE2 */
+#  endif /* VERASE2 */
+#  ifdef VSTART
+#   if NUMCC <= VSTART
+#    undef VSTART
+#   endif /* NUMCC <= VSTART */
+#  endif /* VSTART */
+#  ifdef VSTOP
+#   if NUMCC <= VSTOP
+#    undef VSTOP
+#   endif /* NUMCC <= VSTOP */
+#  endif /* VSTOP */
+#  ifdef VWERASE
+#   if NUMCC <= VWERASE
+#    undef VWERASE
+#   endif /* NUMCC <= VWERASE */
+#  endif /* VWERASE */
+#  ifdef VSUSP
+#   if NUMCC <= VSUSP
+#    undef VSUSP
+#   endif /* NUMCC <= VSUSP */
+#  endif /* VSUSP */
+#  ifdef VDSUSP
+#   if NUMCC <= VDSUSP
+#    undef VDSUSP
+#   endif /* NUMCC <= VDSUSP */
+#  endif /* VDSUSP */
+#  ifdef VREPRINT
+#   if NUMCC <= VREPRINT
+#    undef VREPRINT
+#   endif /* NUMCC <= VREPRINT */
+#  endif /* VREPRINT */
+#  ifdef VDISCARD
+#   if NUMCC <= VDISCARD
+#    undef VDISCARD
+#   endif /* NUMCC <= VDISCARD */
+#  endif /* VDISCARD */
+#  ifdef VLNEXT
+#   if NUMCC <= VLNEXT
+#    undef VLNEXT
+#   endif /* NUMCC <= VLNEXT */
+#  endif /* VLNEXT */
+#  ifdef VSTATUS
+#   if NUMCC <= VSTATUS
+#    undef VSTATUS
+#   endif /* NUMCC <= VSTATUS */
+#  endif /* VSTATUS */
+#  ifdef VPAGE
+#   if NUMCC <= VPAGE
+#    undef VPAGE
+#   endif /* NUMCC <= VPAGE */
+#  endif /* VPAGE */
+#  ifdef VPGOFF
+#   if NUMCC <= VPGOFF
+#    undef VPGOFF
+#   endif /* NUMCC <= VPGOFF */
+#  endif /* VPGOFF */
+#  ifdef VKILL2
+#   if NUMCC <= VKILL2
+#    undef VKILL2
+#   endif /* NUMCC <= VKILL2 */
+#  endif /* VKILL2 */
+#  ifdef VBRK
+#   if NUMCC <= VBRK
+#    undef VBRK
+#   endif /* NUMCC <= VBRK */
+#  endif /* VBRK */
+#  ifdef VMIN
+#   if NUMCC <= VMIN
+#    undef VMIN
+#   endif /* NUMCC <= VMIN */
+#  endif /* VMIN */
+#  ifdef VTIME
+#   if NUMCC <= VTIME
+#    undef VTIME
+#   endif /* NUMCC <= VTIME */
+#  endif /* VTIME */
+# endif /* NUMCC */
+#endif /* !POSIX */
+
 #define C_INTR		 0
 #define C_QUIT		 1
 #define C_ERASE		 2
@@ -260,22 +407,24 @@
 #define C_EOL		 5
 #define C_EOL2		 6
 #define C_SWTCH		 7
-#define C_ERASE2	 8
-#define C_START		 9
-#define C_STOP		10
-#define C_WERASE	11
-#define C_SUSP		12
-#define C_DSUSP		13
-#define C_REPRINT	14
-#define C_DISCARD	15
-#define C_LNEXT		16
-#define C_STATUS	17
-#define C_PAGE		18
-#define C_PGOFF		19
-#define C_BRK		20
-#define C_MIN		21
-#define C_TIME		22
-#define C_NCC		23
+#define C_DSWTCH	 8
+#define C_ERASE2	 9
+#define C_START		10
+#define C_STOP		11
+#define C_WERASE	12
+#define C_SUSP		13
+#define C_DSUSP		14
+#define C_REPRINT	15
+#define C_DISCARD	16
+#define C_LNEXT		17
+#define C_STATUS	18
+#define C_PAGE		19
+#define C_PGOFF		20
+#define C_KILL2		21
+#define C_BRK		22
+#define C_MIN		23
+#define C_TIME		24
+#define C_NCC		25
 #define C_SH(A)		(1 << (A))
 
 #endif /* _h_ed_term */

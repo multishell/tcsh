@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/ed.term.c,v 1.4 1991/10/21 17:24:49 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/ed.term.c,v 1.8 1991/12/19 22:34:14 christos Exp $ */
 /*
  * ed.term.c: Low level terminal interface
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.term.c,v 1.4 1991/10/21 17:24:49 christos Exp $")
+RCSID("$Id: ed.term.c,v 1.8 1991/12/19 22:34:14 christos Exp $")
 
 #include "ed.h"
 #include "ed.term.h"
@@ -67,17 +67,18 @@ ttyperm_t ttylist = {
 	{ "nrmal:", (CBREAK|CRMOD|ANYP), (RAW|ECHO|LCASE|VTDELAY|ALLDELAY) },
 	{ "local:", (LCRTBS|LCRTERA|LCRTKIL), (LPRTERA|LFLUSHO) },
 #endif /* TERMIO */
-	{ "chars:", (C_SH(C_MIN)|C_SH(C_TIME)|C_SH(C_SWTCH)|C_SH(C_WERASE)|
-		     C_SH(C_REPRINT)|C_SH(C_SUSP)|C_SH(C_DSUSP)|C_SH(C_EOF)|
-		     C_SH(C_EOL)|C_SH(C_DISCARD)|C_SH(C_PGOFF)|C_SH(C_PAGE)|
-		     C_SH(C_STATUS)|C_SH(C_LNEXT)), 0 }
+	{ "chars:", (C_SH(C_MIN)|C_SH(C_TIME)|C_SH(C_SWTCH)|C_SH(C_DSWTCH)|
+		     C_SH(C_WERASE)|C_SH(C_REPRINT)|C_SH(C_SUSP)|C_SH(C_DSUSP)|
+		     C_SH(C_EOF)|C_SH(C_EOL)|C_SH(C_DISCARD)|C_SH(C_PGOFF)|
+		     C_SH(C_KILL2)|C_SH(C_PAGE)|C_SH(C_STATUS)|C_SH(C_LNEXT)), 
+		     0 }
     },
     {
 #ifdef TERMIO
 	{ "iflag:", 0, IXON | IXOFF },
 	{ "oflag:", 0, 0 },
 	{ "cflag:", 0, 0 },
-	{ "lflag:", 0, ISIG | IEXTEN | PARENB },
+	{ "lflag:", 0, ISIG | IEXTEN },
 #else /* GSTTY */
 	{ "nrmal:", RAW, CBREAK },
 	{ "local:", 0, 0 },
@@ -234,6 +235,12 @@ static struct tcshmodes {
 # ifdef MDMBUF
     { "mdmbuf",	MDMBUF,	M_CONTROL },
 # endif /* MDMBUF */
+# ifdef RCV1EN
+    { "rcv1en",	RCV1EN,	M_CONTROL },
+# endif /* RCV1EN */
+# ifdef XMT1EN
+    { "xmt1en",	XMT1EN,	M_CONTROL },
+# endif /* XMT1EN */
 
 # ifdef	ISIG
     { "isig",	ISIG,	M_LINED },
@@ -289,6 +296,9 @@ static struct tcshmodes {
 # ifdef	ALTWERASE
     { "altwerase",ALTWERASE,M_LINED },
 # endif /* ALTWERASE */
+# ifdef	EXTPROC
+    { "extproc",EXTPROC,M_LINED },
+# endif /* EXTPROC */
 
 #else /* GSTTY */
 
@@ -457,6 +467,9 @@ static struct tcshmodes {
 # if defined(VSWTCH)
     { "swtch",		C_SH(C_SWTCH), 	M_CHAR },
 # endif /* VSWTCH */
+# if defined(VDSWTCH)
+    { "dswtch",		C_SH(C_DSWTCH),	M_CHAR },
+# endif /* VDSWTCH */
 # if defined(VERASE2)
     { "erase2",		C_SH(C_ERASE2),	M_CHAR },
 # endif /* VERASE2 */
@@ -493,6 +506,9 @@ static struct tcshmodes {
 # if defined(VPGOFF) || defined(TIOCGPAGE)
     { "pgoff",		C_SH(C_PGOFF), 	M_CHAR },
 # endif /* VPGOFF */
+# if defined(VKILL2) 
+    { "kill2",		C_SH(C_KILL2), 	M_CHAR },
+# endif /* VKILL2 */
 # if defined(VBRK) || defined(TIOCGETC)
     { "brk",		C_SH(C_BRK), 	M_CHAR },
 # endif /* VBRK */
@@ -516,7 +532,7 @@ dosetty(v, t)
     int aflag = 0;
     Char *s;
     int z = EX_IO;
-    char cmdname[BUFSIZ];
+    char cmdname[BUFSIZE];
 
     setname(strcpy(cmdname, short2str(*v++)));
 
@@ -741,6 +757,9 @@ tty_getchar(td, s)
 # ifdef VSWTCH
 	s[C_SWTCH]	= n->c_cc[VSWTCH];
 # endif /* VSWTCH */
+# ifdef VDSWTCH
+	s[C_DSWTCH]	= n->c_cc[VDSWTCH];
+# endif /* VDSWTCH */
 # ifdef VERASE2
 	s[C_ERASE2]	= n->c_cc[VERASE2];
 # endif /* VERASE2 */
@@ -777,6 +796,9 @@ tty_getchar(td, s)
 # ifdef VPGOFF
 	s[C_PGOFF]	= n->c_cc[VPGOFF];
 # endif /* VPGOFF */
+# ifdef VKILL2
+	s[C_KILL2]	= n->c_cc[VKILL2];
+# endif /* KILL2 */
 # ifdef VMIN
 	s[C_MIN]	= n->c_cc[VMIN];
 # endif /* VMIN */
@@ -873,6 +895,9 @@ tty_setchar(td, s)
 # ifdef VSWTCH
 	n->c_cc[VSWTCH]		= s[C_SWTCH];
 # endif /* VSWTCH */
+# ifdef VDSWTCH
+	n->c_cc[VDSWTCH]	= s[C_DSWTCH];
+# endif /* VDSWTCH */
 # ifdef VERASE2
 	n->c_cc[VERASE2]	= s[C_ERASE2];
 # endif /* VERASE2 */
@@ -909,6 +934,9 @@ tty_setchar(td, s)
 # ifdef VPGOFF
 	n->c_cc[VPGOFF]		= s[C_PGOFF];
 # endif /* VPGOFF */
+# ifdef VKILL2
+	n->c_cc[VKILL2]		= s[C_KILL2];
+# endif /* VKILL2 */
 # ifdef VMIN
 	n->c_cc[VMIN]		= s[C_MIN];
 # endif /* VMIN */

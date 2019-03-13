@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tc.func.c,v 3.11 1991/10/20 01:38:14 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tc.func.c,v 3.20 1991/12/19 22:34:14 christos Exp $ */
 /*
  * tc.func.c: New tcsh builtins.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.func.c,v 3.11 1991/10/20 01:38:14 christos Exp $")
+RCSID("$Id: tc.func.c,v 3.20 1991/12/19 22:34:14 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -49,16 +49,20 @@ RCSID("$Id: tc.func.c,v 3.11 1991/10/20 01:38:14 christos Exp $")
 
 extern time_t t_period;
 extern int do_logout;
+extern int just_signaled;
 static bool precmd_active = 0;
 static bool periodic_active = 0;
 static bool cwdcmd_active = 0;	/* PWP: for cwd_cmd */
 static bool beepcmd_active = 0;
+static void (*alm_fun)() = NULL;
 
-static	void	Reverse		__P((Char *));
-static	void	auto_logout	__P((void));
-static	void	insert		__P((struct wordent *, bool));
-static	void	insert_we	__P((struct wordent *, struct wordent *));
-static	int	inlist		__P((Char *, Char *));
+static	void	 Reverse	__P((Char *));
+static	void	 auto_logout	__P((void));
+static	char	*xgetpass	__P((char *));
+static	void	 auto_lock	__P((void));
+static	void	 insert		__P((struct wordent *, bool));
+static	void	 insert_we	__P((struct wordent *, struct wordent *));
+static	int	 inlist		__P((Char *, Char *));
 
 
 /*
@@ -138,7 +142,7 @@ sprlex(buf, sp0)
 {
     Char   *cp;
 
-    cp = expand_lex(buf, INBUFSIZ, sp0, 0, NCARGS);
+    cp = expand_lex(buf, INBUFSIZE, sp0, 0, NCARGS);
     *cp = '\0';
     return (buf);
 }
@@ -204,10 +208,8 @@ dolist(v, c)
 	/*
 	 * We cannot process a flag therefore we let ls do it right.
 	 */
-	static Char STRls[] =
-	{'l', 's', '\0'};
-	static Char STRmCF[] =
-	{'-', 'C', 'F', '\0'};
+	static Char STRls[] = {'l', 's', '\0'};
+	static Char STRmCF[] = {'-', 'C', 'F', '\0'};
 	struct command *t;
 	struct wordent cmd, *nextword, *lastword;
 	Char   *cp;
@@ -217,9 +219,9 @@ dolist(v, c)
 
 	if (setintr)
 	    omask = sigblock(sigmask(SIGINT)) & ~sigmask(SIGINT);
-#else
+#else /* !BSDSIGS */
 	sighold(SIGINT);
-#endif
+#endif /* BSDSIGS */
 	if (seterr) {
 	    xfree((ptr_t) seterr);
 	    seterr = NULL;
@@ -259,9 +261,9 @@ dolist(v, c)
 	if (setintr)
 #ifdef BSDSIGS
 	    (void) sigsetmask(omask);
-#else
+#else /* !BSDSIGS */
 	    (void) sigrelse(SIGINT);
-#endif
+#endif /* BSDSIGS */
     }
     else {
 	Char   *dp, *tmp, buf[MAXPATHLEN];
@@ -272,7 +274,7 @@ dolist(v, c)
 	    if (*dp == '/' && dp != tmp)
 #ifdef apollo
 		if (dp != &tmp[1])
-#endif
+#endif /* apollo */
 		*dp = '\0';
 	    if (stat(short2str(tmp), &st) == -1) {
 		if (k != i) {
@@ -351,7 +353,7 @@ dosettc(v, c)
     Char  **v;
     struct command *c;
 {
-    char    tv[2][BUFSIZ];
+    char    tv[2][BUFSIZE];
 
     if (!GotTermCaps)
 	GetTermCaps();
@@ -430,23 +432,29 @@ find_stop_ed()
     vpl = strlen(vp);
     epl = strlen(ep);
 
-    if (pcurrent == PNULL)	/* see if we have any jobs */
-	return PNULL;		/* nope */
+    if (pcurrent == NULL)	/* see if we have any jobs */
+	return NULL;		/* nope */
 
     for (pp = proclist.p_next; pp; pp = pp->p_next)
-	if (pp->p_pid == pp->p_jobid) {
+	if (pp->p_procid == pp->p_jobid) {
 	    p = short2str(pp->p_command);
+	    /* get the first word */
+	    for (cp = p; *cp && !isspace(*cp); cp++)
+		continue;
+	    *cp = '\0';
+		
 	    if ((cp = strrchr(p, '/')) != NULL)	/* and it has a path */
 		cp = cp + 1;		/* then we want only the last part */
 	    else
 		cp = p;			/* else we get all of it */
+
 	    /* if we find either in the current name, fg it */
 	    if (strncmp(ep, cp, (size_t) epl) == 0 ||
 		strncmp(vp, cp, (size_t) vpl) == 0)
 		return pp;
 	}
 
-    return PNULL;		/* didn't find a job */
+    return NULL;		/* didn't find a job */
 }
 
 void
@@ -480,10 +488,106 @@ fg_proc_entry(pp)
 
 #ifdef BSDSIGS
     (void) sigsetmask(omask);
-#else
+#else /* !BSDSIGS */
     (void) sigrelse(SIGINT);
-#endif
+#endif /* BSDSIGS */
 
+}
+
+static char *
+xgetpass(prm)
+    char *prm;
+{
+    static char pass[9];
+    int fd, i;
+    sigret_t (*sigint)();
+
+    sigint = (sigret_t (*)()) sigset(SIGINT, SIG_IGN);
+    Rawmode();	/* Make sure, cause we want echo off */
+    if ((fd = open("/dev/tty", O_RDWR)) == -1)
+	fd = SHIN;
+
+    xprintf("%s", prm); flush();
+    for (i = 0;;)  {
+	if (read(fd, &pass[i], 1) < 1 || pass[i] == '\n') 
+	    break;
+	if (i < 8)
+	    i++;
+    }
+	
+    pass[i] = '\0';
+
+    if (fd != SHIN)
+	(void) close(fd);
+    (void) sigset(SIGINT, sigint);
+
+    return(pass);
+}
+	
+/*
+ * Ask the user for his login password to continue working
+ * On systems that have a shadow password, this will only 
+ * work for root, but what can we do?
+ *
+ * If we fail to get the password, then we log the user out
+ * immediately
+ */
+static void
+auto_lock()
+{
+    int i;
+    struct passwd *pw;
+#ifdef PW_SHADOW
+    struct spwd *spw;
+#endif /* PW_SHADOW */
+    extern char *crypt();
+
+
+    /* Get the passwd of our effective user.  */
+    if ((pw = getpwuid(geteuid())) == NULL) {
+      auto_logout();
+      /*NOTREACHED*/
+      return;
+    }
+
+#ifdef PW_SHADOW
+    /* Get the shadowed password. */
+    if ((spw = getspnam(pw->pw_name)) == NULL) {
+      auto_logout();
+      /*NOTREACHED*/
+      return;
+    }
+#endif /* PW_SHADOW */
+
+    setalarm(0);		/* Not for locking any more */
+#ifdef BSDSIGS
+    (void) sigsetmask(sigblock(0) & ~(sigmask(SIGALRM)));
+#else /* !BSDSIGS */
+    (void) sigrelse(SIGALRM);
+#endif /* BSDSIGS */
+    xprintf("\n"); 
+    for (i = 0; i < 5; i++) {
+	char *crpp, *pp;
+	pp = xgetpass("Password:"); 
+#ifdef PW_SHADOW
+	crpp = crypt(pp, spw->sp_pwdp);
+	if (strcmp(crpp, spw->sp_pwdp) == 0) {
+#else /* !PW_SHADOW */
+	crpp = crypt(pp, pw->pw_passwd);
+	if (strcmp(crpp, pw->pw_passwd) == 0) {
+#endif /* PW_SHADOW */
+	    if (GettingInput && !just_signaled) {
+		(void) Rawmode();
+		ClearLines();	
+		ClearDisp();	
+		Refresh();
+	    }
+	    just_signaled = 0;
+	    return;
+	}
+	xprintf("\nIncorrect passwd for %s\n", pw->pw_name);
+    }
+    auto_logout();
 }
 
 static void
@@ -498,7 +602,7 @@ auto_logout()
     child = 1;
 #ifdef TESLA
     do_logout = 1;
-#endif				/* TESLA */
+#endif /* TESLA */
     goodbye(NULL, NULL);
 }
 
@@ -514,16 +618,16 @@ int snum;
 #endif /* UNRELSIGS */
 
     if ((nl = sched_next()) == -1)
-	auto_logout();		/* no other possibility - logout */
+	(*alm_fun)();		/* no other possibility - logout */
     (void) time(&cl);
     if (nl <= cl + 1)
 	sched_run();
     else
-	auto_logout();
-    setalarm();
+	(*alm_fun)();
+    setalarm(1);
 #ifndef SIGVOID
     return (snum);
-#endif
+#endif /* !SIGVOID */
 }
 
 /*
@@ -540,13 +644,11 @@ precmd()
 {
 #ifdef BSDSIGS
     sigmask_t omask;
-#endif
 
-#ifdef BSDSIGS
     omask = sigblock(sigmask(SIGINT));
-#else
+#else /* !BSDSIGS */
     (void) sighold(SIGINT);
-#endif
+#endif /* BSDSIGS */
     if (precmd_active) {	/* an error must have been caught */
 	aliasrun(2, STRunalias, STRprecmd);
 	xprintf("Faulty alias 'precmd' removed.\n");
@@ -559,9 +661,9 @@ leave:
     precmd_active = 0;
 #ifdef BSDSIGS
     (void) sigsetmask(omask);
-#else
+#else /* !BSDSIGS */
     (void) sigrelse(SIGINT);
-#endif
+#endif /* BSDSIGS */
 }
 
 /*
@@ -575,13 +677,11 @@ cwd_cmd()
 {
 #ifdef BSDSIGS
     sigmask_t omask;
-#endif
 
-#ifdef BSDSIGS
     omask = sigblock(sigmask(SIGINT));
-#else
+#else /* !BSDSIGS */
     (void) sighold(SIGINT);
-#endif
+#endif /* BSDSIGS */
     if (cwdcmd_active) {	/* an error must have been caught */
 	aliasrun(2, STRunalias, STRcwdcmd);
 	xprintf("Faulty alias 'cwdcmd' removed.\n");
@@ -594,9 +694,9 @@ leave:
     cwdcmd_active = 0;
 #ifdef BSDSIGS
     (void) sigsetmask(omask);
-#else
+#else /* !BSDSIGS */
     (void) sigrelse(SIGINT);
-#endif
+#endif /* BSDSIGS */
 }
 
 /*
@@ -608,13 +708,11 @@ beep_cmd()
 {
 #ifdef BSDSIGS
     sigmask_t omask;
-#endif
 
-#ifdef BSDSIGS
     omask = sigblock(sigmask(SIGINT));
-#else
+#else /* !BSDSIGS */
     (void) sighold(SIGINT);
-#endif
+#endif /* BSDSIGS */
     if (beepcmd_active) {	/* an error must have been caught */
 	aliasrun(2, STRunalias, STRbeepcmd);
 	xprintf("Faulty alias 'beepcmd' removed.\n");
@@ -627,9 +725,9 @@ beep_cmd()
     beepcmd_active = 0;
 #ifdef BSDSIGS
     (void) sigsetmask(omask);
-#else
+#else /* !BSDSIGS */
     (void) sigrelse(SIGINT);
-#endif
+#endif /* BSDSIGS */
 }
 
 
@@ -645,13 +743,11 @@ period_cmd()
     time_t  t, interval;
 #ifdef BSDSIGS
     sigmask_t omask;
-#endif
 
-#ifdef BSDSIGS
     omask = sigblock(sigmask(SIGINT));
-#else
+#else /* !BSDSIGS */
     (void) sighold(SIGINT);
-#endif
+#endif /* BSDSIGS */
     if (periodic_active) {	/* an error must have been caught */
 	aliasrun(2, STRunalias, STRperiodic);
 	xprintf("Faulty alias 'periodic' removed.\n");
@@ -660,7 +756,7 @@ period_cmd()
     periodic_active = 1;
     if (!whyles && adrof1(STRperiodic, &aliases)) {
 	vp = value(STRtperiod);
-	if (vp == NOSTR)
+	if (vp == NULL)
 	    return;
 	interval = getn(vp);
 	(void) time(&t);
@@ -673,9 +769,9 @@ leave:
     periodic_active = 0;
 #ifdef BSDSIGS
     (void) sigsetmask(omask);
-#else
+#else /* !BSDSIGS */
     (void) sigrelse(SIGINT);
-#endif
+#endif /* BSDSIGS */
 }
 
 /*
@@ -755,7 +851,7 @@ aliasrun(cnt, s1, s2)
 	    beep_cmd();
 	else if (periodic_active)
 	    period_cmd();
-#endif
+#endif /* notdef */
     }
     /* reset the error catcher to the old place */
     resexit(osetexit);
@@ -764,16 +860,32 @@ aliasrun(cnt, s1, s2)
 }
 
 void
-setalarm()
+setalarm(lck)
+    int lck;
 {
     struct varent *vp;
     Char   *cp;
-    unsigned alrm_time = 0;
+    unsigned alrm_time = 0, lock_time;
     time_t cl, nl, sched_dif;
 
     if (vp = adrof(STRautologout)) {
-	if (cp = vp->vec[0])
-	    alrm_time = (atoi(short2str(cp)) * 60);
+	if (cp = vp->vec[0]) {
+	    if ((alrm_time = atoi(short2str(cp)) * 60) > 0)
+		alm_fun = auto_logout;
+	}
+	if ((cp = vp->vec[1])) {
+	    if ((lock_time = atoi(short2str(cp)) * 60) > 0) {
+		if (lck) {
+		    if (alrm_time == 0 || lock_time < alrm_time) {
+			alrm_time = lock_time;
+			alm_fun = auto_lock;
+		    }
+		}
+		else /* lock_time always < alrm_time */
+		    if (alrm_time)
+			alrm_time -= lock_time;
+	    }
+	}
     }
     if ((nl = sched_next()) != -1) {
 	(void) time(&cl);
@@ -784,7 +896,7 @@ setalarm()
     (void) alarm(alrm_time);	/* Autologout ON */
 }
 
-#define RMDEBUG			/* For now... */
+#undef RMDEBUG			/* For now... */
 
 void
 rmstar(cp)
@@ -794,11 +906,9 @@ rmstar(cp)
     register struct wordent *tmp, *del;
 
 #ifdef RMDEBUG
-    static Char STRrmdebug[] =
-    {'r', 'm', 'd', 'e', 'b', 'u', 'g', '\0'};
+    static Char STRrmdebug[] = {'r', 'm', 'd', 'e', 'b', 'u', 'g', '\0'};
     Char   *tag;
-
-#endif
+#endif /* RMDEBUG */
     Char   *charac;
     char    c;
     int     ask, doit, star = 0, silent = 0;
@@ -807,7 +917,7 @@ rmstar(cp)
 	return;
 #ifdef RMDEBUG
     tag = value(STRrmdebug);
-#endif
+#endif /* RMDEBUG */
     we = cp->next;
     while (*we->word == ';' && we != cp)
 	we = we->next;
@@ -815,7 +925,7 @@ rmstar(cp)
 #ifdef RMDEBUG
 	if (*tag)
 	    xprintf("parsing command line\n");
-#endif
+#endif /* RMDEBUG */
 	if (!Strcmp(we->word, STRrm)) {
 	    args = we->next;
 	    ask = (*args->word != '-');
@@ -839,8 +949,10 @@ rmstar(cp)
 			(void) read(SHIN, &c, 1);
 		    if (!doit) {
 			/* remove the command instead */
+#ifdef RMDEBUG
 			if (*tag)
 			    xprintf("skipping deletion of files!\n");
+#endif /* RMDEBUG */
 			for (tmp = we;
 			     *tmp->word != '\n' &&
 			     *tmp->word != ';' && tmp != cp;) {
@@ -874,7 +986,7 @@ rmstar(cp)
 	for (we = cp->next; we != cp; we = we->next)
 	    xprintf("%s ", short2str(we->word));
     }
-#endif
+#endif /* RMDEBUG */
     return;
 }
 
@@ -882,7 +994,7 @@ rmstar(cp)
 /* Check if command is in continue list
    and do a "aliasing" if it exists as a job in background */
 
-#define CNDEBUG			/* For now */
+#undef CNDEBUG			/* For now */
 void
 continue_jobs(cp)
     struct wordent *cp;
@@ -895,14 +1007,13 @@ continue_jobs(cp)
     Char   *tag;
     static Char STRcndebug[] =
     {'c', 'n', 'd', 'e', 'b', 'u', 'g', '\0'};
-
-#endif
+#endif /* CNDEBUG */
     bool    in_cont_list, in_cont_arg_list;
 
 
 #ifdef CNDEBUG
     tag = value(STRcndebug);
-#endif
+#endif /* CNDEBUG */
     continue_list = value(STRcontinue);
     continue_args_list = value(STRcontinue_args);
     if (*continue_list == '\0' && *continue_args_list == '\0')
@@ -915,7 +1026,7 @@ continue_jobs(cp)
 #ifdef CNDEBUG
 	if (*tag)
 	    xprintf("parsing command line\n");
-#endif
+#endif /* CNDEBUG */
 	cmd = we->word;
 	in_cont_list = inlist(continue_list, cmd);
 	in_cont_arg_list = inlist(continue_args_list, cmd);
@@ -923,8 +1034,8 @@ continue_jobs(cp)
 #ifdef CNDEBUG
 	    if (*tag)
 		xprintf("in one of the lists\n");
-#endif
-	    np = PNULL;
+#endif /* CNDEBUG */
+	    np = NULL;
 	    for (pp = proclist.p_next; pp; pp = pp->p_next) {
 		if (prefix(cmd, pp->p_command)) {
 		    if (pp->p_index) {
@@ -950,7 +1061,7 @@ continue_jobs(cp)
 	    xprintf("%s ",
 		    short2str(we->word));
     }
-#endif
+#endif /* CNDEBUG */
     return;
 }
 
@@ -1027,7 +1138,8 @@ insert(plist, file_args)
 
 	now = plist;
 	xfree((ptr_t) now->word);
-	now->word = (Char *) xcalloc(1, (size_t) ((cmd_len + 2) * sizeof(Char)));
+	now->word = (Char *) xcalloc(1, 
+				     (size_t) ((cmd_len + 2) * sizeof(Char)));
 	cp1 = now->word;
 	cp2 = cmd;
 	*cp1++ = '%';
@@ -1084,7 +1196,7 @@ inlist(list, name)
     return (0);
 }
 
-#endif				/* BSDJOBS */
+#endif /* BSDJOBS */
 
 
 /*
@@ -1124,7 +1236,7 @@ gethomedir(us)
     pp = getpwnam(short2str(us));
 #ifdef YPBUGS
     fix_yp_bugs();
-#endif
+#endif /* YPBUGS */
     if (pp != NULL)
 	return Strsave(str2short(pp->pw_dir));
 #ifdef HESIOD
@@ -1159,7 +1271,7 @@ gethomedir(us)
 	    free(*res1);
 	return rp;
     }
-#endif
+#endif /* HESIOD */
     return NULL;
 }
 
@@ -1268,8 +1380,8 @@ doaliases(v, c)
     jmp_buf oldexit;
     Char  **vec, *lp;
     int     fd;
-    Char    buf[BUFSIZ], line[BUFSIZ];
-    char    tbuf[BUFSIZ + 1], *tmp;
+    Char    buf[BUFSIZE], line[BUFSIZE];
+    char    tbuf[BUFSIZE + 1], *tmp;
     extern bool output_raw;	/* PWP: in sh.print.c */
 
     v++;
@@ -1304,7 +1416,7 @@ doaliases(v, c)
 		if (n <= 0) {
 		    int     i;
 
-		    if ((n = read(fd, tbuf, BUFSIZ)) <= 0)
+		    if ((n = read(fd, tbuf, BUFSIZE)) <= 0)
 			goto eof;
 		    for (i = 0; i < n; i++)
 			buf[i] = tbuf[i];
@@ -1338,4 +1450,36 @@ eof:
     if (gargv)
 	blkfree(gargv), gargv = 0;
     resexit(oldexit);
+}
+
+
+/*
+ * set the shell-level var to 1 or apply change to it.
+ */
+void
+shlvl(val)
+    int val;
+{
+    char *cp;
+
+    if ((cp = getenv("SHLVL")) != NULL) {
+
+	val += atoi(cp);
+
+	if (val <= 0) {
+	    unsetv(STRshlvl);
+	    Unsetenv(STRSHLVL);
+	}
+	else {
+	    Char    buff[BUFSIZE];
+
+	    Itoa(val, buff);
+	    set(STRshlvl, Strsave(buff));
+	    Setenv(STRSHLVL, buff);
+	}
+    }
+    else {
+	set(STRshlvl, SAVE("1"));
+	Setenv(STRSHLVL, str2short("1"));
+    }
 }

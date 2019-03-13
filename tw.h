@@ -1,4 +1,4 @@
-/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.00/RCS/tw.h,v 3.0 1991/07/04 21:49:28 christos Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/tw.h,v 3.2 1991/12/14 20:45:46 christos Exp $ */
 /*
  * tw.h: TwENEX functions headers
  */
@@ -90,6 +90,7 @@
 #define equal(a, b)	(strcmp(a, b) == 0)
 
 #define is_set(var)	adrof(var)
+#define ismetahash(a)	(ismeta(a) && (a) != '#')
 
 #define BUILTINS	"/usr/local/lib/builtins/"	/* fake builtin bin */
 #define SEARCHLIST "HPATH"	/* Env. param for helpfile searchlist */
@@ -99,7 +100,7 @@ extern Char PromptBuf[];
 
 typedef enum {
     LIST, RECOGNIZE, PRINT_HELP, SPELL, GLOB, GLOB_EXPAND,
-    VARS_EXPAND
+    VARS_EXPAND, PATH_NORMALIZE
 }       COMMAND;
 
 

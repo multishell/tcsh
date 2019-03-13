@@ -1,4 +1,4 @@
-/* $Header: /afs/sipb.mit.edu/project/tcsh/beta/tcsh-6.00-b3/RCS/sh.decls.h,v 1.2 91/10/02 03:47:43 marc Exp $ */
+/* $Header: /home/hyperion/mu/christos/src/sys/tcsh-6.01/RCS/sh.decls.h,v 3.7 1991/12/14 20:45:46 christos Exp $ */
 /*
  * sh.decls.h	 External declarations from sh*.c
  */
@@ -122,6 +122,7 @@ extern	int		  tenex		__P((Char *, int));
  * sh.func.c
  */
 extern	void		  Setenv	__P((Char *, Char *));
+extern	void		  Unsetenv	__P((Char *));
 extern	void		  doalias	__P((Char **, struct command *));
 extern	void		  dobreak	__P((Char **, struct command *));
 extern	void		  docontin	__P((Char **, struct command *));
@@ -154,9 +155,9 @@ extern	void		  dowhile	__P((Char **, struct command *));
 extern	void		  dozip		__P((Char **, struct command *));
 extern	void		  func		__P((struct command *, 
 					     struct biltins *));
+extern	void		  gotolab	__P((Char *));
 extern struct biltins 	 *isbfunc	__P((struct command *));
 extern	void		  prvars	__P((void));
-extern	void		  search	__P((int, int, Char *));
 extern	int		  srchx		__P((Char *));
 extern	void		  unalias	__P((Char **, struct command *));
 extern	void		  wfree		__P((void));
