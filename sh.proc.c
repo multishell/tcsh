@@ -48,7 +48,7 @@ RCSID("$Id: sh.proc.c,v 3.95 2006/01/12 19:55:38 christos Exp $")
 #endif /* aiws */
 
 #if defined(_BSD) || (defined(IRIS4D) && __STDC__) || defined(__lucid) || defined(linux) || defined(__GNU__) || defined(__GLIBC__)
-# define BSDWAIT
+//# define BSDWAIT
 #endif /* _BSD || (IRIS4D && __STDC__) || __lucid || glibc */
 #ifndef WTERMSIG
 # define WTERMSIG(w)	(((union wait *) &(w))->w_termsig)
