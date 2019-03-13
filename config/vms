@@ -142,6 +142,7 @@
 #include "config_f.h"
 
 #undef NLS
+#undef NLS_CATALOGS
 #undef SYSMALLOC
 #define SYSMALLOC
 

@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/sh.dol.c,v 3.27 1993/12/16 16:51:24 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/sh.dol.c,v 3.30 1995/04/16 19:15:53 christos Exp $ */
 /*
  * sh.dol.c: Variable substitutions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.dol.c,v 3.27 1993/12/16 16:51:24 christos Exp $")
+RCSID("$Id: sh.dol.c,v 3.30 1995/04/16 19:15:53 christos Exp $")
 
 /*
  * C shell
@@ -263,8 +263,11 @@ Dword()
 		    break;
 		if (c == '\n' || c == DEOF)
 		    stderror(ERR_UNMATCHED, c1);
-		if ((c & (QUOTE | TRIM)) == ('\n' | QUOTE))
-		    --wp, ++i;
+		if ((c & (QUOTE | TRIM)) == ('\n' | QUOTE)) {
+		    if ((wp[-1] & TRIM) == '\\')
+			--wp;
+		    ++i;
+		}
 		if (--i <= 0)
 		    stderror(ERR_WTOOLONG);
 		switch (c1) {
@@ -484,7 +487,7 @@ Dgetdol()
 #ifdef BSDSIGS
 	    sigmask_t omask = sigsetmask(sigblock(0) & ~sigmask(SIGINT));
 #else /* !BSDSIGS */
-	    sigrelse(SIGINT);
+	    (void) sigrelse(SIGINT);
 #endif /* BSDSIGS */
 	    for (np = wbuf; read(OLDSTD, &tnp, 1) == 1; np++) {
 		*np = (unsigned char) tnp;
@@ -1000,6 +1003,7 @@ heredoc(term)
     quoted = gflag;
     ocnt = BUFSIZE;
     obp = obuf;
+    inheredoc = 1;
     for (;;) {
 	/*
 	 * Read up a line
@@ -1026,6 +1030,7 @@ heredoc(term)
 	if (c < 0 || eq(lbuf, term)) {
 	    (void) write(0, short2str(obuf), (size_t) (BUFSIZE - ocnt));
 	    (void) lseek(0, 0l, L_SET);
+	    inheredoc = 0;
 	    return;
 	}
 

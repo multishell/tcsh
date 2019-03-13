@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/ed.refresh.c,v 3.16 1994/05/26 13:11:20 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/ed.refresh.c,v 3.16 1994/05/26 13:11:20 christos Exp $ */
 /*
  * ed.refresh.c: Lower level screen refreshing functions
  */

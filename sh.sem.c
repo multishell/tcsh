@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/sh.sem.c,v 3.34 1994/03/13 00:46:35 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/sh.sem.c,v 3.36 1995/04/16 19:15:53 christos Exp $ */
 /*
  * sh.sem.c: I/O redirections and job forking. A touchy issue!
  *	     Most stuff with builtins is incorrect
@@ -37,7 +37,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.sem.c,v 3.34 1994/03/13 00:46:35 christos Exp $")
+RCSID("$Id: sh.sem.c,v 3.36 1995/04/16 19:15:53 christos Exp $")
 
 #include "tc.h"
 
@@ -50,9 +50,9 @@ RCSID("$Id: sh.sem.c,v 3.34 1994/03/13 00:46:35 christos Exp $")
 #endif /* CLOSE_ON_EXEC */
 
 #if defined(__sparc__) || defined(sparc)
-# if !defined(MACH) && SYSVREL == 0 && !defined(Lynx)
+# if !defined(MACH) && SYSVREL == 0 && !defined(Lynx) && !defined(__NetBSD__)
 #  include <vfork.h>
-# endif /* !MACH && SYSVREL == 0 */
+# endif /* !MACH && SYSVREL == 0 && !Lynx && !__NetBSD__ */
 #endif /* __sparc__ || sparc */
 
 #ifdef VFORK
@@ -769,7 +769,7 @@ doio(t, pipein, pipeout)
 {
     register int fd;
     register Char *cp;
-    register int flags = t->t_dflg;
+    register unsigned long flags = t->t_dflg;
 
     if (didfds || (flags & F_REPEAT))
 	return;

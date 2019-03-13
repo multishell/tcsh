@@ -119,5 +119,6 @@
 /* have been moved to config_f.h */
 #include "config_f.h"
 #undef NLS
+#undef NLS_CATALOGS
 #define SYSMALLOC
 #endif /* _h_config */

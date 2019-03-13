@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/tw.comp.c,v 1.26 1994/03/31 22:36:44 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/tw.comp.c,v 1.29 1995/03/12 04:49:26 christos Exp $ */
 /*
  * tw.comp.c: File completion builtin
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tw.comp.c,v 1.26 1994/03/31 22:36:44 christos Exp $")
+RCSID("$Id: tw.comp.c,v 1.29 1995/03/12 04:49:26 christos Exp $")
 
 #include "tw.h"
 #include "ed.h"
@@ -53,7 +53,7 @@ static void	  	  tw_pr		__P((Char **));
 static int	  	  tw_match	__P((Char *, Char *));
 static void	 	  tw_prlist	__P((struct varent *));
 static Char  		 *tw_dollar	__P((Char *,Char **, int, Char *, 
-					     int, char *));
+					     int, const char *));
 
 /* docomplete():
  *	Add or list completions in the completion list
@@ -265,7 +265,7 @@ tw_match(str, pat)
     xprintf("%s, ", short2str(pat));
     xprintf("%s) = %d [%d]\n", short2str(estr), rv, estr - str);
 #endif /* TDEBUG */
-    return (rv ? estr - str : 0);
+    return (rv ? estr - str : -1);
 }
 
 
@@ -416,7 +416,7 @@ tw_dollar(str, wl, nwl, buffer, sep, msg)
     int nwl;
     Char *buffer;
     int sep;
-    char *msg;
+    const char *msg;
 {
     Char *sp, *bp = buffer, *ebp = &buffer[MAXPATHLEN];
 
@@ -546,18 +546,26 @@ tw_complete(line, word, pat, looking, suf)
 	case 'p':
 	    break;
 	default:
-	    stderror(ERR_COMPINV, "command", cmd);
+	    stderror(ERR_COMPINV, CGETS(27, 1, "command"), cmd);
 	    return TW_ZERO;
 	}
 
 	sep = ptr[1];
 	if (!Ispunct(sep)) {
-	    stderror(ERR_COMPINV, "separator", sep);
+	    stderror(ERR_COMPINV, CGETS(27, 2, "separator"), sep);
 	    return TW_ZERO;
 	}
 
-	ptr = tw_dollar(&ptr[2], wl, wordno, ran, sep, "pattern");
-	ptr = tw_dollar(ptr, wl, wordno, com, sep, "completion"); 
+	ptr = tw_dollar(&ptr[2], wl, wordno, ran, sep,
+			CGETS(27, 3, "pattern"));
+	if (ran[0] == '\0')	/* check for empty pattern (disallowed) */
+	{
+	    stderror(ERR_COMPINC, cmd == 'p' ?  CGETS(27, 4, "range") :
+		     CGETS(27, 3, "pattern"), "");
+	    return TW_ZERO;
+	}
+
+	ptr = tw_dollar(ptr, wl, wordno, com, sep, CGETS(27, 5, "completion")); 
 
 	if (*ptr != '\0') {
 	    if (*ptr == sep)
@@ -603,7 +611,7 @@ tw_complete(line, word, pat, looking, suf)
 #ifdef TDEBUG
 	    xprintf("%c: ", cmd);
 #endif /* TDEBUG */
-	    if ((n = tw_match(pos, ran)) == 0)
+	    if ((n = tw_match(pos, ran)) < 0)
 		continue;
 	    if (cmd == 'c')
 		*word += n;
@@ -613,5 +621,6 @@ tw_complete(line, word, pat, looking, suf)
 	    return TW_ZERO;	/* Cannot happen */
 	}
     }
+    *suf = '\0';
     return TW_ZERO;
 } /* end tw_complete */

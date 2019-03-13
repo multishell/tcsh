@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/tw.init.c,v 3.18 1993/10/08 19:21:56 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/tw.init.c,v 3.18 1993/10/08 19:21:56 christos Exp $ */
 /*
  * tw.init.c: Handle lists of things to complete
  */

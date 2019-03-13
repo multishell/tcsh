@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/sh.dir.c,v 3.37 1994/03/13 00:46:35 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/sh.dir.c,v 3.40 1995/04/16 19:15:53 christos Exp $ */
 /*
  * sh.dir.c: Directory manipulation functions
  */
@@ -36,12 +36,13 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.dir.c,v 3.37 1994/03/13 00:46:35 christos Exp $")
+RCSID("$Id: sh.dir.c,v 3.40 1995/04/16 19:15:53 christos Exp $")
 
 /*
  * C Shell - directory management
  */
 
+static	void			 dstart		__P((const char *));
 static	struct directory	*dfind		__P((Char *));
 static	Char 			*dfollow	__P((Char *));
 static	void 	 	 	 printdirs	__P((int));
@@ -57,6 +58,13 @@ static int    printd;			/* force name to be printed */
 
 int     bequiet = 0;		/* do not print dir stack -strike */
 
+static void
+dstart(from)
+    const char *from;
+{
+    xprintf(CGETS(12, 1, "tcsh: Trying to start from \"%s\"\n"), from);
+}
+
 /*
  * dinit - initialize current working directory
  */
@@ -68,7 +76,6 @@ dinit(hp)
     register Char *cp;
     register struct directory *dp;
     char    path[MAXPATHLEN];
-    static char *emsg = "tcsh: Trying to start from \"%s\"\n";
 
     /* Don't believe the login shell home, because it may be a symlink */
     tcp = (char *) getwd(path);
@@ -76,7 +83,7 @@ dinit(hp)
 	xprintf("tcsh: %s\n", path);
 	if (hp && *hp) {
 	    tcp = short2str(hp);
-	    xprintf(emsg, tcp);
+	    dstart(tcp);
 	    if (chdir(tcp) == -1)
 		cp = NULL;
 	    else
@@ -85,7 +92,7 @@ dinit(hp)
 	else
 	    cp = NULL;
 	if (cp == NULL) {
-	    xprintf(emsg, "/");
+	    dstart("/");
 	    if (chdir("/") == -1)
 		/* I am not even try to print an error message! */
 		xexit(1);
@@ -147,14 +154,14 @@ Char *dp;
     tsetenv(STRPWD, dp);
 }
 
-#define DIR_PRINT	0x01
-#define DIR_LONG  	0x02
-#define DIR_VERT  	0x04
-#define DIR_LINE  	0x08
-#define DIR_SAVE 	0x10
-#define DIR_LOAD	0x20
-#define DIR_CLEAR	0x40
-#define DIR_OLD	  	0x80
+#define DIR_PRINT	0x01	/* -p */
+#define DIR_LONG  	0x02	/* -l */
+#define DIR_VERT  	0x04	/* -v */
+#define DIR_LINE  	0x08	/* -n */
+#define DIR_SAVE 	0x10	/* -S */
+#define DIR_LOAD	0x20	/* -L */
+#define DIR_CLEAR	0x40	/* -c */
+#define DIR_OLD	  	0x80	/* - */
 
 static int
 skipargs(v, dstr, str)
@@ -164,22 +171,29 @@ skipargs(v, dstr, str)
 {
     Char  **n = *v, *s;
 
-    int dflag = 0;
-    for (n++; *n != NULL && (*n)[0] == '-'; n++) 
-	if (*(s = &((*n)[1])) == '\0')
+    int dflag = 0, loop = 1;
+    for (n++; loop && *n != NULL && (*n)[0] == '-'; n++) 
+	if (*(s = &((*n)[1])) == '\0')	/* test for bare "-" argument */
 	    dflag |= DIR_OLD;
 	else {
 	    char *p;
-	    if ((p = strchr(dstr, *s)) != NULL)
-		dflag |= (1 << (p - dstr));
-	    else {
-		stderror(ERR_DIRUS, short2str(**v), dstr, str);
-		break;
+	    while (loop && *s != '\0')	/* examine flags */
+	    {
+		if ((p = strchr(dstr, *s++)) != NULL)
+		    dflag |= (1 << (p - dstr));
+	        else {
+		    stderror(ERR_DIRUS, short2str(**v), dstr, str);
+		    loop = 0;	/* break from both loops */
+		    break;
+	        }
 	    }
 	}
     if (*n && (dflag & DIR_OLD))
 	stderror(ERR_DIRUS, short2str(**v), dstr, str);
     *v = n;
+    /* make -l, -v, and -n imply -p */
+    if (dflag & (DIR_LONG|DIR_VERT|DIR_LINE))
+	dflag |= DIR_PRINT;
     return dflag;
 }
 
@@ -450,8 +464,6 @@ dochngd(v, c)
 	dcwd->di_next->di_prev = dcwd->di_prev;
 	dfree(dcwd);
 	dnewcwd(dp, dflag);
-	if (dflag & DIR_PRINT)
-	    printdirs(dflag);
 	return;
     }
     else
@@ -466,8 +478,6 @@ dochngd(v, c)
     dp->di_next->di_prev = dp;
     dfree(dcwd);
     dnewcwd(dp, dflag);
-    if (dflag & DIR_PRINT)
-	printdirs(dflag);
 }
 
 static Char *
@@ -687,8 +697,6 @@ dopushd(v, c)
 	dp->di_next->di_prev = dp;
     }
     dnewcwd(dp, dflag);
-    if (dflag & DIR_PRINT)
-	printdirs(dflag);
 }
 
 /*
@@ -761,8 +769,6 @@ dopopd(v, c)
     dp->di_next->di_prev = dp->di_prev;
     if (dp == dcwd) {
 	dnewcwd(p, dflag);
-	if (dflag & DIR_PRINT)
-	    printdirs(dflag);
     }
     else {
 	printdirs(dflag);
@@ -1135,6 +1141,7 @@ dnewcwd(dp, dflag)
     register struct directory *dp;
     int dflag;
 {
+    int print;
 
     if (adrof(STRdunique)) {
 	struct directory *dn;
@@ -1150,8 +1157,14 @@ dnewcwd(dp, dflag)
     dcwd = dp;
     dset(dcwd->di_name);
     dgetstack();
-    if (printd && !(adrof(STRpushdsilent))	/* PWP: pushdsilent */
-	&& !bequiet)		/* be quite while restoring stack -strike */
+    print = printd;		/* if printd is set, print dirstack... */
+    if (adrof(STRpushdsilent))	/* but pushdsilent overrides printd... */
+	print = 0;
+    if (dflag & DIR_PRINT)	/* but DIR_PRINT overrides pushdsilent... */
+	print = 1;
+    if (bequiet)		/* and bequiet overrides everything */
+	print = 0;
+    if (print)
 	printdirs(dflag);
     cwd_cmd();			/* PWP: run the defined cwd command */
 }
@@ -1203,7 +1216,7 @@ dgetstack()
 
     for (dn = dhead.di_prev; dn != &dhead; dn = dn->di_prev, i++) 
 	continue;
-    dbp = dblk = (Char**) xmalloc((i + 1) * sizeof(Char *));
+    dbp = dblk = (Char**) xmalloc((size_t) (i + 1) * sizeof(Char *));
     for (dn = dhead.di_prev; dn != &dhead; dn = dn->di_prev, dbp++) 
 	 *dbp = Strsave(dn->di_name);
     *dbp = NULL;
@@ -1316,7 +1329,7 @@ recdirs(fname, def)
     }
 
     if ((snum = varval(STRsavedirs)) == STRNULL) 
-	num = ~0;
+	num = (unsigned int) ~0;
     else
 	num = (unsigned int) atoi(short2str(snum));
 

@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/tw.h,v 3.18 1994/05/26 13:11:20 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/tw.h,v 3.18 1994/05/26 13:11:20 christos Exp $ */
 /*
  * tw.h: TwENEX functions headers
  */

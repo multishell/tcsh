@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/sh.types.h,v 3.31 1994/04/12 15:46:46 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/sh.types.h,v 3.33 1995/04/29 22:28:24 christos Exp $ */
 /* sh.types.h: Do the necessary typedefs for each system.
  *             Up till now I avoided making this into a separate file
  *	       But I just wanted to eliminate the whole mess from sh.h
@@ -109,7 +109,7 @@
 
 
 /***
- *** Hp's running hpux 7.0
+ *** Hp's running hpux 7.0 or 8.0
  ***/
 #ifdef __hpux
 # ifndef _SIZE_T
@@ -141,10 +141,6 @@ extern uid_t getuid(), geteuid();
 extern gid_t getgid(), getegid();
 extern sigmask_t sigblock();
 extern sigmask_t sigsetmask();
-#ifdef notdef	/* XXX: Not true for 8.0 */
-extern void sigpause();
-extern sigmask_t sigspace();
-#endif
 extern pid_t getpid();
 extern pid_t fork();
 extern void perror();
@@ -154,7 +150,9 @@ extern void qsort();
 extern void free();
 extern unsigned int alarm();
 extern unsigned int sleep();
-#ifdef notdef	/* XXX: Not true for 8.0 */
+# if HPUXVERSION < 800	/* XXX: Not true for 8.0 */
+extern void sigpause();
+extern sigmask_t sigspace();
 extern int lstat();
 extern int readlink();
 extern int sigvector();
@@ -162,7 +160,7 @@ extern int gethostname();
 extern int ioctl();
 extern int nice();
 extern char *sbrk();
-#endif
+# endif /* HPUXVERSION < 800 */
 #endif /* __hpux */
 
 #if defined(_MINIX) || defined(__EMX__) || defined(COHERENT)
@@ -533,6 +531,15 @@ typedef char * caddr_t;
 #  define _SIZE_T
 # endif /* _SIZE_T */
 #endif /* _VMS_POSIX */
+
+/***
+ *** a pdp/11, running 2BSD
+ ***/
+#ifdef pdp11
+# ifndef _PID_T
+#  define _PID_T
+# endif /* _PID_T */
+#endif /* pdp11 */
 
 /***
  *** Catch all for non POSIX and/or non ANSI systems.

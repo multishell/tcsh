@@ -145,5 +145,6 @@
 
 #ifndef NeXT
 #undef NLS
+#undef NLS_CATALOGS
 #endif
 #endif /* _h_config */

@@ -24,7 +24,9 @@
 
 #if __STDC__ && !defined(__GNUC__)
 # define _POSIX_SOURCE
-# define _HPUX_SOURCE
+# ifndef _HPUX_SOURCE
+# define  _HPUX_SOURCE
+# endif /* !_HPUX_SOURCE */
 #endif
 
 /*
@@ -133,6 +135,9 @@
 #ifdef __hpux
 # define NAMEI_BUG	/* Great! you broke that one too */
 #endif
+
+#define HPUXVERSION 700	/* For HP-UX version 7.00 */
+
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"

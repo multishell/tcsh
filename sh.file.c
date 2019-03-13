@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/sh.file.c,v 3.9 1994/03/13 00:46:35 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/sh.file.c,v 3.12 1995/04/29 22:28:24 christos Exp $ */
 /*
  * sh.file.c: File completion for csh. This file is not used in tcsh.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.file.c,v 3.9 1994/03/13 00:46:35 christos Exp $")
+RCSID("$Id: sh.file.c,v 3.12 1995/04/29 22:28:24 christos Exp $")
 
 #ifdef FILEC
 
@@ -96,9 +96,9 @@ setup_tty(on)
 {
 #ifdef TERMIO
 # ifdef POSIX
-    static struct termios tchars;
+    struct termios tchars;
 # else
-    static struct termio tchars;
+    struct termio tchars;
 # endif /* POSIX */
 
 # ifdef POSIX
@@ -110,9 +110,9 @@ setup_tty(on)
 	tchars.c_cc[VEOL] = ESC;
 	if (tchars.c_lflag & ICANON)
 # ifdef POSIX
-	    on = TCSANOW;
+	    on = TCSADRAIN;
 # else
-	    on = TCSETAW;
+	    on = TCSETA;
 # endif /* POSIX */
 	else {
 # ifdef POSIX
@@ -127,9 +127,9 @@ setup_tty(on)
     else {
 	tchars.c_cc[VEOL] = _POSIX_VDISABLE;
 # ifdef POSIX
-	on = TCSANOW;
+	on = TCSADRAIN;
 # else
-        on = TCSETAW;
+        on = TCSETA;
 # endif /* POSIX */
     }
 # ifdef POSIX
@@ -618,9 +618,10 @@ again:				/* search for matches */
 	    continue;
 	if (command == LIST) {
 	    if (numitems >= MAXITEMS) {
-		xprintf("\nYikes!! Too many %s!!\n",
+		xprintf(CGETS(14, 1, "\nYikes!! Too many %s!!\n"),
 			looking_for_lognames ?
-			"names in password file" : "files");
+			CGETS(14, 2, "names in password file") :
+			CGETS(14, 3, "files");
 		break;
 	    }
 	    /*

@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/sh.func.c,v 3.57 1994/05/26 13:11:20 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/sh.func.c,v 3.64 1995/05/06 17:51:58 christos Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.func.c,v 3.57 1994/05/26 13:11:20 christos Exp $")
+RCSID("$Id: sh.func.c,v 3.64 1995/05/06 17:51:58 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -62,7 +62,6 @@ static	void	doagain		__P((void));
 static  char   *isrchx		__P((int));
 static	void	search		__P((int, int, Char *));
 static	int	getword		__P((Char *));
-static	int	keyword		__P((Char *));
 static	void	toend		__P((void));
 static	void	xecho		__P((int, Char **));
 
@@ -337,7 +336,8 @@ dologin(v, c)
     islogin();
     rechist(NULL, adrof(STRsavehist) != NULL);
     (void) signal(SIGTERM, parterm);
-    (void) execl(_PATH_LOGIN, "login", short2str(v[1]), NULL);
+    (void) execl(_PATH_BIN_LOGIN, "login", short2str(v[1]), NULL);
+    (void) execl(_PATH_USRBIN_LOGIN, "login", short2str(v[1]), NULL);
     untty();
     xexit(1);
 }
@@ -354,13 +354,13 @@ donewgrp(v, c)
     if (chkstop == 0 && setintr)
 	panystop(0);
     (void) signal(SIGTERM, parterm);
-    p = short2blk(&v[1]);
+    p = short2blk(v);
     /*
      * From Beto Appleton (beto@aixwiz.austin.ibm.com)
      * Newgrp can take 2 arguments...
      */
-    (void) execv(_PATH_BIN_NEWGRP, "newgrp", p, NULL);
-    (void) execv(_PATH_USRBIN_NEWGRP, "newgrp", p, NULL);
+    (void) execv(_PATH_BIN_NEWGRP, p);
+    (void) execv(_PATH_USRBIN_NEWGRP, p);
     blkfree((Char **) p);
     untty();
     xexit(1);
@@ -766,6 +766,12 @@ srchx(cp)
     register i;
 
     /*
+     * Ignore keywords inside heredocs
+     */
+    if (inheredoc)
+	return -1;
+
+    /*
      * Binary search Sp1 is the beginning of the current search range. Sp2 is
      * one past the end.
      */
@@ -904,10 +910,8 @@ static int
 getword(wp)
     register Char *wp;
 {
-    register int found = 0;
-    register int c, d;
-    int     kwd = 0;
-    Char   *owp = wp;
+    int found = 0, first;
+    int c, d;
 
     c = readc(1);
     d = 0;
@@ -927,6 +931,7 @@ getword(wp)
 	}
 	unreadc(c);
 	found = 1;
+	first = 1;
 	do {
 	    c = readc(1);
 	    if (c == '\\' && (c = readc(1)) == '\n')
@@ -940,21 +945,24 @@ getword(wp)
 		goto past;
 	    if (wp) {
 		*wp++ = (Char) c;
-		*wp = 0;	/* end the string b4 test */
+		*wp = '\0';
 	    }
-	} while ((d || (!(kwd = keyword(owp)) && c != ' '
-		  && c != '\t')) && c != '\n');
+	    if (!first && !d && c == '(') {
+		if (wp) {
+		    unreadc(c);
+		    *--wp = '\0';
+		    return found;
+		}
+		else 
+		    break;
+	    }
+	    first = 0;
+	} while ((d || (c != ' ' && c != '\t')) && c != '\n');
     } while (wp == 0);
 
-    /*
-     * if we have read a keyword ( "if", "switch" or "while" ) then we do not
-     * need to unreadc the look-ahead char
-     */
-    if (!kwd) {
-	unreadc(c);
-	if (found)
-	    *--wp = 0;
-    }
+    unreadc(c);
+    if (found)
+	*--wp = '\0';
 
     return (found);
 
@@ -987,33 +995,6 @@ past:
 	break;
     }
     /* NOTREACHED */
-    return (0);
-}
-
-/*
- * keyword(wp) determines if wp is one of the built-n functions if,
- * switch or while. It seems that when an if statement looks like
- * "if(" then getword above sucks in the '(' and so the search routine
- * never finds what it is scanning for. Rather than rewrite doword, I hack
- * in a test to see if the string forms a keyword. Then doword stops
- * and returns the word "if" -strike
- */
-
-static int
-keyword(wp)
-    Char   *wp;
-{
-    static Char STRif[] = {'i', 'f', '\0'};
-    static Char STRwhile[] = {'w', 'h', 'i', 'l', 'e', '\0'};
-    static Char STRswitch[] = {'s', 'w', 'i', 't', 'c', 'h', '\0'};
-
-    if (!wp)
-	return (0);
-
-    if ((Strcmp(wp, STRif) == 0) || (Strcmp(wp, STRwhile) == 0)
-	|| (Strcmp(wp, STRswitch) == 0))
-	return (1);
-
     return (0);
 }
 
@@ -1202,7 +1183,8 @@ xecho(sep, v)
 			c = c * 8 + *cp++ - '0';
 		    break;
 		case '\0':
-		    c = *--cp;
+		    c = '\\';
+		    cp--;
 		    break;
 		default:
 		    xputchar('\\' | QUOTE);
@@ -1331,6 +1313,14 @@ dosetenv(v, c)
 # ifdef LC_COLLATE
 	(void) setlocale(LC_COLLATE, "");
 # endif
+# if defined(NLS_CATALOGS) && defined(LC_MESSAGES)
+	(void) setlocale(LC_MESSAGES, "");
+	(void) catclose(catd);
+	nlsinit();
+# endif /* NLS_CATALOGS && LC_MESSAGES */
+# ifdef LC_CTYPE
+	(void) setlocale(LC_CTYPE, ""); /* for iscntrl */
+# endif /* LC_CTYPE */
 # ifdef SETLOCALEBUG
 	dont_free = 0;
 # endif /* SETLOCALEBUG */
@@ -1388,6 +1378,11 @@ dosetenv(v, c)
 	return;
     }
 
+    if (eq(vp, STRKGROUP)) {
+	set(STRgroup, quote(lp), VAR_READWRITE);	/* lp memory used here */
+	return;
+    }
+
 #ifdef SIG_WINDOW
     /*
      * Load/Update $LINES $COLUMNS
@@ -1403,12 +1398,15 @@ dosetenv(v, c)
      * Change the size to the one directed by $LINES and $COLUMNS
      */
     if (eq(vp, STRLINES) || eq(vp, STRCOLUMNS)) {
+#if 0
 	GotTermCaps = 0;
+#endif
 	xfree((ptr_t) lp);
 	ed_Init();
 	return;
     }
 #endif /* SIG_WINDOW */
+    xfree((ptr_t) lp);
 }
 
 /*ARGSUSED*/
@@ -1471,6 +1469,14 @@ dounsetenv(v, c)
 # ifdef LC_COLLATE
 		    (void) setlocale(LC_COLLATE, "");
 # endif
+# if defined(NLS_CATALOGS) && defined(LC_MESSAGES)
+		    (void) setlocale(LC_MESSAGES, "");
+		    (void) catclose(catd);
+		    nlsinit();
+# endif /* NLS_CATALOGS && LC_MESSAGES */
+# ifdef LC_CTYPE
+	(void) setlocale(LC_CTYPE, ""); /* for iscntrl */
+# endif /* LC_CTYPE */
 # ifdef SETLOCALEBUG
 		    dont_free = 0;
 # endif /* SETLOCALEBUG */
@@ -1600,9 +1606,9 @@ doumask(v, c)
 # ifndef BSDLIMIT
    typedef long RLIM_TYPE;
 #  ifndef RLIM_INFINITY
-#   ifndef _MINIX
+#   if !defined(_MINIX) && !defined(__clipper__)
     extern RLIM_TYPE ulimit();
-#   endif /* ! _MINIX */
+#   endif /* ! _MINIX && !__clipper__ */
 #   define RLIM_INFINITY 0x003fffff
 #   define RLIMIT_FSIZE 1
 #  endif /* RLIM_INFINITY */
@@ -1621,7 +1627,7 @@ doumask(v, c)
 #  endif /* BSD4_4 && !__386BSD__ && !defined(bsdi) */
 # endif /* BSDLIMIT */
 
-# if defined(hpux) && defined(BSDLIMIT)
+# if (HPUXVERSION > 700) && defined(BSDLIMIT)
 /* Yes hpux8.0 has limits but <sys/resource.h> does not make them public */
 /* Yes, we could have defined _KERNEL, and -I/etc/conf/h, but is that better? */
 #  ifndef RLIMIT_CPU
@@ -1636,7 +1642,7 @@ doumask(v, c)
 #  ifndef RLIM_INFINITY
 #   define RLIM_INFINITY	0x7fffffff
 #  endif /* RLIM_INFINITY */
-# endif /* hpux && BSDLIMIT */
+# endif /* (HPUXVERSION > 700) && BSDLIMIT */
 
 # if SYSVREL > 3 && defined(BSDLIMIT)
 /* In order to use rusage, we included "/usr/ucbinclude/sys/resource.h" in */
@@ -2029,9 +2035,10 @@ setlim(lp, hard, limit)
 # endif /* aiws */
     if (ulimit(toset(lp->limconst), limit) < 0) {
 # endif /* BSDLIMIT */
-	xprintf("%s: %s: Can't %s%s limit\n", bname, lp->limname,
-		limit == RLIM_INFINITY ? "remove" : "set",
-		hard ? " hard" : "");
+	xprintf(CGETS(15, 1, "%s: %s: Can't %s%s limit\n"), bname, lp->limname,
+		limit == RLIM_INFINITY ? CGETS(15, 2, "remove") :
+		CGETS(15, 3, "set"),
+		hard ? CGETS(14, 4, " hard") : "");
 	return (-1);
     }
     return (0);
@@ -2249,4 +2256,17 @@ struct command *c;
 
     lbuffed = 1;		/* turn back on line buffering */
     flush();
+}
+
+void
+nlsinit()
+{
+#ifdef NLS_CATALOGS
+    catd = catopen("tcsh", MCLoadBySet);
+#endif
+    errinit();		/* init the errorlist in correct locale */
+    mesginit();		/* init the messages for signals */
+    dateinit();		/* init the messages for dates */
+    editinit();		/* init the editor messages */
+    terminit();		/* init the termcap messages */
 }

@@ -149,5 +149,6 @@
 
 #ifdef mc68000
 # undef NLS
+# undef NLS_CATALOGS
 #endif
 #endif /* _h_config */

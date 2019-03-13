@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/sh.decls.h,v 3.25 1994/05/07 18:51:25 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/sh.decls.h,v 3.28 1995/03/12 04:49:26 christos Exp $ */
 /*
  * sh.decls.h	 External declarations from sh*.c
  */
@@ -84,6 +84,7 @@ extern	void		  heredoc	__P((Char *));
 /*
  * sh.err.c
  */
+extern	void		  errinit	__P((void));
 extern	void		  seterror	__P((unsigned int, ...));
 extern	void		  stderror	__P((unsigned int, ...));
 
@@ -180,6 +181,7 @@ extern	void		  trim		__P((Char **));
 #ifdef FILEC
 extern	int		  sortscmp	__P((Char **, Char **));
 #endif
+extern	void		  nlsinit	__P((void));
 
 /*
  * sh.hist.c
@@ -191,6 +193,10 @@ extern	void		  fmthist	__P((int, ptr_t, char *));
 extern	void		  rechist	__P((Char *, int));
 extern	void		  loadhist	__P((Char *, bool));
 
+/*
+ * sh.init.c
+ */
+extern	void		  mesginit	__P((void));
 
 /*
  * sh.lex.c
@@ -298,7 +304,7 @@ extern	void		  pjwait	__P((struct process *));
 extern	void		  pnote		__P((void));
 extern	void		  prestjob	__P((void));
 extern	void		  psavejob	__P((void));
-extern	void		  pstart	__P((struct process *, int));
+extern	int		  pstart	__P((struct process *, int));
 extern	void		  pwait		__P((void));
 extern  struct process   *pfind		__P((Char *));
 

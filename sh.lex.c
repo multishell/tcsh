@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/sh.lex.c,v 3.40 1994/06/06 05:04:54 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/sh.lex.c,v 3.43 1995/04/16 19:15:53 christos Exp $ */
 /*
  * sh.lex.c: Lexical analysis into tokens
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.lex.c,v 3.40 1994/06/06 05:04:54 christos Exp $")
+RCSID("$Id: sh.lex.c,v 3.43 1995/04/16 19:15:53 christos Exp $")
 
 #include "ed.h"
 /* #define DEBUG_INP */
@@ -1597,7 +1597,8 @@ reread:
 		     * is now obsolete. As the foreground process group
 		     * changes, the shell needs to adjust. Well too bad.
 		     */
-		    xprintf("Reset tty pgrp from %d to %d\n", ctpgrp, tpgrp);
+		    xprintf(CGETS(16, 1, "Reset tty pgrp from %d to %d\n"),
+			    ctpgrp, tpgrp);
 # endif /* notdef */
 		    goto reread;
 		}
@@ -1622,13 +1623,16 @@ reread:
 		if (adrof(STRignoreeof)) {
 			/* If so, tell the user to use exit or logout */
 		    if (loginsh) {
-				xprintf("\nUse \"logout\" to logout.\n");
+				xprintf(CGETS(16, 2,
+					"\nUse \"logout\" to logout.\n"));
 		   	} else {
-				xprintf("\nUse \"exit\" to leave tcsh.\n");
+				xprintf(CGETS(16, 3,
+					"\nUse \"exit\" to leave tcsh.\n"));
 			}
 			reset();
 		} else {
 			/* If we don't have ignoreeof set, just fall through */
+			;	/* EMPTY */
 		}
 	    }
     oops:
@@ -1761,24 +1765,24 @@ bseek(l)
 	evalvec = l->a_seek;
 	evalp = l->c_seek;
 #ifdef DEBUG_SEEK
-	xprintf("seek to eval %x %x\n", evalvec, evalp);
+	xprintf(CGETS(16, 4, "seek to eval %x %x\n"), evalvec, evalp);
 #endif
 	return;
     case A_SEEK:
 	alvec = l->a_seek;
 	alvecp = l->c_seek;
 #ifdef DEBUG_SEEK
-	xprintf("seek to alias %x %x\n", alvec, alvecp);
+	xprintf(CGETS(16, 5, "seek to alias %x %x\n"), alvec, alvecp);
 #endif
 	return;
     case F_SEEK:	
 #ifdef DEBUG_SEEK
-	xprintf("seek to file %x\n", fseekp);
+	xprintf(CGETS(16, 6, "seek to file %x\n"), fseekp);
 #endif
 	fseekp = l->f_seek;
 	return;
     default:
-	xprintf("Bad seek type %d\n", aret);
+	xprintf(CGETS(16, 7, "Bad seek type %d\n"), aret);
 	abort();
     }
 }
@@ -1793,14 +1797,14 @@ struct Ain *l;
 	l->a_seek = evalvec;
 	l->c_seek = evalp;
 #ifdef DEBUG_SEEK
-	xprintf("tell eval %x %x\n", evalvec, evalp);
+	xprintf(CGETS(16, 8, "tell eval %x %x\n"), evalvec, evalp);
 #endif
 	return;
     case A_SEEK:
 	l->a_seek = alvec;
 	l->c_seek = alvecp;
 #ifdef DEBUG_SEEK
-	xprintf("tell alias %x %x\n", alvec, alvecp);
+	xprintf(CGETS(16, 9, "tell alias %x %x\n"), alvec, alvecp);
 #endif
 	return;
     case F_SEEK:
@@ -1808,11 +1812,11 @@ struct Ain *l;
 	l->f_seek = fseekp;
 	l->a_seek = NULL;
 #ifdef DEBUG_SEEK
-	xprintf("tell file %x\n", fseekp);
+	xprintf(CGETS(16, 10, "tell file %x\n"), fseekp);
 #endif
 	return;
     default:
-	xprintf("Bad seek type %d\n", aret);
+	xprintf(CGETS(16, 7, "Bad seek type %d\n"), aret);
 	abort();
     }
 }

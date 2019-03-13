@@ -90,9 +90,15 @@
 
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
- *		to send command output to /dev/null
+ *		to send command output to /dev/null [they are back!]
  */
-#undef YPBUGS
+#define YPBUGS
+
+/*
+ * NISPLUS    Make sure that fd's 0, 1, and 2 always are open so that
+ *            Sun's NIS+ doesn't get them, making ~-expansion hang.
+ */
+#define NISPLUS
 
 /*
  * SIGVOID	Define this if your signal handlers return void.  On older

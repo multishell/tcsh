@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/tw.spell.c,v 3.10 1993/06/25 21:17:12 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/tw.spell.c,v 3.13 1994/09/04 23:13:13 christos Exp $ */
 /*
  * tw.spell.c: Spell check words
  */
@@ -36,15 +36,17 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tw.spell.c,v 3.10 1993/06/25 21:17:12 christos Exp $")
+RCSID("$Id: tw.spell.c,v 3.13 1994/09/04 23:13:13 christos Exp $")
 
 #include "tw.h"
 
 /* spell_me : return corrrectly spelled filename.  From K&P spname */
 int
-spell_me(oldname, oldsize, looking)
+spell_me(oldname, oldsize, looking, pat, suf)
     Char   *oldname;
     int     oldsize, looking;
+    Char   *pat;
+    int     suf;
 {
     /* The +1 is to fool hp's optimizer */
     Char    guess[FILSIZ + 1], newname[FILSIZ + 1];
@@ -85,7 +87,7 @@ spell_me(oldname, oldsize, looking)
 	/* (*should* say "looking for directory" whenever '/' is next...) */
 	retval = t_search(guess, p, SPELL, FILSIZ,
 			  looking == TW_COMMAND && (foundslash || *old != '/') ?
-			  TW_COMMAND : looking, 1, STRNULL, 0);
+			  TW_COMMAND : looking, 1, pat, suf);
 	if (retval >= 4 || retval < 0)
 	    return -1;		/* hopeless */
 	for (p = ws; (*new = *p++) != '\0'; new++)

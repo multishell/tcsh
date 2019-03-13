@@ -1,5 +1,5 @@
 newcode	:
-/* $Header: /u/christos/src/tcsh-6.05/RCS/host.defs,v 1.6 1994/05/26 13:11:20 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/host.defs,v 1.11 1995/04/29 22:28:24 christos Exp $ */
 /*
  * host.defs: Hosttype/Machtype etc.
  */
@@ -37,7 +37,7 @@ newcode	:
  */
 #include "sh.h"
 
-RCSID("$Id: host.defs,v 1.6 1994/05/26 13:11:20 christos Exp $")
+RCSID("$Id: host.defs,v 1.11 1995/04/29 22:28:24 christos Exp $")
 
 endcode	:
 
@@ -349,7 +349,7 @@ enddef	:
 
 newdef	: defined(_MINIX)
 comment	: Andy Teitelbaum's minix
-vendor	: defined(i386)					: "ibm"
+vendor	: defined(i386)					: "intel"
 hosttype: defined(i386)					: "minix386"
 hosttype:						: "minix"
 ostype	:						: "minix"
@@ -359,23 +359,25 @@ enddef	:
 
 newdef	: defined(linux)
 comment	: Linus Torvalds's linux
-vendor	: defined(i386)					: "ibm"
+vendor	: defined(i386)					: "intel"
+hosttype: defined(i486) || defined(__i486__)		: "i486-linux"
 hosttype: defined(i386)					: "i386-linux"
 ostype	: 						: "linux"
+hosttype: defined(i486) || defined(__i486__)		: "i486"
 machtype: defined(i386)					: "i386"
 enddef	:
 
 
 newdef	: defined(__EMX__)
 comment	: OS/2 EMX [unix emulation under OS/2]
-vendor	: defined(i386)					: "ibm"
+vendor	: defined(i386)					: "intel"
 hosttype: defined(i386)					: "i386-emx"
 ostype	:						: "os2"
 machtype: defined(i386)					: "i386"
 enddef	:
 
 
-newdef	: defined(__NetBSD__) || defined(__BSD_NET2__)
+newdef	: defined(__NetBSD__) 
 comment	: Chris Demetriou's NetBSD
 vendor	: defined(amiga)				: "commodore"
 vendor	: defined(hp300)				: "hp"
@@ -386,8 +388,8 @@ vendor	: defined(pc532)				: "national-semi"
 vendor	: defined(pmax)					: "dec"
 vendor	: defined(sparc)				: "sun"
 vendor	: defined(sun3)					: "sun"
-hosttype:						: "NetBSD"
-ostype	:						: "NetBSD"
+hosttype: 						: "NetBSD"
+ostype	: 						: "NetBSD"
 machtype: defined(sparc)				: "sparc"
 machtype: defined(mc68020)				: "m68k"
 machtype: defined(i386)					: "i386"
@@ -396,9 +398,18 @@ machtype: defined(pc532)				: "pc532"
 enddef	:
 
 
+newdef	: defined(__FreeBSD__) 
+comment	: Free BSD
+vendor	: defined(i386)					: "intel"
+hosttype:						: "FreeBSD"
+ostype	:						: "FreeBSD"
+machtype:						: "i386"
+enddef	:
+
+
 newdef	: defined(__386BSD__)
 comment	: Bill Jolitz's 386BSD
-vendor	: defined(i386)					: "ibm"
+vendor	: defined(i386)					: "intel"
 hosttype:						: "386BSD"
 ostype	:						: "386BSD"
 machtype:						: "i386"
@@ -407,7 +418,7 @@ enddef	:
 
 newdef	: defined(bsdi)
 comment	: BSDI's unix
-vendor	: defined(i386)					: "ibm"
+vendor	: defined(i386)					: "intel"
 hosttype:						: "bsd386"
 ostype	:						: "bsdi"
 machtype: defined(i386)					: "i386"
@@ -416,7 +427,7 @@ enddef	:
 
 newdef	: defined(COHERENT)
 comment	: COHERENT's unix
-vendor	: defined(_I386)				: "ibm"
+vendor	: defined(_I386)				: "intel"
 hosttype:						: "coh386"
 hosttype:						: "coherent"
 ostype	:						: "coherent"
@@ -469,15 +480,6 @@ machtype: defined(i386)					: "i386"
 enddef	:
 
 
-newdef  : !defined(SOLARIS2) && (defined(__svr4__) || defined(SVR4))
-comment : Unix System V Release 4.0
-vendor  : defined(DELL)                                 : "dell"
-hosttype: defined(i386)                                 : "i386"
-ostype  :                                               : "svr4"
-machtype: defined(i386)                                 : "i386"
-enddef	:
-
-
 newdef	: defined(alliant)
 comment	: Alliants FSX
 vendor	:						: "alliant"
@@ -487,6 +489,19 @@ hosttype:						: "alliant"
 ostype	:						: "fsx"
 machtype: defined(mc68000)				: "mc68000"
 machtype: defined(i860)					: "i860"
+enddef	:
+
+
+newdef	: defined(_FTX)
+comment	: Stratus Computer, Inc FTX2 (i860 based)
+comment	: Stratus Computer, Inc FTX3 (HPPA based)
+vendor	:						: "stratus"
+hosttype: defined(i860) && defined(_FTX)		: "atlantic"
+hosttype: defined(__hppa) && defined(_FTX)		: "continuum"
+ostype	: defined(i860) && defined(_FTX)		: "ftx2"
+ostype	: defined(__hppa) && defined(_FTX)		: "ftx3"
+machtype: defined(i860)					: "i860"
+machtype: defined(__hppa)				: "hppa"
 enddef	:
 
 
@@ -568,6 +583,7 @@ vendor	:						: "next"
 hosttype:						: "next"
 ostype	:						: "mach"
 machtype: defined(mc68020) || defined(__mc68020__)	: "m68k"
+machtype: defined(i386) || defined(__i386__)		: "i386"
 enddef	:
 
 newdef	: defined(sony_news)
@@ -594,14 +610,19 @@ machtype: defined(mc68000) 				: "mc68000"
 enddef	:
 
 
+
 newdef	: defined(ultrix) || defined(__ultrix)
 comment	: Digital's Ultrix 
 vendor	:						: "dec"
 hosttype: defined(M_mipsel)				: "decstation"
 hosttype: defined(M_mipseb)				: "decmips"
+hosttype: defined(vax) || defined(__vax)		: "vax"
+hosttype: defined(__vax__) 				: "vax"
 ostype	:						: "ultrix"
 machtype: defined(M_mipsel)				: "mipsel"
 machtype: defined(M_mipseb)				: "mipseb"
+machtype: defined(vax) || defined (__vax)		: "vax"
+hosttype: defined(__vax__) 				: "vax"
 enddef	:
 
 
@@ -764,6 +785,12 @@ hosttype: 						: "sysV68"
 machtype:						: "m68k"
 enddef	:
 
+newdef	: defined(supermax)
+comment	: DDE Supermax running System V/68 R3 (SVR3/68020 based)
+vendor	:						: "supermax"
+hosttype: 						: "supermax"
+machtype:						: "m68k"
+enddef	:
 
 newdef	: defined(sysV88)
 comment	: Motorola MPC running System V/88 R32V2 (SVR3/88100 based)
@@ -775,9 +802,18 @@ enddef	:
 
 newdef	: defined(__clipper__)
 comment	: Clipper Chipset (Intergraph)
-vendor	:						: "integraph"
+vendor	:						: "intergraph"
 hosttype:						: "clipper"
 machtype:						: "clipper"
+enddef	:
+
+
+newdef  : !defined(SOLARIS2) && (SYSVREL == 4)
+comment : Unix System V Release 4.0
+vendor  : defined(DELL)                                 : "dell"
+hosttype: defined(i386)                                 : "i386"
+ostype  :                                               : "svr4"
+machtype: defined(i386)                                 : "i386"
 enddef	:
 
 

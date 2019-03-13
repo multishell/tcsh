@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/gethost.c,v 1.3 1994/03/13 00:46:35 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/gethost.c,v 1.4 1995/04/16 19:15:53 christos Exp $ */
 /*
  * gethost.c: Create version file from prototype
  */
@@ -36,10 +36,16 @@
  */
 #include "sh.h"
 
-RCSID("$Id: gethost.c,v 1.3 1994/03/13 00:46:35 christos Exp $")
+RCSID("$Id: gethost.c,v 1.4 1995/04/16 19:15:53 christos Exp $")
 
 #include <stdio.h>
 #include <ctype.h>
+
+/* Some people don't bother to declare these */
+#if defined(SUNOS4) || defined(ibm032)
+extern int fprintf();
+extern int fclose();
+#endif /* SUNOS4 || ibm032 */
 
 #define ISSPACE(p)	(isspace((unsigned char) (p)) && (p) != '\n')
 

@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/config_f.h,v 3.9 1994/04/12 15:46:46 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/config_f.h,v 3.12 1995/03/05 03:18:09 christos Exp $ */
 /*
  * config_f.h -- configure various defines for tcsh
  *
@@ -59,6 +59,15 @@
 #define NLS
 
 /*
+ * NLS_CATALOGS:Use Native Language System catalogs for
+ *		international messages.
+ *		Routines like catopen() are needed
+ *		if you don't have <nl_types.h>, you don't want
+ *		to define this.
+ */
+#undef NLS_CATALOGS
+
+/*
  * LOGINFIRST   Source ~/.login before ~/.cshrc
  */
 #undef LOGINFIRST
@@ -84,6 +93,11 @@
  * DOTLAST      put "." last in the default path, for security reasons
  */
 #define DOTLAST
+
+/*
+ * NODOT	Don't put "." in the default path, for security reasons
+ */
+#undef NODOT
 
 /*
  * AUTOLOGOUT	tries to determine if it should set autologout depending

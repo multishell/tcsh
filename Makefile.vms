@@ -1,4 +1,4 @@
-# $Id: Makefile.vms,v 1.22 1994/06/19 20:46:44 christos Exp $
+# $Id: Makefile.vms,v 1.27 1995/04/29 22:28:24 christos Exp $
 #	Makefile.vms	4.3	6/11/83
 #
 # C Shell with process control; VM/UNIX VAX Makefile
@@ -8,7 +8,7 @@
 # things; Paul Placeway, CIS Dept., Ohio State University
 #
 SHELL=/bin/sh
-VERSION=6.05
+VERSION=6.06
 BUILD=tcsh
 
 ################################################################
@@ -46,7 +46,7 @@ LFLAGS=$(INCLUDES)
 #CFLAGS=-O $(INCLUDES)
 
 # gcc-2.1+
-#CFLAGS=-O2 $(INCLUDES) -g
+#CFLAGS=-O2 $(INCLUDES)
 
 # lucid c on suns
 #CFLAGS=-O5 $(INCLUDES)
@@ -54,7 +54,7 @@ LFLAGS=$(INCLUDES)
 # gcc 2.1 on linux
 #CFLAGS=-O6 -fomit-frame-pointer $(INCLUDES)
 
-#hpux 8.0, careful about the +O3... breaks globbing in some versions
+# HP/UX 8.0, 9.0
 #CFLAGS= $(INCLUDES) +O3 -Aa
 
 # Ultrix 4.2a
@@ -62,6 +62,13 @@ LFLAGS=$(INCLUDES)
 
 # Intel Paragon OSF/1 with PGI compilers
 #CFLAGS=-O -Mnodebug -Mnoperfmon $(INCLUDES)
+
+# DEC Alpha OSF/1
+#CFLAGS= -O2 $(INCLUDES) -Olimit 2000	## Normal Optimization
+#CFLAGS= -O3 $(INCLUDES) -Olimit 2000	## Full Optimization - may not work
+#CF=-j
+#SUF=u
+#.SUFFIXES: .u
 
 # for silicon graphics (and other mips compilers) -- use the
 # global optimizer! (-O3).
@@ -93,6 +100,12 @@ LFLAGS=$(INCLUDES)
 # Pyramid OS/x
 #CFLAGS = -OG
 
+# Multiflow (5M binary... if you choose -O5!)
+#CFLAGS = -O5 -sb_trace 0
+
+# DDE Supermax Unix SYSV Rel III.
+# CFLAGS= -O3
+
 # Apollo's with cc [apollo builtins don't work with gcc]
 # and apollo should not define __STDC__ if it does not have
 # the standard header files. RT's (aos4.3) need that too;
@@ -105,13 +118,15 @@ LFLAGS=$(INCLUDES)
 # AU/X 2.0 needs a flag for POSIX (read the config file)
 #DFLAGS=-Zp
 # Tektronix 4300 running UTek 4.0 (BSD 4.2) needs:
-#DFLAGS = -DUTek
+#DFLAGS = -DUTek -DBSD
 # VMS_POSIX needs:
 #DFLAGS=-D_VMS_POSIX
-# DEC/osf-1 on the alpha
-#DFLAGS=-D_BSD
+# Multiflow
+#DFLAGS=-DMULTIFLOW
+# DELL SVR4
+#DFLAGS=-DDELL
 DFLAGS=
-#DFLAGS=-D_PATH_TCSH='"${DESTBIN}/tcsh"'
+#DFLAGS=-D_PATH_TCSHELL='"${DESTBIN}/tcsh"'
 
 
 ################################################################
@@ -132,12 +147,14 @@ LDFLAGS= 			## The simplest, suitable for all.
 ################################################################
 #LIBES= -ltermcap 			 ## BSD style things
 #LIBES= -ltermcap			 ## SunOS, HP-UX, pyramid
-#LIBES= -ltermcap -lcs			 ## Mach
+#LIBES= -ltermcap			 ## Linux
+#LIBES= -ltermcap -lshadow		 ## Linux with PW_SHADOW
 #LIBES= -ltermcap -lsec			 ## Tek XD88/10 (UTekV) with PW_SHADOW
 #LIBES= -ltermcap -lsec			 ## Motorola MPC (sysV88) with PW_SHADOW
-#LIBES= -ltermcap -lshadow		 ## Linux
+#LIBES= -ltermcap -lcs			 ## Mach
 #LIBES= -ltermcap -lbsd			 ## DEC osf1 on the alpha
 #LIBES= -ltermcap -lbsd			 ## Intel paragon
+#LIBES= -ltermcap -lbsd			 ## Clipper intergraph
 #LIBES= -ltermcap -lseq			 ## Sequent's Dynix
 #LIBES= -ltermcap -lauth		 ## Ultrix with Enhanced Security
 #LIBES= -ltermcap -ldir -lx		 ## Xenix 386 style things
@@ -171,6 +188,9 @@ LDFLAGS= 			## The simplest, suitable for all.
 #LIBES= -lcurses -lnsl -lsocket -lc /usr/ucblib/libucb.a ## Stardent Vistra
 #LIBES= -ltermc				 ## emx under OS/2
 LIBES=					 ## Minix, VMS_POSIX
+#LIBES= -ltermcap -lcrypt		 ## Multiflow
+#LIBES= -ltermcap -lcrypt		 ## NetBSD
+#LIBES= -lcurses 			 ## DDE Supermax
 
 ################################################################
 ## EXTRAFLAGS and EXTRALIBS
@@ -178,18 +198,21 @@ LIBES=					 ## Minix, VMS_POSIX
 # Compiling for HESIOD
 #HESDEF = -DHESIOD -I/usr/athena/include
 #HESLIB = -L/usr/athena/lib -lhesiod
-HESDEF=
-HESLIB=
 #
 # Compiling for AFS with kerberos authentication
 #AFSLIBDIR = /usr/afsws/lib
 #AFSDEF = -DAFS -I/usr/afsws/include
+#AFS33LIB = -laudit
+#
+#Solaris and HPUX require the BSD libraries with AFS.
+#We use -lc to use only what we require.
+#AFSAUXLIB = -lsocket -lnsl -lc -lucb                    # Solaris
+#AFSAUXLIB = -lc -lBSD                                   # HPUX   
+#
 #AFSLIB = -L$(AFSLIBDIR) -L$(AFSLIBDIR)/afs -lkauth -lprot -lubik\
 #         -lauth -lrxkad -lsys -ldes -lrx -llwp -lcom_err\
-#         $(AFSLIBDIR)/afs/util.a
+#         $(AFSLIBDIR)/afs/util.a $(AFS33LIB) $(AFSAUXLIB)
 #
-AFSDEF=
-AFSLIB=
 
 EXTRAFLAGS = $(HESDEF) $(AFSDEF)
 EXTRALIBS = $(HESLIB) $(AFSLIB)
@@ -205,8 +228,8 @@ EXTRALIBS = $(HESLIB) $(AFSLIB)
 
 # The -B tells gcc to use /bin/ld. This is to avoid using the gnu ld, which
 # on the suns does not know how to make dynamically linked binaries.
-#CC=	gcc -Wall -B/bin/	# -ansi -pedantic
-#CC=	gcc -m486 -Wall # Generate code for Intel 486 (linux)
+#CC=	gcc -Wall -pipe -B/bin/	# -ansi -pedantic
+#CC=	gcc -m486 -pipe -Wall # Generate code for Intel 486 (linux)
 #CC=	cc
 #CC=	occ
 #CC=	acc
@@ -276,7 +299,7 @@ AVSRCS= Fixes MAKEDIFFS MAKESHAR NewThings README FAQ \
 	WishList config_f.h eight-bit.me glob.3 patchlevel.h \
 	pathnames.h tcsh.man Ported src.desc Imakefile imake.config \
 	README.imake complete.tcsh vmsreadme.txt termcap.vms snames.h \
-	host.defs gethost.c
+	host.defs gethost.c tcsh.man2html
 
 VHSRCS=${PVSRCS} ${AVSRCS}
 
@@ -305,7 +328,7 @@ tcsh.exe: tcsh
 
 gethost:  gethost.c sh.err.h tc.const.h sh.h
 	rm -f gethost
-	${CC} -o gethost ${LDFLAGS} ${CFLAGS} gethost.c ${LIBES} ${EXTRALIBS}
+	${CC} -o gethost ${LDFLAGS} ${CFLAGS} ${DFLAGS} gethost.c ${LIBES} ${EXTRALIBS}
 
 tc.defs.c:	gethost host.defs
 	@rm -f $@
@@ -391,10 +414,10 @@ sh.prof.${SUF}:
 	${CC} ${CF} ${CFLAGS} -DPROF sh.prof.c
 
 lint: tc.const.h ed.defns.h
-	lint ${LFLAGS} sh*.c tw*.c ed*.c tc.*.c ${LIBES}
+	lint ${DFLAGS} ${LFLAGS} sh*.c tw*.c ed*.c tc.*.c ${LIBES}
 
 alint: tc.const.h ed.defns.h
-	alint ${LFLAGS} sh*.c tw*.c ed*.c tc.*.c ${LIBES}
+	alint ${DFLAGS} ${LFLAGS} sh*.c tw*.c ed*.c tc.*.c ${LIBES}
 
 print:
 	@pr READ_ME
@@ -445,8 +468,10 @@ install.man: tcsh.man
 clean:
 	${RM} -f a.out strings x.c xs.c tcsh tcsh.a _MAKE_LOG core gethost
 	${RM} -f *.${SUF} sh.prof.c ed.defns.h tc.const.h sh.err.h tc.defs.c
+	${RM} -f tcsh.*.m tcsh.*.cat
 
 veryclean: clean
+	${RM} -f config.h
 	${RM} -f *~ #*
 
 tags:	/tmp
@@ -458,6 +483,7 @@ tar.Z:
 	mkdir tcsh-${VERSION} tcsh-${VERSION}/config
 	cp ${ALLSRCS} tcsh-${VERSION}
 	cp ${CONFSRCS} tcsh-${VERSION}/config
+	tar cf - nls/Makefile nls/?*/set?* | (cd tcsh-${VERSION}; tar xpf -)
 	tar cvf - tcsh-${VERSION} | compress > tcsh-${VERSION}.tar.Z
 	rm -rf tcsh-${VERSION}
 
@@ -467,18 +493,24 @@ tar.gz:
 	mkdir tcsh-${VERSION} tcsh-${VERSION}/config
 	cp ${ALLSRCS} tcsh-${VERSION}
 	cp ${CONFSRCS} tcsh-${VERSION}/config
+	tar cf - nls/Makefile nls/?*/set?* | (cd tcsh-${VERSION}; tar xpf -)
 	tar cvf - tcsh-${VERSION} | gzip > tcsh-${VERSION}.tar.gz
 	rm -rf tcsh-${VERSION}
 
-shar:	
+shar:
 	rm -f tcsh-*.shar
 	rm -rf tcsh-${VERSION} 
-	mkdir tcsh-${VERSION} tcsh-${VERSION}/config 
+	mkdir tcsh-${VERSION} tcsh-${VERSION}/config
 	cp ${ALLSRCS} tcsh-${VERSION}
 	cp ${CONFSRCS} tcsh-${VERSION}/config
+	tar cf - nls/Makefile nls/?*/set?* | (cd tcsh-${VERSION}; tar xpf -)
 	MAKESHAR -v -n tcsh-${VERSION} tcsh-${VERSION} \
-		 tcsh-${VERSION}/* tcsh-${VERSION}/config/*
+		 tcsh-${VERSION}/?* tcsh-${VERSION}/config/?* \
+		 tcsh-${VERSION}/?*/set?*
 	rm -rf tcsh-${VERSION}
+
+catalogs:
+	@(cd nls; make catalogs)
 
 tcsh-${VERSION}.tar.Z:
 	rm -rf tcsh-${VERSION} 
@@ -490,6 +522,7 @@ tcsh-${VERSION}.tar.Z:
 	mkdir tcsh-${VERSION}/config
 	cp ${CONFSRCS} tcsh-${VERSION}/config
 	cp Makefile tcsh-${VERSION}/Makefile.new
+	tar cf - nls/Makefile nls/?*/set?* | (cd tcsh-${VERSION}; tar xpf -)
 	tar cvf - tcsh-${VERSION} | compress > tcsh-${VERSION}.tar.Z
 	rm -rf tcsh-${VERSION}
 
@@ -503,6 +536,7 @@ tcsh.tahoe-${VERSION}.tar.Z:
 	mkdir tcsh.tahoe-${VERSION}/config
 	cp ${CONFSRCS} tcsh.tahoe-${VERSION}/config
 	cp Makefile tcsh.tahoe-${VERSION}/Makefile.new
+	tar cf - nls/Makefile nls/?*/set?* | (cd tcsh-${VERSION}; tar xpf -)
 	tar cvf - tcsh.tahoe-${VERSION} | compress > tcsh.tahoe-${VERSION}.tar.Z
 	rm -rf tcsh.tahoe-${VERSION}
 
@@ -516,6 +550,7 @@ tcsh.reno-${VERSION}.tar.Z:
 	mkdir tcsh.reno-${VERSION}/config
 	cp ${CONFSRCS} tcsh.reno-${VERSION}/config
 	cp Makefile tcsh.reno-${VERSION}/Makefile.new
+	tar cf - nls/Makefile nls/?*/set?* | (cd tcsh-${VERSION}; tar xpf -)
 	tar cvf - tcsh.reno-${VERSION} | compress > tcsh.reno-${VERSION}.tar.Z
 	rm -rf tcsh.reno-${VERSION}
 

@@ -38,7 +38,10 @@
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
  */
-#define VFORK
+ /*
+  *		We undef this for OSF/1 because it causes pipeline failures.
+  */
+#undef VFORK
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and

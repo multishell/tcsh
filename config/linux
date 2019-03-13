@@ -129,10 +129,10 @@
 /* have been moved to config_f.h */
 #include "config_f.h"
 
-/* GNU libc 1.03 has a dummy implementation of setlocale() that
-   does more harm than good. Hopefully we can remove this #undef
-   in the future. Meanwhile, the builtin ISO8859-1 support should
-   satisfy most people.
- */
-#undef NLS
+/* that gives too long startup delays for me */
+
+#undef REMOTEHOST
+
+#define NLS_CATALOGS
+
 #endif /* _h_config */

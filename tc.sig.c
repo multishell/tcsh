@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/tc.sig.c,v 3.17 1993/08/11 16:25:52 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/tc.sig.c,v 3.20 1995/04/16 19:15:53 christos Exp $ */
 /*
  * tc.sig.c: Signal routine emulations
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.sig.c,v 3.17 1993/08/11 16:25:52 christos Exp $")
+RCSID("$Id: tc.sig.c,v 3.20 1995/04/16 19:15:53 christos Exp $")
 
 #include "tc.wait.h"
 
@@ -161,7 +161,7 @@ ourwait(w)
     pid_t pid;
 
 #  ifdef JOBDEBUG
-    xprintf("our wait %d\n", stk_ptr);
+    xprintf(CGETS(25, 1, "our wait %d\n", stk_ptr));
     flush();
 #  endif /* JOBDEBUG */
 
@@ -209,7 +209,7 @@ void
 sigpause(what)
 {
     if (what == SIGCHLD) {
-	bsd_sigpause(bsd_sigblock((sigmask_t) 0) & ~sigmask(SIGBSDCHLD));
+	(void) bsd_sigpause(bsd_sigblock((sigmask_t) 0) & ~sigmask(SIGBSDCHLD));
     }
     else if (what == 0) {
 	pause();
@@ -288,7 +288,7 @@ sigsetmask(mask)
 
     for (i = 1; i <= MAXSIG; i++)
 	if (ISSET(mask, i))
-	    sigaddset(&set, i);
+	    (void) sigaddset(&set, i);
 
     if ((sigprocmask(SIG_SETMASK, &set, &oset)) == -1) {
 	xprintf("sigsetmask(0x%x) - sigprocmask failed, errno %d",
@@ -328,7 +328,7 @@ sigblock(mask)
     /* Add in signals from mask. */
     for (i = 1; i <= MAXSIG; i++)
 	if (ISSET(mask, i))
-	    sigaddset(&set, i);
+	    (void) sigaddset(&set, i);
 
     if ((sigprocmask(SIG_SETMASK, &set, &oset)) == -1)
 	stderror(ERR_SYSTEM, "sigprocmask", strerror(errno));
@@ -360,8 +360,8 @@ bsd_sigpause(mask)
 
     for (i = 1; i <= MAXSIG; i++)
 	if (ISSET(mask, i))
-	    sigaddset(&set, i);
-    sigsuspend(&set);
+	    (void) sigaddset(&set, i);
+    (void) sigsuspend(&set);
 }
 
 /*
@@ -378,7 +378,8 @@ sigret_t (*bsd_signal(sig, func))()
         sigret_t (*r_func)();
 
         if (sig < 0 || sig > MAXSIG) {
-                xprintf("error: bsd_signal(%d) signal out of range\n", sig);
+                xprintf(CGETS(25, 2,
+			"error: bsd_signal(%d) signal out of range\n"), sig);
                 return((sigret_t(*)()) SIG_IGN);
         }
 
@@ -389,8 +390,9 @@ sigret_t (*bsd_signal(sig, func))()
         act.sa_flags = 0;                       /* no special actions */
 
         if (sigaction(sig, &act, &oact)) {
-                xprintf("error: bsd_signal(%d) - sigaction failed, errno %d\n",
-                    sig, errno);
+                xprintf(CGETS(25, 3,
+			"error: bsd_signal(%d) - sigaction failed, errno %d\n"),
+			sig, errno);
                 return((sigret_t(*)()) SIG_IGN);
         }
 

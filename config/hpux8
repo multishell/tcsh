@@ -20,7 +20,9 @@
 
 #if __STDC__ && !defined(__GNUC__)
 # define _POSIX_SOURCE
-# define _HPUX_SOURCE
+# ifndef _HPUX_SOURCE
+# define  _HPUX_SOURCE
+# endif /* !_HPUX_SOURCE */
 #endif
 
 /*
@@ -129,6 +131,8 @@
 
 /****************** local defines *********************/
 #define NAMEI_BUG	/* Great! you broke that one too */
+
+#define HPUXVERSION 800	/* For HP-UX version 8.00 */
 
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */

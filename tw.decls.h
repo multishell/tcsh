@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/tw.decls.h,v 3.12 1993/10/08 20:36:28 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/tw.decls.h,v 3.13 1994/09/04 21:54:15 christos Exp $ */
 /*
  * tw.decls.h: Tenex external declarations
  */
@@ -98,7 +98,8 @@ extern	 Char		 *tw_item_find		__P((Char *));
 /*
  * tw.spell.c
  */
-extern	 int		  spell_me		__P((Char *, int, int));
+extern	 int		  spell_me		__P((Char *, int, int,
+						     Char *, int));
 extern	 int		  spdir			__P((Char *, Char *, Char *, 
 						     Char *));
 extern	 int		  spdist		__P((Char *, Char *));

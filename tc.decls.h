@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/tc.decls.h,v 3.30 1994/05/26 13:11:20 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/tc.decls.h,v 3.35 1995/04/29 22:28:24 christos Exp $ */
 /*
  * tc.decls.h: Function declarations from all the tcsh modules
  */
@@ -58,8 +58,6 @@ extern	void		  showall	__P((Char **, struct command *));
  * tc.bind.c
  */
 extern	void		  dobindkey	__P((Char **, struct command *));
-extern	int		  parseescape	__P((Char **));
-extern	unsigned char    *unparsestring	__P((Char *, unsigned char *, Char *));
 #ifdef OBSOLETE
 extern	void		  dobind	__P((Char **, struct command *));
 #endif /* OBSOLETE */
@@ -135,6 +133,10 @@ extern	void		  domigrate	__P((Char **, struct command *));
 #ifdef WARP
 extern	void 		  dowarp	__P((Char **, struct command *));
 #endif /* WARP */
+
+#ifdef _CRAY
+extern	void 		  dodmmode	__P((Char **, struct command *));
+#endif /* _CRAY */
 
 #if defined(masscomp) || defined(hcx)
 extern	void		  douniverse	__P((Char **, struct command *));
@@ -218,6 +220,7 @@ extern	pret_t		  xvsprintf	__P((char *, const char *, va_list));
 /*
  * tc.prompt.c
  */
+extern	void		  dateinit	__P((void));
 extern	void		  printprompt	__P((int, char *));
 extern	void		  tprintf	__P((int, Char *, Char *, size_t, 
 					     char *, time_t, ptr_t));
@@ -259,7 +262,7 @@ extern	void 		  sigpause	__P((int));
 extern	sigret_t	(*xsignal	__P((int, sigret_t (*)(int)))) ();
 # define signal(a, b)	  xsignal(a, b)
 #endif /* NEEDsignal */
-#if defined(_SEQUENT_) || ((SYSVREL > 3 || defined(_DGUX_SOURCE)) && defined(POSIXSIGS))
+#if defined(_SEQUENT_) || ((SYSVREL > 3 || defined(_DGUX_SOURCE)) && defined(POSIXSIGS)) || (defined(_AIX) && defined(POSIXSIGS))
 extern	sigmask_t	  sigsetmask	__P((sigmask_t));
 extern	sigmask_t	  sigblock	__P((sigmask_t));
 extern	void		  bsd_sigpause	__P((sigmask_t));
@@ -310,7 +313,7 @@ extern	void		  fix_version	__P((void));
 extern	void		  initwatch	__P((void));
 extern	void		  resetwatch	__P((void));
 extern	void		  watch_login	__P((int));
-extern	char 		 *who_info	__P((ptr_t, int, char *));
+extern	const char 	 *who_info	__P((ptr_t, int, char *));
 extern	void		  dolog		__P((Char **, struct command *));
 # ifdef UTHOST
 extern	char		 *utmphost	__P((void));

@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/tc.alloc.c,v 3.24 1994/06/18 19:48:50 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/tc.alloc.c,v 3.29 1995/04/16 19:15:53 christos Exp $ */
 /*
  * tc.alloc.c (Caltech) 2/21/82
  * Chris Kingsley, kingsley@cit-20.
@@ -44,7 +44,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.alloc.c,v 3.24 1994/06/18 19:48:50 christos Exp $")
+RCSID("$Id: tc.alloc.c,v 3.29 1995/04/16 19:15:53 christos Exp $")
 
 static char   *memtop = NULL;		/* PWP: top of current memory */
 static char   *membot = NULL;		/* PWP: bottom of allocatable memory */
@@ -196,7 +196,7 @@ malloc(nbytes)
 	stderror(ERR_NOMEM);
 #else
 	showall(NULL, NULL);
-	xprintf("nbytes=%d: Out of memory\n", nbytes);
+	xprintf(CGETS(19, 1, "nbytes=%d: Out of memory\n"), nbytes);
 	abort();
 #endif
 	/* fool lint */
@@ -297,18 +297,23 @@ free(cp)
      */
     if (cp == NULL || dont_free)
 	return;
-    CHECK(!memtop || !membot, "free(%lx) called before any allocations.", cp);
-    CHECK(cp > (ptr_t) memtop, "free(%lx) above top of memory.", cp);
-    CHECK(cp < (ptr_t) membot, "free(%lx) below bottom of memory.", cp);
+    CHECK(!memtop || !membot,
+	  CGETS(19, 2, "free(%lx) called before any allocations."), cp);
+    CHECK(cp > (ptr_t) memtop,
+	  CGETS(19, 3, "free(%lx) above top of memory."), cp);
+    CHECK(cp < (ptr_t) membot,
+	  CGETS(19, 4, "free(%lx) below bottom of memory."), cp);
     op = (union overhead *) (((caddr_t) cp) - MEMALIGN(sizeof(union overhead)));
-    CHECK(op->ov_magic != MAGIC, "free(%lx) bad block.", cp);
+    CHECK(op->ov_magic != MAGIC,
+	  CGETS(19, 5, "free(%lx) bad block."), cp);
 
 #ifdef RCHECK
     if (op->ov_index <= 13)
 	CHECK(*(U_int *) ((caddr_t) op + op->ov_size + 1 - RSLOP) != RMAGIC,
-	      "free(%lx) bad range check.", cp);
+	      CGETS(19, 6, "free(%lx) bad range check."), cp);
 #endif
-    CHECK(op->ov_index >= NBUCKETS, "free(%lx) bad block index.", cp);
+    CHECK(op->ov_index >= NBUCKETS,
+	  CGETS(19, 7, "free(%lx) bad block index."), cp);
     size = op->ov_index;
     op->ov_next = nextf[size];
     nextf[size] = op;
@@ -356,7 +361,8 @@ calloc(i, j)
  * however many bytes was given to realloc() and hope it's not huge.
  */
 #ifndef lint
-int     realloc_srchlen = 4;	/* 4 should be plenty, -1 =>'s whole list */
+/* 4 should be plenty, -1 =>'s whole list */
+static int     realloc_srchlen = 4;	
 #endif /* lint */
 
 memalign_t
@@ -367,7 +373,7 @@ realloc(cp, nbytes)
 #ifndef lint
     register U_int onb;
     union overhead *op;
-    char   *res;
+    ptr_t res;
     register int i;
     int     was_alloced = 0;
 
@@ -589,28 +595,29 @@ showall(v, c)
     register union overhead *p;
     int     totfree = 0, totused = 0;
 
-    xprintf("tcsh current memory allocation:\nfree:\t");
+    xprintf(CGETS(19, 8, "tcsh current memory allocation:\nfree:\t"));
     for (i = 0; i < NBUCKETS; i++) {
 	for (j = 0, p = nextf[i]; p; p = p->ov_next, j++)
 	    continue;
 	xprintf(" %4d", j);
 	totfree += j * (1 << (i + 3));
     }
-    xprintf("\nused:\t");
+    xprintf(CGETS(19, 9, "\nused:\t"));
     for (i = 0; i < NBUCKETS; i++) {
 	xprintf(" %4u", nmalloc[i]);
 	totused += nmalloc[i] * (1 << (i + 3));
     }
-    xprintf("\n\tTotal in use: %d, total free: %d\n",
+    xprintf(CGETS(19, 10, "\n\tTotal in use: %d, total free: %d\n"),
 	    totused, totfree);
-    xprintf("\tAllocated memory from 0x%lx to 0x%lx.  Real top at 0x%lx\n",
+    xprintf(CGETS(19, 11,
+	    "\tAllocated memory from 0x%lx to 0x%lx.  Real top at 0x%lx\n"),
 	    (unsigned long) membot, (unsigned long) memtop,
 	    (unsigned long) sbrk(0));
 #else
 #ifndef _VMS_POSIX
     memtop = (char *) sbrk(0);
 #endif /* !_VMS_POSIX */
-    xprintf("Allocated memory from 0x%lx to 0x%lx (%ld).\n",
+    xprintf(CGETS(19, 12, "Allocated memory from 0x%lx to 0x%lx (%ld).\n"),
 	    (unsigned long) membot, (unsigned long) memtop, 
 	    (unsigned long) (memtop - membot));
 #endif /* SYSMALLOC */

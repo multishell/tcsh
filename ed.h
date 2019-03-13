@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/ed.h,v 3.23 1994/05/26 13:11:20 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/ed.h,v 3.25 1995/03/12 04:49:26 christos Exp $ */
 /*
  * ed.h: Editor declarations and globals
  */
@@ -61,7 +61,7 @@ typedef CCRETVAL(*PFCmd) __P((int));	/* pointer to function returning CCRETVAL *
 struct KeyFuncs {		/* for the "bind" shell command */
     char   *name;		/* function name for bind command */
     int     func;		/* function numeric value */
-    char   *description;	/* description of function */
+    char   *desc;		/* description of function */
 };
 
 extern PFCmd CcFuncTbl[];	/* table of available commands */
@@ -97,9 +97,14 @@ extern KEYCMD NumFuns;		/* number of KEYCMDs in above table */
 #define CC_COMPLETE_BACK	20
 #define CC_NORMALIZE_COMMAND	21
 
+typedef struct {
+    Char *buf;
+    int   len;
+} CStr;
+
 typedef union Xmapval {		/* value passed to the Xkey routines */
     KEYCMD cmd;
-    Char *str;
+    CStr str;
 } XmapVal;
 
 #define XK_NOD	-1		/* Internal tree node */

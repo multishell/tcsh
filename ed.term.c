@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/ed.term.c,v 1.15 1993/07/03 23:47:53 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/ed.term.c,v 1.18 1995/04/16 19:15:53 christos Exp $ */
 /*
  * ed.term.c: Low level terminal interface
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.term.c,v 1.15 1993/07/03 23:47:53 christos Exp $")
+RCSID("$Id: ed.term.c,v 1.18 1995/04/16 19:15:53 christos Exp $")
 
 #include "ed.h"
 #include "ed.term.h"
@@ -90,7 +90,11 @@ ttyperm_t ttylist = {
 
 static struct tcshmodes {
     char *m_name;
+#ifdef SOLARIS2
+    unsigned long m_value;
+#else /* !SOLARIS2 */
     int   m_value;
+#endif /* SOLARIS2 */
     int   m_type;
 } modelist[] = {
 #if defined(POSIX) || defined(TERMIO)
@@ -575,7 +579,7 @@ dosetty(v, t)
 	    break;
 	default:
 	    stderror(ERR_NAME | ERR_SYSTEM, short2str(v[0]), 
-		     "Unknown switch");
+		     CGETS(8, 1, "Unknown switch"));
 	    break;
 	}
 
@@ -626,7 +630,7 @@ dosetty(v, t)
 	    if (strcmp(m->m_name, d) == 0)
 		break;
 	if (!m->m_name) 
-	    stderror(ERR_NAME | ERR_SYSTEM, d, "Invalid argument");
+	    stderror(ERR_NAME | ERR_SYSTEM, d, CGETS(8, 2, "Invalid argument"));
 
 	switch (x) {
 	case '+':

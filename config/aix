@@ -43,7 +43,11 @@
 /*
  * POSIXSIGS	Use the POSIX signal facilities to emulate BSD signals.
  */
+#ifdef _AIX32
+#define POSIXSIGS
+#else
 #undef POSIXSIGS
+#endif
 
 /*
  * VFORK	This machine has a vfork().  
@@ -223,6 +227,7 @@
 
 #if defined(_AIXPS2) || defined(aiws)
 # undef NLS
+# undef NLS_CATALOGS
 #endif
 
 #endif /* _h_config */

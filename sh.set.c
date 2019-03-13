@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/sh.set.c,v 3.25 1994/04/12 15:46:46 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/sh.set.c,v 3.28 1995/03/12 04:49:26 christos Exp $ */
 /*
  * sh.set.c: Setting and Clearing of variables
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.set.c,v 3.25 1994/04/12 15:46:46 christos Exp $")
+RCSID("$Id: sh.set.c,v 3.28 1995/03/12 04:49:26 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -74,12 +74,21 @@ update_vars(vp)
 	HIST = *pn++;
 	HISTSUB = *pn;
     }
+    else if (eq(vp, STRpromptchars)) {
+	register Char *pn = varval(vp);
+
+	PRCH = *pn++;
+	PRCHROOT = *pn;
+    }
     else if (eq(vp, STRhistlit)) {
 	HistLit = 1;
     }
     else if (eq(vp, STRuser)) {
 	tsetenv(STRKUSER, varval(vp));
 	tsetenv(STRLOGNAME, varval(vp));
+    }
+    else if (eq(vp, STRgroup)) {
+	tsetenv(STRKGROUP, varval(vp));
     }
     else if (eq(vp, STRwordchars)) {
 	word_chars = varval(vp);
@@ -614,6 +623,10 @@ unset(v, c)
 	HIST = '!';
 	HISTSUB = '^';
     }
+    if (adrof(STRpromptchars) == 0) {
+	PRCH = '>';
+	PRCHROOT = '#';
+    }
     if (adrof(STRhistlit) == 0)
 	HistLit = 0;
     if (adrof(STRloginsh) == 0)
@@ -686,6 +699,7 @@ unsetv1(p)
 	for (c = p->v_left; c->v_right; c = c->v_right)
 	    continue;
 	p->v_name = c->v_name;
+	p->v_flags = c->v_flags;
 	p->vec = c->vec;
 	p = c;
 	c = p->v_left;
@@ -749,7 +763,8 @@ exportpath(val)
     if (val)
 	while (*val) {
 	    if (Strlen(*val) + Strlen(exppath) + 2 > BUFSIZE) {
-		xprintf("Warning: ridiculously long PATH truncated\n");
+		xprintf(CGETS(18, 1,
+			      "Warning: ridiculously long PATH truncated\n"));
 		break;
 	    }
 	    (void) Strcat(exppath, *val++);

@@ -119,5 +119,7 @@
 #define BSD	/* We really look like BSD 4.2 */
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
+
 #include "config_f.h"
+
 #endif /* _h_config */

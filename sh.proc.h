@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/sh.proc.h,v 3.6 1993/10/30 19:50:16 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/sh.proc.h,v 3.6 1993/10/30 19:50:16 christos Exp $ */
 /*
  * sh.proc.h: Process data structures and variables
  */

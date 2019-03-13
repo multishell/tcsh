@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/tc.func.c,v 3.57 1994/05/26 13:11:20 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/tc.func.c,v 3.66 1995/05/06 22:00:08 christos Exp $ */
 /*
  * tc.func.c: New tcsh builtins.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.func.c,v 3.57 1994/05/26 13:11:20 christos Exp $")
+RCSID("$Id: tc.func.c,v 3.66 1995/05/06 22:00:08 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -49,10 +49,13 @@ RCSID("$Id: tc.func.c,v 3.57 1994/05/26 13:11:20 christos Exp $")
 
 #ifdef AFS
 #define PASSMAX 16
+#include <afs/stds.h>
 #include <afs/kautils.h>
 long ka_UserAuthenticateGeneral();
 #else
+#ifndef PASSMAX
 #define PASSMAX 8
+#endif
 #endif /* AFS */
 
 #ifdef TESLA
@@ -76,6 +79,9 @@ static	void	 insert_we	__P((struct wordent *, struct wordent *));
 static	int	 inlist		__P((Char *, Char *));
 #endif /* BSDJOBS */
 static  Char    *gethomedir	__P((Char *));
+#ifdef REMOTEHOST
+static	void	 getremotehost	__P((void));
+#endif /* REMOTEHOST */
 
 /*
  * Tops-C shell
@@ -227,6 +233,7 @@ dolist(v, c)
 	 */
 	static Char STRls[] = {'l', 's', '\0'};
 	static Char STRmCF[] = {'-', 'C', 'F', '\0', '\0' };
+	Char *lspath;
 	struct command *t;
 	struct wordent cmd, *nextword, *lastword;
 	Char   *cp;
@@ -245,21 +252,34 @@ dolist(v, c)
 	    seterr = NULL;
 	}
 
-	/* Look at showdots, to add -A to the flags if necessary */
-	if ((vp = adrof(STRshowdots)) != NULL) {
-	    if (vp->vec[0][0] == '-' && vp->vec[0][1] == 'A' &&
-		vp->vec[0][2] == '\0')
-		STRmCF[3] = 'A';
-	    else
-		STRmCF[3] = '\0';
+	lspath = STRls;
+	STRmCF[1] = 'C';
+	STRmCF[3] = '\0';
+	/* Look at listflags, to add -A to the flags, to get a path
+	   of ls if necessary */
+	if ((vp = adrof(STRlistflags)) != NULL && vp->vec[0] != STRNULL) {
+	    if (vp->vec[1] != STRNULL)
+		lspath = vp->vec[1];
+	    for (cp = vp->vec[0]; *cp; cp++)
+		switch (*cp) {
+		case 'x':
+		    STRmCF[1] = 'x';
+		    break;
+		case 'a':
+		    STRmCF[3] = 'a';
+		    break;
+		case 'A':
+		    STRmCF[3] = 'A';
+		    break;
+		default:
+		    break;
+		}
 	}
-	else
-	    STRmCF[3] = '\0';
 
 	cmd.word = STRNULL;
 	lastword = &cmd;
 	nextword = (struct wordent *) xcalloc(1, sizeof cmd);
-	nextword->word = Strsave(STRls);
+	nextword->word = Strsave(lspath);
 	lastword->next = nextword;
 	nextword->prev = lastword;
 	lastword = nextword;
@@ -424,7 +444,7 @@ cmd_expand(cmd, str)
 
     if ((vp = adrof1(cmd, &aliases)) != NULL) {
 	if (str == NULL) {
-	    xprintf("%S: \t aliased to ", cmd);
+	    xprintf(CGETS(22, 1, "%S: \t aliased to "), cmd);
 	    blkpr(vp->vec);
 	    xputchar('\n');
 	}
@@ -554,8 +574,11 @@ fg_proc_entry(pp)
 				 * process getting stopped by a signal */
     if (setexit() == 0) {	/* come back here after pjwait */
 	pendjob();
-	pstart(pp, 1);		/* found it. */
 	(void) alarm(0);	/* No autologout */
+	if (!pstart(pp, 1)) {
+	    pp->p_procid = 0;
+	    stderror(ERR_BADJOB, pp->p_command, strerror(errno));
+	}
 	pjwait(pp);
     }
     setalarm(1);		/* Autologout back on */
@@ -707,7 +730,7 @@ auto_lock()
 	    just_signaled = 0;
 	    return;
 	}
-	xprintf("\nIncorrect passwd for %s\n", pw->pw_name);
+	xprintf(CGETS(22, 2, "\nIncorrect passwd for %s\n"), pw->pw_name);
     }
 #endif /* NO_CRYPT */
     auto_logout();
@@ -770,7 +793,7 @@ precmd()
 #endif /* BSDSIGS */
     if (precmd_active) {	/* an error must have been caught */
 	aliasrun(2, STRunalias, STRprecmd);
-	xprintf("Faulty alias 'precmd' removed.\n");
+	xprintf(CGETS(22, 3, "Faulty alias 'precmd' removed.\n"));
 	goto leave;
     }
     precmd_active = 1;
@@ -803,7 +826,7 @@ cwd_cmd()
 #endif /* BSDSIGS */
     if (cwdcmd_active) {	/* an error must have been caught */
 	aliasrun(2, STRunalias, STRcwdcmd);
-	xprintf("Faulty alias 'cwdcmd' removed.\n");
+	xprintf(CGETS(22, 4, "Faulty alias 'cwdcmd' removed.\n"));
 	goto leave;
     }
     cwdcmd_active = 1;
@@ -834,7 +857,7 @@ beep_cmd()
 #endif /* BSDSIGS */
     if (beepcmd_active) {	/* an error must have been caught */
 	aliasrun(2, STRunalias, STRbeepcmd);
-	xprintf("Faulty alias 'beepcmd' removed.\n");
+	xprintf(CGETS(22, 5, "Faulty alias 'beepcmd' removed.\n"));
     }
     else {
 	beepcmd_active = 1;
@@ -869,7 +892,7 @@ period_cmd()
 #endif /* BSDSIGS */
     if (periodic_active) {	/* an error must have been caught */
 	aliasrun(2, STRunalias, STRperiodic);
-	xprintf("Faulty alias 'periodic' removed.\n");
+	xprintf(CGETS(22, 6, "Faulty alias 'periodic' removed.\n"));
 	goto leave;
     }
     periodic_active = 1;
@@ -1055,7 +1078,7 @@ rmstar(cp)
     while (we != cp) {
 #ifdef RMDEBUG
 	if (*tag)
-	    xprintf("parsing command line\n");
+	    xprintf(CGETS(22, 7, "parsing command line\n"));
 #endif /* RMDEBUG */
 	if (!Strcmp(we->word, STRrm)) {
 	    args = we->next;
@@ -1072,17 +1095,23 @@ rmstar(cp)
 		    if (!Strcmp(args->word, STRstar))
 			star = 1;
 		if (ask && star) {
-		    xprintf("Do you really want to delete all files? [n/y] ");
+		    xprintf(CGETS(22, 8,
+			    "Do you really want to delete all files? [n/y] "));
 		    flush();
 		    (void) read(SHIN, &c, 1);
-		    doit = (c == 'Y' || c == 'y');
+		    /* 
+		     * Perhaps we should use the yesexpr from the
+		     * actual locale
+		     */
+		    doit = (strchr(CGETS(22, 14, "Yy"), c) != NULL);
 		    while (c != '\n')
 			(void) read(SHIN, &c, 1);
 		    if (!doit) {
 			/* remove the command instead */
 #ifdef RMDEBUG
 			if (*tag)
-			    xprintf("skipping deletion of files!\n");
+			    xprintf(CGETS(22, 9,
+				    "skipping deletion of files!\n"));
 #endif /* RMDEBUG */
 			for (tmp = we;
 			     *tmp->word != '\n' &&
@@ -1114,7 +1143,7 @@ rmstar(cp)
     }
 #ifdef RMDEBUG
     if (*tag) {
-	xprintf("command line now is:\n");
+	xprintf(CGETS(22, 10, "command line now is:\n"));
 	for (we = cp->next; we != cp; we = we->next)
 	    xprintf("%S ", we->word);
     }
@@ -1157,7 +1186,7 @@ continue_jobs(cp)
     while (we != cp) {
 #ifdef CNDEBUG
 	if (*tag)
-	    xprintf("parsing command line\n");
+	    xprintf(CGETS(22, 11, "parsing command line\n"));
 #endif /* CNDEBUG */
 	cmd = we->word;
 	in_cont_list = inlist(continue_list, cmd);
@@ -1165,7 +1194,7 @@ continue_jobs(cp)
 	if (in_cont_list || in_cont_arg_list) {
 #ifdef CNDEBUG
 	    if (*tag)
-		xprintf("in one of the lists\n");
+		xprintf(CGETS(22, 12, "in one of the lists\n"));
 #endif /* CNDEBUG */
 	    np = NULL;
 	    for (pp = proclist.p_next; pp; pp = pp->p_next) {
@@ -1189,7 +1218,7 @@ continue_jobs(cp)
     }
 #ifdef CNDEBUG
     if (*tag) {
-	xprintf("command line now is:\n");
+	xprintf(CGETS(22, 13, "command line now is:\n"));
 	for (we = cp->next; we != cp; we = we->next)
 	    xprintf("%S ", we->word);
     }
@@ -1418,6 +1447,10 @@ gettilde(us)
 {
     struct tildecache *bp1, *bp2, *bp;
     Char *hd;
+
+    /* Ignore NIS special names */
+    if (*us == '+' || *us == '-')
+	return NULL;
 
     if (tcache == NULL)
 	tcache = (struct tildecache *) xmalloc((size_t) (TILINCR *
@@ -1835,6 +1868,7 @@ hashbang(fd, vp)
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <sys/uio.h>	/* For struct iovec */
 
 static sigret_t
 palarm(snum)
@@ -1846,29 +1880,25 @@ palarm(snum)
 	(void) sigset(snum, SIG_IGN);
 #endif /* UNRELSIGS */
     (void) alarm(0);
+    reset();
 
 #ifndef SIGVOID
     return (snum);
 #endif
 }
 
-/*
- * From: <lesv@ppvku.ericsson.se> (Lennart Svensson)
- */
-void 
-remotehost()
+
+static void
+getremotehost()
 {
-    char *host = NULL;
+    const char *host = NULL;
     struct hostent* hp;
     struct sockaddr_in saddr;
     int len = sizeof(struct sockaddr_in);
 
-    /* Don't get stuck if the resolver does not work! */
-    sigret_t (*osig)() = signal(SIGALRM, palarm);
-    (void) alarm(2);
-
     if (getpeername(SHIN, (struct sockaddr *) &saddr, &len) != -1) {
-	if ((hp = gethostbyaddr((char *)&saddr.sin_addr, len, AF_INET)) != NULL)
+	if ((hp = gethostbyaddr((char *)&saddr.sin_addr, sizeof(struct in_addr),
+				AF_INET)) != NULL)
 	    host = hp->h_name;
 	else
 	    host = inet_ntoa(saddr.sin_addr);
@@ -1877,30 +1907,60 @@ remotehost()
     else {
 	char *ptr, *sptr;
 	char *name = utmphost();
-	if (name != NULL) {
+	if (name != NULL && *name != '\0') {
 	    /* Look for host:display.screen */
 	    if ((sptr = strchr(name, ':')) != NULL)
 		*sptr = '\0';
-	    if ((hp = gethostbyname(name)) == NULL) {
-		/* Try again eliminating the trailing domain */
-		if ((ptr = strchr(name, '.')) != NULL) {
-		    *ptr = '\0';
-		    if ((hp = gethostbyname(name)) != NULL)
-			host = hp->h_name;
-		    *ptr = '.';
+	    if (sptr != name) {
+		if ((hp = gethostbyname(name)) == NULL) {
+		    /* Try again eliminating the trailing domain */
+		    if ((ptr = strchr(name, '.')) != NULL) {
+			*ptr = '\0';
+			if ((hp = gethostbyname(name)) != NULL)
+			    host = hp->h_name;
+			*ptr = '.';
+		    }
 		}
+		else
+		    host = hp->h_name;
 	    }
-	    else
-		host = hp->h_name;
 	    if (sptr)
 		*sptr = ':';
 	}
     }
 #endif
-    (void) alarm(0);
-    (void) signal(SIGALRM, osig);
 
     if (host)
 	tsetenv(STRREMOTEHOST, str2short(host));
+}
+
+
+/*
+ * From: <lesv@ppvku.ericsson.se> (Lennart Svensson)
+ */
+void 
+remotehost()
+{
+    /* Don't get stuck if the resolver does not work! */
+    sigret_t (*osig)() = sigset(SIGALRM, palarm);
+
+    jmp_buf_t osetexit;
+    getexit(osetexit);
+
+    (void) alarm(2);
+
+    if (setexit() == 0)
+	getremotehost();
+
+    resexit(osetexit);
+
+    (void) alarm(0);
+    (void) sigset(SIGALRM, osig);
+
+#ifdef YPBUGS
+    /* From: casper@fwi.uva.nl (Casper H.S. Dik), for Solaris 2.3 */
+    fix_yp_bugs();
+#endif /* YPBUGS */
+
 }
 #endif /* REMOTEHOST */

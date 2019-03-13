@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/ed.decls.h,v 3.20 1994/06/19 20:46:44 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/ed.decls.h,v 3.23 1995/03/19 22:33:26 christos Exp $ */
 /*
  * ed.decls.h: Editor external definitions
  */
@@ -80,6 +80,7 @@ extern	void	tty_setdisc		__P((int, int));
 /*
  * ed.screen.c
  */
+extern	void	terminit		__P((void));
 extern	void	SetAttributes		__P((int));
 extern	void	so_write		__P((Char *, int));
 extern	void	ClearScreen		__P((void));
@@ -91,12 +92,12 @@ extern	void	DeleteChars		__P((int));
 extern	void	TellTC			__P((char *));
 extern	void	SetTC			__P((char *, char *));
 extern	void	EchoTC			__P((Char **));
-extern	int 	SetArrowKeys		__P((Char *, XmapVal *, int));
+extern	int 	SetArrowKeys		__P((CStr *, XmapVal *, int));
 extern	int 	IsArrowKey		__P((Char *));
 extern	void	ResetArrowKeys		__P((void));
 extern	void	DefaultArrowKeys	__P((void));
-extern	int 	ClearArrowKeys		__P((Char *));
-extern	void 	PrintArrowKeys		__P((Char *));
+extern	int 	ClearArrowKeys		__P((CStr *));
+extern	void 	PrintArrowKeys		__P((CStr *));
 extern	void	BindArrowKeys		__P((void));
 extern	void	Beep			__P((void));
 extern	int	CanWeTab		__P((void));
@@ -110,6 +111,7 @@ extern	void	GetTermCaps		__P((void));
 /*
  * ed.defns.c
  */
+extern	void	editinit		__P((void));
 extern	void	ed_InitNLSMaps		__P((void));
 #ifdef DEBUG_EDIT
 extern	void	CheckMaps		__P((void));
@@ -231,6 +233,7 @@ extern  CCRETVAL        e_list_all		__P((int));
 extern  CCRETVAL        e_complete_all		__P((int));
 extern  CCRETVAL        e_complete_fwd		__P((int));
 extern  CCRETVAL        e_complete_back		__P((int));
+extern  CCRETVAL        e_dabbrev_expand	__P((int));
 
 /*
  * ed.inputl.c
@@ -252,14 +255,16 @@ extern	void	PastBottom		__P((void));
 /*
  * ed.xmap.c
  */
-extern  XmapVal *XmapStr		__P((Char *));
+extern  XmapVal *XmapStr		__P((CStr *));
 extern  XmapVal *XmapCmd		__P((int));
-extern	void	 AddXkey		__P((Char *, XmapVal *, int));
-extern	void	 ClearXkey		__P((KEYCMD *, Char *));
-extern	int	 GetXkey		__P((Char *, XmapVal *));
+extern	void	 AddXkey		__P((CStr *, XmapVal *, int));
+extern	void	 ClearXkey		__P((KEYCMD *, CStr *));
+extern	int	 GetXkey		__P((CStr *, XmapVal *));
 extern	void	 ResetXmap		__P((void));
-extern	int	 DeleteXkey		__P((Char *));
-extern	void	 PrintXkey		__P((Char *));
-extern	int	 printOne		__P((Char *, XmapVal *, int));
+extern	int	 DeleteXkey		__P((CStr *));
+extern	void	 PrintXkey		__P((CStr *));
+extern	int	 printOne		__P((CStr *, XmapVal *, int));
+extern	int		  parseescape	__P((Char **));
+extern	unsigned char    *unparsestring	__P((CStr *, unsigned char *, Char *));
 
 #endif /* _h_ed_decls */

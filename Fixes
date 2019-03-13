@@ -1,5 +1,126 @@
-V6.05.00, 08/19/94
-113. 6.04.17 08/18/94
+V6.06.00, 05/13/95
+ 88. Cleanup off-by-one error ed.defns.c.
+ 87. 6.05.09 - 05/06/95
+ 86. Small memory leak in dosetenv()
+ 85. Make sure that the number of editing functions defined is correct
+     and abort otherwise.
+ 84. Completion Fixes from Tom
+ 83. Don't add yp stuff in the tilde cache [names that start with + or -]
+ 82. Don't let children catclose() in xexit(), because the parent will lose
+     access to the nls catalogs. From Michael.
+ 81. 6.05.08 - 04/29/95
+ 80. Update to the newest csh sh.file.c
+ 79. More completions from Tom.
+ 78. Fix the Imakefile to use XCOMM
+ 77. Update for AIX 3.2.
+ 76. French catalog from J.M.Vansteene@frcl.bull.fr (fwd Michael Schmidt)
+ 75. Nls fixes and small typos from Michael
+ 74. PDP11 BSD type fixes.
+ 73. More manual page fixes.
+ 72. 6.05.07 - 04/19/95
+ 71. More NLS catalog fixes.
+ 70. Bruce's jumbo patch.
+ 69. 6.05.06 - 03/15/95
+ 68. make clean does not clobber config.h if Makefile.std is used.
+     make veryclean does.
+ 67. New config define NISPLUS. Reportedly fixes vanishing output of ~expansion
+     on solaris 2.4.
+ 66. showdots has been removed; use listflags instead. [handles -x too]
+ 65. more nls catalog fixes.
+ 64. set histchars=,. did not have any effect in .cshrc
+ 63. fix "-c command" new core dump.
+ 62. more completions from Tom
+ 61. call catclose() before exiting, so that svr4 cleans up the symlinks before
+     exiting.
+ 60. Per's fix for insert-last-word
+ 59. Per's emacs abbreviation mode.
+ 58. Makefile fixes for catalog stuff.
+ 57. fixed again complete-word-raw and list-word-raw
+ 56. 6.05.05 - 03/11/95
+ 55. Made %?str work again
+ 54. IRIX sigalarm problem should be fixed
+ 53. complete-word-raw and list-word-raw should work
+ 52. nls catalogs complete reworking.
+ 51. sh.init.c: Signal complete rewrite.
+ 50. Signal fixes from Bruce.
+ 49. Added promptchars, like histchars; affect %# in the prompt. The first
+     char is for the user and the second is for root.
+ 48. 6.05.04 - 03/03/95
+ 47. Add NODOT config, $command [that holds the command passed with -c]
+     $GROUP and $group
+ 46. AFS fixes from Larry Schwimmer <rosebud@cyclone.Stanford.EDU>
+ 45. Real NLS catalogs from Michael Schmidt <michael@muc.de>
+ 44. patch to allow ^? binding.
+ 43. completion patch from Paul DuBois.
+ 42. Don't spell check in here docs.
+ 41. Incorrect normalization of usec in sh.time.c
+ 40. directory printing and option parsing fixes [from Paul DuBois]
+ 39. realloc_searchlen should be static to avoid conflicts with OS's that
+     use the same malloc package.
+ 38. LOGINFIRST now applies to /etc/csh.login
+ 37. Fixes in bind compatibility code to bindkey.
+ 36. 6.05.03 - 01/17/95
+ 35. Don't print the whole watchlist on startup. One can use explicitly
+     the log builtin for that.
+ 34. Don't display the $watch value in the log command. 
+ 33. Don't delete the unmatched portion if we try to complete a spelling error.
+ 32. Solaris 2.4 workaround for isprint('\t') lossage (From Casper)
+ 31. Fixed csh bug: [Reported by Jaap]
+	set test="one\
+	two\
+	three"
+	echo "$test:q"
+ 30. Fixed the lossage in setting the looking mode in tw.parse.c before
+     calling t_search; $x/$y will not append the right suffix.
+ 29. Another attempt at the gethost timeout code.
+ 28. Cray dmmode and filetests -m -k [need documentation!]
+ 27. More manual patches.
+ 26. Don't glob the path; security problem and core-dump. [from beto]
+ 25. Avoid waiting for jobs that failed to restart, thus hanging the shell.
+     eg, run job in background, attach to debugger; kill it inside the
+     debugger. Get out of the debugger and you are stuck if you fg that job.
+ 24. 6.05.02 - 09/04/94
+ 23. remhost code could pass the wrong length to getpeername()
+ 22. too eager sed'ing broke convex getwarpbyvalue() to getwarpbyvarval()
+ 21. Fixed new bindings bug.
+ 20. Fixed bug in newgrp code; execv was called incorrectly.
+ 19. Take into account programmable completion hints when spell checking.
+ 18. Unconditionally change stty modes in Rawmode()
+ 17. Change date in $version to be ISO 8601 per Keith's suggestion
+ 16. Fixed portability problems in the new counted-strings codes (From Kaveh)
+ 15. Fixed binding problem with the new counted-strings code [all key bindings
+     ended up in the extended map]
+ 14. 6.05.01 - 07/08/94
+ 13. Changed key bindings to use counted strings instead of Null terminated
+     strings, so that binding ^@ works.
+ 12. Fix parsing bug, where words that contained keywords caused incorrect
+     word breaks:
+	switch (iftagd)
+	case iftagd:
+	    echo It works
+	    breaksw
+	default:
+	    echo It is broken.
+	endsw
+ 11. Fix sh.c for systems with no job control. [the new hup builtin sends
+     SIGCONT].
+ 10. Don't add the suffix character when all completions fail, from michael
+  9. Added histdup=erase, that deletes the oldest duplicate instead of
+     the newest.
+  8. Don't call .logout recursively if we receive more than one hup,
+     and don't process hangups when we execute the .logout.
+  7. $logout was set to a static string.
+  6. Non printable binding listing was broken.
+  5. Recursive sourced scripts would get mangled up because of input buffer
+     confusion (thanks michael)
+  4. M-space should not be counted as a space. Leads to infinite loop in
+     word splitting.
+  3. Pyramid fixes.
+  2. Fixed '\' in sysv echo (from Mika)
+  1. Missed fix_yp_bugs() when setting REMOTEHOST (From Casper)
+
+V6.05.00, 06/19/94
+113. 6.04.17 06/18/94
 112. Realloc debug fix from John.
 111. Completion fixes from Bruce.
 110. Added -b option to bind.

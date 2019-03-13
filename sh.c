@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/sh.c,v 3.63 1994/05/26 13:11:20 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/sh.c,v 3.70 1995/05/06 17:51:58 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -43,7 +43,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$Id: sh.c,v 3.63 1994/05/26 13:11:20 christos Exp $")
+RCSID("$Id: sh.c,v 3.70 1995/05/06 17:51:58 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -179,6 +179,18 @@ main(argc, argv)
     sigvec_t osv;
 #endif /* BSDSIGS */
 
+#if defined(NLS_CATALOGS) && defined(LC_MESSAGES)
+    (void) setlocale(LC_MESSAGES, "");
+#endif /* NLS_CATALOGS && LC_MESSAGES */
+
+#ifdef NLS
+# ifdef LC_CTYPE
+    (void) setlocale(LC_CTYPE, ""); /* for iscntrl */
+# endif /* LC_CTYPE */
+#endif /* NLS */
+
+    nlsinit();
+
 #ifdef MALLOC_TRACE
      mal_setstatsfile(fdopen(dup2(open("/tmp/tcsh.trace", 
 				       O_WRONLY|O_CREAT, 0666), 25), "w"));
@@ -236,6 +248,8 @@ main(argc, argv)
 
     HIST = '!';
     HISTSUB = '^';
+    PRCH = '>';
+    PRCHROOT = '#';
     word_chars = STR_WORD_CHARS;
     bslash_quote = 0;		/* PWP: do tcsh-style backslash quoting? */
 
@@ -483,9 +497,10 @@ main(argc, argv)
      * everything??
      */
     {
-	char *cln, *cus;
+	char *cln, *cus, *cgr;
 	Char    buff[BUFSIZE];
 	struct passwd *pw;
+	struct group *gr;
 
 
 #ifdef apollo
@@ -515,6 +530,16 @@ main(argc, argv)
 	    tsetenv(STRLOGNAME, varval(STRuser));
 	if (cus == NULL)
 	    tsetenv(STRKUSER, varval(STRuser));
+	
+	cgr = getenv("GROUP");
+	if (cgr != NULL)
+	    set(STRgroup, quote(SAVE(cgr)), VAR_READWRITE);
+	else if ((gr = getgrgid(gid)) == NULL)
+	    set(STRgroup, SAVE("unknown"), VAR_READWRITE);
+	else
+	    set(STRgroup, SAVE(gr->gr_name), VAR_READWRITE);
+	if (cgr == NULL)
+	    tsetenv(STRKGROUP, varval(STRgroup));
     }
 
     /*
@@ -584,7 +609,7 @@ main(argc, argv)
      * Re-initialize path if set in environment
      */
     if ((tcp = getenv("PATH")) == NULL)
-	set1(STRpath, defaultpath(), &shvhed, VAR_READWRITE);
+	setq(STRpath, defaultpath(), &shvhed, VAR_READWRITE);
     else
 	/* Importpath() allocates memory for the path, and the
 	 * returned pointer from SAVE() was discarded, so
@@ -700,6 +725,13 @@ main(argc, argv)
 		  }
 #endif
 		arginp = SAVE(tempv[0]);
+
+		/*
+		 * we put the command into a variable
+		 */
+		if (arginp != NULL)
+		  set(STRcommand, quote(Strsave(arginp)), VAR_READWRITE);
+
 		/*
 		 * * Give an error on -c arguments that end in * backslash to
 		 * ensure that you don't make * nonportable csh scripts.
@@ -1042,8 +1074,9 @@ main(argc, argv)
 	    }
 	    if (tpgrp == -1) {
 	notty:
-		xprintf("Warning: no access to tty (%s).\n", strerror(errno));
-		xprintf("Thus no job control in this shell.\n");
+		xprintf(CGETS(11, 1, "Warning: no access to tty (%s).\n"),
+			strerror(errno));
+		xprintf(CGETS(11, 2, "Thus no job control in this shell.\n"));
 		/*
 		 * Fix from:Sakari Jalovaara <sja@sirius.hut.fi> if we don't
 		 * have access to tty, disable editing too
@@ -1110,14 +1143,23 @@ main(argc, argv)
 #endif
 	    setintr = 0;
 	    parintr = SIG_IGN;	/* onintr in /etc/ files has no effect */
+#ifdef LOGINFIRST
+#ifdef _PATH_DOTLOGIN
+	    if (loginsh)
+	      (void) srcfile(_PATH_DOTLOGIN, 0, 0, NULL);
+#endif
+#endif
+
 #ifdef _PATH_DOTCSHRC
 	    (void) srcfile(_PATH_DOTCSHRC, 0, 0, NULL);
 #endif
 	    if (!arginp && !onelflg && !havhash)
 		dohash(NULL,NULL);
+#ifndef LOGINFIRST
 #ifdef _PATH_DOTLOGIN
 	    if (loginsh)
 		(void) srcfile(_PATH_DOTLOGIN, 0, 0, NULL);
+#endif
 #endif
 #ifdef BSDSIGS
 	    (void) sigsetmask(omask);
@@ -1241,7 +1283,7 @@ importpath(cp)
 	    dp++;
 	}
     pv[i] = 0;
-    set1(STRpath, pv, &shvhed, VAR_READWRITE);
+    setq(STRpath, pv, &shvhed, VAR_READWRITE);
 }
 
 /*
@@ -1306,7 +1348,10 @@ st_save(st, unit, hflg, al, av)
     st->alvec		= alvec;
     st->onelflg		= onelflg;
     st->enterhist	= enterhist;
-    st->HIST		= HIST;
+    if (hflg)
+	st->HIST	= HIST;
+    else
+	st->HIST	= '\0';
     st->cantell		= cantell;
     cpybin(st->B, B);
 
@@ -1326,6 +1371,8 @@ st_save(st, unit, hflg, al, av)
     else
 	st->argv = NULL;
 
+    SHIN	= unit;	/* Do this first */
+
     /* Establish new input arena */
     {
 	fbuf = NULL;
@@ -1333,7 +1380,6 @@ st_save(st, unit, hflg, al, av)
 	settell();
     }
 
-    SHIN	= unit;
     arginp	= 0;
     onelflg	= 0;
     intty	= isatty(SHIN);
@@ -1388,7 +1434,8 @@ st_restore(st, av)
     intty	= st->intty;
     whyles	= st->whyles;
     gointr	= st->gointr;
-    HIST	= st->HIST;
+    if (st->HIST != '\0')
+	HIST	= st->HIST;
     enterhist	= st->enterhist;
     cantell	= st->cantell;
 
@@ -1498,12 +1545,13 @@ goodbye(v, c)
     record();
 
     if (loginsh) {
-	(void) signal(SIGQUIT, SIG_IGN);
+	(void) sigset(SIGQUIT, SIG_IGN);
 	(void) sigset(SIGINT, SIG_IGN);
-	(void) signal(SIGTERM, SIG_IGN);
+	(void) sigset(SIGTERM, SIG_IGN);
+	(void) sigset(SIGHUP, SIG_IGN);
 	setintr = 0;		/* No interrupts after "logout" */
 	if (!(adrof(STRlogout)))
-	    set(STRlogout, STRnormal, VAR_READWRITE);
+	    set(STRlogout, Strsave(STRnormal), VAR_READWRITE);
 #ifdef _PATH_DOTLOGOUT
 	(void) srcfile(_PATH_DOTLOGOUT, 0, 0, NULL);
 #endif
@@ -1539,13 +1587,24 @@ static  sigret_t
 phup(snum)
 int snum;
 {
+    /*
+     * There is no return from here,
+     * so we are not going to release SIGHUP
+     * anymore
+     */
 #ifdef UNRELSIGS
     if (snum)
 	(void) sigset(snum, SIG_IGN);
+#else
+# ifdef BSDSIGS
+    (void) sigblock(sigmask(SIGHUP));
+# else
+    (void) sighold(SIGHUP);
+# endif /* BSDSIGS */
 #endif /* UNRELSIGS */
 
     if (loginsh) {
-	set(STRlogout, STRhangup, VAR_READWRITE);
+	set(STRlogout, Strsave(STRhangup), VAR_READWRITE);
 #ifdef _PATH_DOTLOGOUT
 	(void) srcfile(_PATH_DOTLOGOUT, 0, 0, NULL);
 #endif
@@ -1581,7 +1640,9 @@ int snum;
 		    np->p_flags &= ~PHUP;
 		    if (killpg(np->p_jobid, SIGHUP) != -1) {
 			/* In case the job was suspended... */
+#ifdef SIGCONT
 			(void) killpg(np->p_jobid, SIGCONT);
+#endif
 			break;
 		    }
 		}
@@ -1921,8 +1982,8 @@ process(catch)
 	freesyn(savet), savet = NULL;
 #ifdef SIG_WINDOW
 	if (catch && intty && !whyles && !tellwhat)
-	    window_change(0);	/* for window systems */
-#endif				/* SIG_WINDOW */
+	    (void) window_change(0);	/* for window systems */
+#endif /* SIG_WINDOW */
     }
     savet = t;
     resexit(osetexit);
@@ -2029,12 +2090,12 @@ mailchk()
 		continue;
 
 	    if (cnt == 1) {
-		xprintf("You have %d piece%s of mail.\n", mailcount,
-			  mailcount == 1 ? "" : "s");
+		xprintf(CGETS(11, 3, "You have %d mail messages.\n"),
+			mailcount);
 	    }
 	    else {
-		xprintf("You have %d piece%s of mail in %s.\n",
-			  mailcount, mailcount == 1 ? "" : "s", filename);
+		xprintf(CGETS(11, 4, "You have %d mail messages in %s.\n"),
+			mailcount, filename);
 	    }
 	}
 	else {
@@ -2043,10 +2104,11 @@ mailchk()
 		(loginsh && !new))
 		continue;
 	    if (cnt == 1)
-		xprintf("You have %smail.\n", new ? "new " : "");
+		xprintf(CGETS(11, 5, "You have %smail.\n"),
+			new ? CGETS(11, 6, "new ") : "");
 	    else
-		xprintf("You have %smail in %s.\n", new ? "new " : "",
-			filename);
+	        xprintf(CGETS(11, 7, "You have %smail in %s.\n"),
+			new ? CGETS(11, 6, "new ") : "", filename);
 	}
     }
     chktim = t;
@@ -2144,13 +2206,24 @@ xexit(i)
 		if ((np->p_flags & PHUP) && np->p_jobid != shpgrp)
 		    if (killpg(np->p_jobid, SIGHUP) != -1) {
 			/* In case the job was suspended... */
+#ifdef SIGCONT
 			(void) killpg(np->p_jobid, SIGCONT);
+#endif
 			break;
 		    }
 	    while ((np = np->p_friends) != pp);
 	}
     }
     untty();
+#ifdef NLS_CATALOGS
+    /*
+     * We need to call catclose, because SVR4 leaves symlinks behind otherwise
+     * in the catalog directories. We cannot close on a vforked() child,
+     * because messages will stop working on the parent too.
+     */
+    if (child == 0)
+	(void) catclose(catd);
+#endif /* NLS_CATALOGS */
     _exit(i);
 }
 
@@ -2163,8 +2236,10 @@ defaultpath()
 
     blkp = blk = (Char **) xmalloc((size_t) sizeof(Char *) * 10);
 
-#ifndef DOTLAST
+#ifndef NODOT
+# ifndef DOTLAST
     *blkp++ = Strsave(STRdot);
+# endif
 #endif
 
 #define DIRAPPEND(a)  \
@@ -2193,8 +2268,10 @@ defaultpath()
 
 #undef DIRAPPEND
 
-#ifdef DOTLAST
+#ifndef NODOT
+# ifdef DOTLAST
     *blkp++ = Strsave(STRdot);
+# endif
 #endif
     *blkp = NULL;
     return (blk);

@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/sh.proc.c,v 3.55 1994/05/26 13:11:20 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/sh.proc.c,v 3.62 1995/04/16 19:15:53 christos Exp $ */
 /*
  * sh.proc.c: Job manipulations
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.proc.c,v 3.55 1994/05/26 13:11:20 christos Exp $")
+RCSID("$Id: sh.proc.c,v 3.62 1995/04/16 19:15:53 christos Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -47,21 +47,21 @@ RCSID("$Id: sh.proc.c,v 3.55 1994/05/26 13:11:20 christos Exp $")
 # define HZ 16
 #endif /* aiws */
 
-#if (defined(_BSD) && defined(_BSD_INCLUDES)) || (defined(IRIS4D) && __STDC__) || defined(__lucid) || defined(linux)
+#if defined(_BSD) || (defined(IRIS4D) && __STDC__) || defined(__lucid) || defined(linux)
 # define BSDWAIT
-#endif
+#endif /* _BSD || (IRIS4D && __STDC__) || __lucid || linux */
 #ifndef WTERMSIG
 # define WTERMSIG(w)	(((union wait *) &(w))->w_termsig)
 # ifndef BSDWAIT
 #  define BSDWAIT
-# endif
+# endif /* !BSDWAIT */
 #endif /* !WTERMSIG */
 #ifndef WEXITSTATUS
 # define WEXITSTATUS(w)	(((union wait *) &(w))->w_retcode)
 #endif /* !WEXITSTATUS */
 #ifndef WSTOPSIG
 # define WSTOPSIG(w)	(((union wait *) &(w))->w_stopsig)
-#endif /* WSTOPSIG */
+#endif /* !WSTOPSIG */
 
 #ifndef WCOREDUMP
 # ifdef BSDWAIT
@@ -78,11 +78,11 @@ RCSID("$Id: sh.proc.c,v 3.55 1994/05/26 13:11:20 christos Exp $")
 #define BIGINDEX	9	/* largest desirable job index */
 
 #ifdef BSDTIMES
-# if defined(SUNOS4) || defined(hp9000)
+# if defined(SUNOS4) || defined(hp9000) || (defined(__alpha) && defined(__osf__))
 static struct rusage zru = {{0L, 0L}, {0L, 0L}, 0L, 0L, 0L, 0L,
 			    0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L};
 
-# else /* !SUNOS4 && !hp9000 */
+# else /* !SUNOS4 && !hp9000 && !(__alpha && __osf__) */
 #  ifdef masscomp
 /*
  * Initialization of this structure under RTU 4.1A & RTU 5.0 is problematic
@@ -94,8 +94,8 @@ static struct rusage zru;
 static struct rusage zru = {{0L, 0L}, {0L, 0L}, 0, 0, 0, 0, 0, 0, 0, 
 			    0, 0, 0, 0, 0, 0};
 #  endif /* masscomp */
-# endif	/* !SUNOS4 && !hp9000 */
-#else /* ! BSDTIMES */
+# endif	/* SUNOS4 || hp9000 || (__alpha && __osf__) */
+#else /* !BSDTIMES */
 # ifdef _SEQUENT_
 static struct process_stats zru = {{0L, 0L}, {0L, 0L}, 0, 0, 0, 0, 0, 0, 0,
 				   0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -106,10 +106,11 @@ static struct tms zru = {0L, 0L, 0L, 0L}, lru = {0L, 0L, 0L, 0L};
 
 #ifndef RUSAGE_CHILDREN
 # define	RUSAGE_CHILDREN	-1
-#endif
+#endif /* RUSAGE_CHILDREN */
 
 static	void		 pflushall	__P((void));
 static	void		 pflush		__P((struct process *));
+static	void		 pfree		__P((struct process *));
 static	void		 pclrcurr	__P((struct process *));
 static	void		 padd		__P((struct command *));
 static	int		 pprint		__P((struct process *, int));
@@ -137,7 +138,7 @@ int snum;
     register int pid;
 #if defined(BSDJOBS) || (!defined(BSDTIMES) && (defined(ODT) || defined(aiws) || defined(uts)))
     extern int insource;
-#endif /* BSDJOBS */
+#endif /* BSDJOBS || (!BSDTIMES && (ODT || aiws || uts)) */
 #ifdef BSDWAIT
     union wait w;
 #else /* !BSDWAIT */
@@ -159,8 +160,8 @@ int snum;
 	timesdone++;
 	(void) times(&shtimes);
     }
-# endif	/* _SEQUENT_ */
-#endif /* BSDTIMES */
+# endif	/* !_SEQUENT_ */
+#endif /* !BSDTIMES */
 
 #ifdef JOBDEBUG
     xprintf("pchild()\n");
@@ -187,7 +188,7 @@ loop:
 #ifdef JOBDEBUG
     xprintf("Waiting...\n");
     flush();
-#endif
+#endif /* JOBDEBUG */
 #ifdef BSDJOBS
 # ifdef BSDTIMES
     /* both a wait3 and rusage */
@@ -226,38 +227,38 @@ loop:
     pid = wait3(&w.w_status, WNOHANG, &ru);
 #  endif /* !hpux */
 # else /* !BSDTIMES */
-# ifdef ODT  /* For Sco Unix 3.2.0 or ODT 1.0 */
-#  define HAVEwait3
-    pid = waitpid(-1, &w,
-	    (setintr && (intty || insource) ? WNOHANG | WUNTRACED : WNOHANG));
-# endif /* ODT */	    
-# if defined(aiws) || defined(uts)
-#  define HAVEwait3
+#  ifdef ODT  /* For Sco Unix 3.2.0 or ODT 1.0 */
+#   define HAVEwait3
+     pid = waitpid(-1, &w,
+ 	    (setintr && (intty || insource) ? WNOHANG | WUNTRACED : WNOHANG));
+#  endif /* ODT */	    
+#  if defined(aiws) || defined(uts)
+#   define HAVEwait3
     pid = wait3(&w.w_status, 
 	(setintr && (intty || insource) ? WNOHANG | WUNTRACED : WNOHANG), 0);
-# endif /* aiws || uts */
-# ifndef HAVEwait3
-#  ifdef UNRELSIGS
-    /* no wait3, therefore no rusage */
-    /* on Sys V, this may hang.  I hope it's not going to be a problem */
-#   ifdef _MINIX
-    pid = wait(&w);
-#   else /* !_MINIX */
-    pid = ourwait(&w.w_status);
-#   endif /* _MINIX */
-#  else	/* UNRELSIGS */
-    /* 
-     * XXX: for greater than 3 we should use waitpid(). 
-     * but then again, SVR4 falls into the POSIX/BSDJOBS category.
-     */
-    pid = wait(&w.w_status);
-#  endif /* SYSVREL >= 3 */
-# endif /* HAVEwait3 */
-# endif	/* BSDTIMES */
+#  endif /* aiws || uts */
+#  ifndef HAVEwait3
+#   ifdef UNRELSIGS
+     /* no wait3, therefore no rusage */
+     /* on Sys V, this may hang.  I hope it's not going to be a problem */
+#    ifdef _MINIX
+      pid = wait(&w);
+#    else /* !_MINIX */
+      pid = ourwait(&w.w_status);
+#    endif /* _MINIX */
+#   else /* !UNRELSIGS */
+     /* 
+      * XXX: for greater than 3 we should use waitpid(). 
+      * but then again, SVR4 falls into the POSIX/BSDJOBS category.
+      */
+     pid = wait(&w.w_status);
+#   endif /* !UNRELSIGS */
+#  endif /* !HAVEwait3 */
+# endif	/* !BSDTIMES */
 # ifndef BSDSIGS
     (void) sigset(SIGCHLD, pchild);
 # endif /* !BSDSIGS */
-#endif /* BSDJOBS */
+#endif /* !BSDJOBS */
 
 #ifdef JOBDEBUG
     xprintf("parent %d pid %d, retval %x termsig %x retcode %x\n",
@@ -268,7 +269,7 @@ loop:
     if (pid <= 0) {
 #ifdef JOBDEBUG
 	xprintf("errno == %d\n", errno);
-#endif
+#endif /* JOBDEBUG */
 	if (errno == EINTR) {
 	    errno = 0;
 	    goto loop;
@@ -278,7 +279,7 @@ loop:
 	return (0);
 #else /* !SIGVOID */
 	return;
-#endif /* SIGVOID */
+#endif /* !SIGVOID */
     }
     for (pp = proclist.p_next; pp != NULL; pp = pp->p_next)
 	if (pid == pp->p_procid)
@@ -304,10 +305,10 @@ found:
 # else	/* !_SEQUENT_ */
 #  ifndef COHERENT
 	    pp->p_etime = times(&proctimes);
-#  else /* !COHERENT */
+#  else /* COHERENT */
 	    pp->p_etime = HZ * time(NULL);
 	    times(&proctimes);
-#  endif /* !COHERENT */
+#  endif /* COHERENT */
 # endif	/* !_SEQUENT_ */
 #else /* BSDTIMES */
 	    (void) gettimeofday(&pp->p_etime, NULL);
@@ -398,7 +399,7 @@ found:
 #ifdef notdef
 		else if ((jobflags & (PTIME|PSTOPPED)) == PTIME)
 		    ptprint(fp);
-#endif
+#endif /* notdef */
 	    }
 	}
 	else {
@@ -424,7 +425,7 @@ found:
 			 * input
 			 */
 			ClearLines();
-#endif
+#endif /* notdef */
 			ClearDisp();
 			Refresh();
 		    }
@@ -471,6 +472,19 @@ pnote()
     }
 }
 
+
+static void
+pfree(pp)
+    struct process *pp;
+{	
+    xfree((ptr_t) pp->p_command);
+    if (pp->p_cwd && --pp->p_cwd->di_count == 0)
+	if (pp->p_cwd->di_next == 0)
+	    dfree(pp->p_cwd);
+    xfree((ptr_t) pp);
+}
+
+
 /*
  * pwait - wait for current job to terminate, maintaining integrity
  *	of current and previous job indicators.
@@ -494,11 +508,7 @@ pwait()
     for (pp = (fp = &proclist)->p_next; pp != NULL; pp = (fp = pp)->p_next)
 	if (pp->p_procid == 0) {
 	    fp->p_next = pp->p_next;
-	    xfree((ptr_t) pp->p_command);
-	    if (pp->p_cwd && --pp->p_cwd->di_count == 0)
-		if (pp->p_cwd->di_next == 0)
-		    dfree(pp->p_cwd);
-	    xfree((ptr_t) pp);
+	    pfree(pp);
 	    pp = fp;
 	}
 #ifdef BSDSIGS
@@ -508,7 +518,7 @@ pwait()
 # ifdef notdef
     if (setintr)
 	sigignore(SIGINT);
-# endif
+# endif /* notdef */
 #endif /* !BSDSIGS */
     pjwait(pcurrjob);
 }
@@ -536,7 +546,7 @@ pjwait(pp)
 
     do {
 	if ((fp->p_flags & (PFOREGND | PRUNNING)) == PRUNNING)
-	    xprintf("BUG: waiting for background job!\n");
+	    xprintf(CGETS(17, 1, "BUG: waiting for background job!\n"));
     } while ((fp = fp->p_friends) != pp);
     /*
      * Now keep pausing as long as we are not interrupted (SIGINT), and the
@@ -627,7 +637,7 @@ pjwait(pp)
      */
     if ((reason != 0) && (adrof(STRprintexitvalue)) && 
 	(pp->p_flags & PBACKQ) == 0)
-	xprintf("Exit %d\n", reason);
+	xprintf(CGETS(17, 2, "Exit %d\n"), reason);
     set(STRstatus, putn(reason), VAR_READWRITE);
     if (reason && exiterr)
 	exitstat();
@@ -705,7 +715,7 @@ pflush(pp)
     register int idx;
 
     if (pp->p_procid == 0) {
-	xprintf("BUG: process flushed twice");
+	xprintf(CGETS(17, 3, "BUG: process flushed twice"));
 	return;
     }
     while (pp->p_procid != pp->p_jobid)
@@ -1080,11 +1090,7 @@ pprint(pp, flag)
 	    }
 	    if (flag & (REASON | AREASON)) {
 		if (flag & NAME)
-#ifdef SUSPENDED
-		    format = "%-23s";
-#else /* !SUSPENDED */
-		    format = "%-21s";
-#endif /* !SUSPENDED */
+		    format = "%-30s";
 		else
 		    format = "%s";
 		if (pstatus == status)
@@ -1101,7 +1107,7 @@ pprint(pp, flag)
 		switch (status) {
 
 		case PRUNNING:
-		    xprintf(format, "Running ");
+		    xprintf(format, CGETS(17, 4, "Running "));
 		    break;
 
 		case PINTERRUPTED:
@@ -1116,8 +1122,15 @@ pprint(pp, flag)
 			|| ((flag & AREASON)
 			    && reason != SIGINT
 			    && (reason != SIGPIPE
-				|| (pp->p_flags & PPOU) == 0)))
-			xprintf(format, mesg[pp->p_reason & ASCII].pname);
+				|| (pp->p_flags & PPOU) == 0))) {
+			char *ptr;
+			char buf[1024];
+
+			if ((ptr = mesg[pp->p_reason & ASCII].pname) == NULL)
+			    xsprintf(ptr = buf, "%s %d", CGETS(17, 5, "Signal"),
+				     pp->p_reason & ASCII);
+			xprintf(format, ptr);
+		    }
 		    else
 			reason = -1;
 		    break;
@@ -1126,17 +1139,14 @@ pprint(pp, flag)
 		case PAEXITED:
 		    if (flag & REASON)
 			if (pp->p_reason)
-#ifdef SUSPENDED
-			    xprintf("Exit %-18d", pp->p_reason);
-#else /* SUSPENDED */
-			    xprintf("Exit %-16d", pp->p_reason);
-#endif /* SUSPENDED */
+			    xprintf(CGETS(17, 6, "Exit %-25d"), pp->p_reason);
 			else
-			    xprintf(format, "Done");
+			    xprintf(format, CGETS(17, 7, "Done"));
 		    break;
 
 		default:
-		    xprintf("BUG: status=%-9o", status);
+		    xprintf(CGETS(17, 8, "BUG: status=%-9o"),
+			    status);
 		}
 	    }
 	}
@@ -1149,13 +1159,13 @@ prcomd:
 		xprintf("&");
 	}
 	if (flag & (REASON | AREASON) && pp->p_flags & PDUMPED)
-	    xprintf(" (core dumped)");
+	    xprintf(CGETS(17, 9, " (core dumped)"));
 	if (tp == pp->p_friends) {
 	    if (flag & AMPERSAND)
 		xprintf(" &");
 	    if (flag & JOBDIR &&
 		!eq(tp->p_cwd->di_name, dcwd->di_name)) {
-		xprintf(" (wd: ");
+		xprintf(CGETS(17, 10, " (wd: "));
 		dtildepr(tp->p_cwd->di_name);
 		xprintf(")");
 	    }
@@ -1186,7 +1196,7 @@ prcomd:
 	    if (linp != linbuf)
 		xputchar('\n');
 	    if (flag & SHELLDIR && !eq(tp->p_cwd->di_name, dcwd->di_name)) {
-		xprintf("(wd now: ");
+		xprintf(CGETS(17, 11, "(wd now: "));
 		dtildepr(dcwd->di_name);
 		xprintf(")\n");
 	    }
@@ -1361,7 +1371,11 @@ dofg(v, c)
     ++v;
     do {
 	pp = pfind(*v);
-	pstart(pp, 1);
+	if (!pstart(pp, 1)) {
+	    pp->p_procid = 0;
+	    stderror(ERR_NAME|ERR_BADJOB, pp->p_command, strerror(errno));
+	    continue;
+	}
 #ifndef BSDSIGS
 # ifdef notdef
 	if (setintr)
@@ -1386,7 +1400,11 @@ dofg1(v, c)
     USE(c);
     okpcntl();
     pp = pfind(v[0]);
-    pstart(pp, 1);
+    if (!pstart(pp, 1)) {
+	pp->p_procid = 0;
+	stderror(ERR_NAME|ERR_BADJOB, pp->p_command, strerror(errno));
+	return;
+    }
 #ifndef BSDSIGS
 # ifdef notdef
     if (setintr)
@@ -1412,7 +1430,10 @@ dobg(v, c)
     ++v;
     do {
 	pp = pfind(*v);
-	pstart(pp, 0);
+	if (!pstart(pp, 0)) {
+	    pp->p_procid = 0;
+	    stderror(ERR_NAME|ERR_BADJOB, pp->p_command, strerror(errno));
+	}
     } while (*v && *++v);
 }
 
@@ -1429,7 +1450,10 @@ dobg1(v, c)
 
     USE(c);
     pp = pfind(v[0]);
-    pstart(pp, 0);
+    if (!pstart(pp, 0)) {
+	pp->p_procid = 0;
+	stderror(ERR_NAME|ERR_BADJOB, pp->p_command, strerror(errno));
+    }
 }
 
 /*
@@ -1480,7 +1504,7 @@ dokill(v, c)
 	}
 	if (Isdigit(v[0][1])) {
 	    signum = atoi(short2str(v[0] + 1));
-	    if (signum < 0 || signum > NSIG)
+	    if (signum < 0 || signum > (MAXSIG-1))
 		stderror(ERR_NAME | ERR_BADSIG);
 	}
 	else {
@@ -1510,7 +1534,7 @@ pkill(v, signum)
 #ifdef BSDSIGS
     sigmask_t omask;
 #endif /* BSDSIGS */
-    Char   *cp;
+    Char   *cp, **vp;
 
 #ifdef BSDSIGS
     omask = sigmask(SIGCHLD);
@@ -1522,6 +1546,12 @@ pkill(v, signum)
 	(void) sighold(SIGINT);
     (void) sighold(SIGCHLD);
 #endif /* !BSDSIGS */
+
+    /* Avoid globbing %?x patterns */
+    for (vp = v; vp && *vp; vp++)
+	if (**vp == '%')
+	    (void) quote(*vp);
+
     gflag = 0, tglob(v);
     if (gflag) {
 	v = globall(v);
@@ -1532,6 +1562,7 @@ pkill(v, signum)
 	v = gargv = saveblk(v);
 	trim(v);
     }
+
 
     while (v && (cp = *v)) {
 	if (*cp == '%') {
@@ -1548,9 +1579,9 @@ pkill(v, signum)
 	    case SIGTTOU:
 		if ((jobflags & PRUNNING) == 0) {
 # ifdef SUSPENDED
-		    xprintf("%S: Already suspended\n", cp);
+		    xprintf(CGETS(17, 12, "%S: Already suspended\n"), cp);
 # else /* !SUSPENDED */
-		    xprintf("%S: Already stopped\n", cp);
+		    xprintf(CGETS(17, 13, "%S: Already stopped\n"), cp);
 # endif /* !SUSPENDED */
 		    err1++;
 		    goto cont;
@@ -1561,7 +1592,11 @@ pkill(v, signum)
 		 * says it is suspended, but it is running; thanks jaap..
 		 */
 	    case SIGCONT:
-		pstart(pp, 0);
+		if (!pstart(pp, 0)) {
+		    pp->p_procid = 0;
+		    stderror(ERR_NAME|ERR_BADJOB, pp->p_command,
+			     strerror(errno));
+		}
 		goto cont;
 	    default:
 		break;
@@ -1609,11 +1644,12 @@ cont:
 /*
  * pstart - start the job in foreground/background
  */
-void
+int
 pstart(pp, foregnd)
     register struct process *pp;
     int     foregnd;
 {
+    int rv = 0;
     register struct process *np;
 #ifdef BSDSIGS
     sigmask_t omask;
@@ -1644,7 +1680,7 @@ pstart(pp, foregnd)
     (void) pprint(pp, foregnd ? NAME | JOBDIR : NUMBER | NAME | AMPERSAND);
 #ifdef BSDJOBS
     if (foregnd) {
-	(void) tcsetpgrp(FSHTTY, pp->p_jobid);
+	rv = tcsetpgrp(FSHTTY, pp->p_jobid);
     }
     /*
      * 1. child process of csh (shell script) receives SIGTTIN/SIGTTOU
@@ -1658,16 +1694,20 @@ pstart(pp, foregnd)
      * 5. CONSEQUENCE : csh is UNaware that the process is stopped
      * 6. THIS LINE HAS BEEN COMMENTED OUT : if (jobflags&PSTOPPED)
      * 	  (beto@aixwiz.austin.ibm.com - aug/03/91)
+     * 7. I removed the line completely and added extra checks for
+     *    pstart, so that if a job gets attached to and dies inside
+     *    a debugger it does not confuse the shell. [christos]
      */
 
-    /* if (jobflags & PSTOPPED) */
-	(void) killpg(pp->p_jobid, SIGCONT);
+    if (rv != -1)
+	rv = killpg(pp->p_jobid, SIGCONT);
 #endif /* BSDJOBS */
 #ifdef BSDSIGS
     (void) sigsetmask(omask);
 #else /* !BSDSIGS */
     (void) sigrelse(SIGCHLD);
 #endif /* !BSDSIGS */
+    return rv != -1;
 }
 
 void
@@ -1796,7 +1836,7 @@ pfork(t, wanttty)
 #endif /* BSDSIGS */
 #ifdef SIGSYNCH
     sigvec_t osv;
-    static sigvec_t nsv = {synch_handler, ~0, 0};
+    static sigvec_t nsv = {synch_handler, (sigset_t) ~0, 0};
 #endif /* SIGSYNCH */
 
     /*

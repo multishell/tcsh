@@ -82,7 +82,7 @@
  **********************************************************************
  */
 #include "sh.h"
-RCSID("$Id: ma.setp.c,v 1.8 1993/10/30 19:50:16 christos Exp $")
+RCSID("$Id: ma.setp.c,v 1.11 1995/04/16 19:15:53 christos Exp $")
 
 #ifdef MACH
 
@@ -119,13 +119,15 @@ static int sflag;
 static int eflag;
 
 #define INVALID { \
-	if (eflag) xprintf("setpath: invalid command '%s'.\n", cmd); \
+	if (eflag) xprintf(CGETS(10, 1, \
+				 "setpath: invalid command '%s'.\n"), cmd); \
 	freepaths(); \
 	return(-1); \
 }
 
 #define TOOFEW { \
-	if (eflag) xprintf("setpath: insufficient arguments to command '%s'.\n", cmd); \
+	if (eflag) xprintf(CGETS(10, 2, \
+		 "setpath: insufficient arguments to command '%s'.\n"), cmd); \
 	freepaths(); \
 	return(-1); \
 }
@@ -240,7 +242,8 @@ register char **paths;
 	val = index(path, '=');
 	if (val == NULL) {
 	    if (eflag)
-		xprintf("setpath: value missing in path '%s'\n", path);
+		xprintf(CGETS(10, 3,
+			      "setpath: value missing in path '%s'\n"), path);
 	    freepaths();
 	    return(-1);
 	}
@@ -355,10 +358,10 @@ char *localsyspath;
 	*new = '\0';
 	if (localsyspath != NULL) {
 	    *new = ':';
-	    strcpy(new + 1, localsyspath);
-	    strcat(new, pe->psuf);
+	    (void) strcpy(new + 1, localsyspath);
+	    (void) strcat(new, pe->psuf);
 	}
-	strcat(new, pe->pdef);
+	(void) strcat(new, pe->pdef);
 	for (n = 0; n < pe->pdirs; n++) {
 	    if (pe->pdir[n] == NULL)
 		continue;
@@ -399,8 +402,8 @@ char *path, *localsyspath;
 	    new = localsyspath;
 	else {
 	    new = newbuf;
-	    strcpy(new, localsyspath);
-	    strcat(new, pe->psuf);
+	    (void) strcpy(new, localsyspath);
+	    (void) strcat(new, pe->psuf);
 	}
 	n = locate(pe, new);
 	if (n >= 0)
@@ -422,7 +425,7 @@ char *inpath, *path;
 	if (n >= 0)
 	    insert(pe, n + 1, path);
 	else
-	    xprintf("setpath: %s not found in %s\n",
+	    xprintf(CGETS(10, 4, "setpath: %s not found in %s\n"),
 		    inpath, pe->pname);
     }
 }
@@ -439,7 +442,7 @@ char *inpath, *path;
 	if (n >= 0)
 	    insert(pe, n, path);
 	else
-	    xprintf("setpath: %s not found in %s\n",
+	    xprintf(CGETS(10, 4, "setpath: %s not found in %s\n",
 		    inpath, pe->pname);
 	}
 }
@@ -467,8 +470,8 @@ register char *key;
 
     if (sflag) {		/* add suffix */
 	new = newbuf;
-	strcpy(new, key);
-	strcat(new, pe->psuf);
+	(void) strcpy(new, key);
+	(void) strcat(new, pe->psuf);
     } else
 	new = key;
     new = strsave(new);
@@ -496,7 +499,7 @@ char *path;
 	if (n >= 0)
 	    delete(pe, n);
 	else
-	    xprintf("setpath: %s not found in %s\n",
+	    xprintf(CGETS(10, 4, "setpath: %s not found in %s\n"),
 		    path, pe->pname);
     }
 }
@@ -511,7 +514,8 @@ int n;
 	if (n < pe->pdirs)
 	    delete(pe, n);
 	else
-	    xprintf("setpath: %d not valid position in %s\n",
+	    xprintf(CGETS(10, 5,
+			    "setpath: %d not valid position in %s\n"),
 		    n, pe->pname);
     }
 }
@@ -545,7 +549,7 @@ char *inpath, *path;
 	if (n >= 0)
 	    change(pe, n, path);
 	else
-	    xprintf("setpath: %s not found in %s\n",
+	    xprintf(CGETS(10, 4, "setpath: %s not found in %s\n"),
 		    inpath, pe->pname);
     }
 }
@@ -561,7 +565,8 @@ int n;
 	if (n < pe->pdirs)
 	    change(pe, n, path);
 	else
-	    xprintf("setpath: %d not valid position in %s\n",
+	    xprintf(CGETS(10, 5,
+			    "setpath: %d not valid position in %s\n"),
 		    n, pe->pname);
     }
 }
@@ -577,8 +582,8 @@ register char *key;
 
     if (sflag) {		/* append suffix */
 	new = newbuf;
-	strcpy(new, key);
-	strcat(new, pe->psuf);
+	(void) strcpy(new, key);
+	(void) strcat(new, pe->psuf);
     } else
 	new = key;
     new = strsave(new);
@@ -601,8 +606,8 @@ register char *key;
 
     if (sflag) {
 	realkey = keybuf;
-	strcpy(realkey, key);
-	strcat(realkey, pe->psuf);
+	(void) strcpy(realkey, key);
+	(void) strcat(realkey, pe->psuf);
     } else
 	realkey = key;
     for (i = 0; i < pe->pdirs; i++)

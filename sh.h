@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.05/RCS/sh.h,v 3.64 1994/05/07 18:51:25 christos Exp $ */
+/* $Header: /u/christos/src/tcsh-6.06/RCS/sh.h,v 3.68 1995/04/16 19:15:53 christos Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -73,14 +73,15 @@ typedef char Char;
  * throw it away and get gcc or, use the following define
  * and get rid of the typedef.
  * [The 4.2/3BSD vax compiler does not like that]
+ * Both MULTIFLOW and PCC compilers exhbit this bug.  -- sterling@netcom.com
  */
 #ifdef SIGVOID
-# if (defined(vax) || defined(uts)) && !defined(__GNUC__)
+# if (defined(vax) || defined(uts) || defined(MULTIFLOW) || defined(PCC)) && !defined(__GNUC__)
 #  define sigret_t void
-# else
+# else /* !((vax || uts || MULTIFLOW || PCC) && !__GNUC__) */
 typedef void sigret_t;
-# endif 
-#else
+# endif /* (vax || uts || MULTIFLOW || PCC) && !__GNUC__ */
+#else /* !SIGVOID */
 typedef int sigret_t;
 #endif /* SIGVOID */
 
@@ -177,7 +178,8 @@ typedef int sigret_t;
 
 #ifdef NLS
 # include <locale.h>
-#endif 
+#endif /* NLS */
+
 
 #if !defined(_MINIX) && !defined(_VMS_POSIX)
 # include <sys/param.h>
@@ -224,8 +226,8 @@ typedef int sigret_t;
 # include <unistd.h>
 # undef getpgrp
 # undef setpgrp
-extern int getpgrp();
-extern int setpgrp();
+extern pid_t getpgrp();
+extern pid_t setpgrp();
 
 /*
  * the gcc+protoize version of <stdlib.h>
@@ -259,7 +261,7 @@ extern int setpgrp();
 # endif /* !pyr && !stellar */
 #endif /* SYSVREL > 0 ||  _IBMR2 */
 
-#if !((defined(SUNOS4) || defined(_MINIX)) && defined(TERMIO))
+#if !((defined(SUNOS4) || defined(_MINIX) || defined(DECOSF1)) && defined(TERMIO))
 # if !defined(COHERENT) && !defined(_VMS_POSIX)
 #  include <sys/ioctl.h>
 # endif
@@ -274,9 +276,9 @@ extern int setpgrp();
 # include <sys/filio.h>
 #endif /* (!FIOCLEX && SUNOS4) || (SYSVREL == 4 && !_SEQUENT_) */
 
-#if !defined(_MINIX) && !defined(COHERENT)
+#if !defined(_MINIX) && !defined(COHERENT) && !defined(supermax)
 # include <sys/file.h>
-#endif	/* !_MINIX && !COHERENT */
+#endif	/* !_MINIX && !COHERENT && !supermax */
 
 #if !defined(O_RDONLY) || !defined(O_NDELAY)
 # include <fcntl.h>
@@ -365,13 +367,19 @@ extern int setpgrp();
 /* exit normally, allowing purify to trace leaks */
 # define _exit		exit
 typedef  int		pret_t;
-#else
-# ifndef MULTIFLOW
-typedef void		pret_t;
-# else
-/* Multiflow compiler bug */
-#  define pret_t	void
-# endif
+#else /* !PURIFY */
+/*
+ * If your compiler complains, then you can either
+ * throw it away and get gcc or, use the following define
+ * and get rid of the typedef.
+ * [The 4.2/3BSD vax compiler does not like that]
+ * Both MULTIFLOW and PCC compilers exhbit this bug.  -- sterling@netcom.com
+ */
+# if (defined(vax) || defined(uts) || defined(MULTIFLOW) || defined(PCC)) && !defined(__GNUC__)
+#  define pret_t void
+# else /* !((vax || uts || MULTIFLOW || PCC) && !__GNUC__) */
+typedef void pret_t;
+# endif /* (vax || uts || MULTIFLOW || PCC) && !__GNUC__ */
 #endif /* PURIFY */
 
 typedef int bool;
@@ -491,6 +499,7 @@ EXTERN bool    isdiagatty;	/* is SHDIAG a tty */
 EXTERN bool    is1atty;		/* is file descriptor 1 a tty (didfds mode) */
 EXTERN bool    is2atty;		/* is file descriptor 2 a tty (didfds mode) */
 EXTERN bool    arun;		/* Currently running multi-line-aliases */
+EXTERN bool    inheredoc;	/* Currently parsing a heredoc */
 
 /*
  * Global i/o info
@@ -960,6 +969,8 @@ EXTERN int     lastev;		/* Last event reference (default) */
 
 EXTERN Char    HIST;		/* history invocation character */
 EXTERN Char    HISTSUB;		/* auto-substitute character */
+EXTERN Char    PRCH;		/* Prompt symbol for regular users */
+EXTERN Char    PRCHROOT;	/* Prompt symbol for root */
 
 /*
  * For operating systems with single case filenames (OS/2)
@@ -1065,5 +1076,33 @@ extern char *sys_errlist[];
 #endif
 extern int errno, sys_nerr;
 #endif /* !linux */
+
+#ifdef NLS_CATALOGS
+# ifdef linux
+#  include <localeinfo.h>
+#  include <features.h>
+# endif
+# ifdef SUNOS4
+   /* Who stole my nl_types.h? :-( 
+    * All this stuff is in the man pages, but nowhere else?
+    * This does not link right now...
+    */
+   typedef void *nl_catd; 
+   extern const char * catgets __P((nl_catd, int, int, const char *));
+   nl_catd catopen __P((const char *, int));
+   int catclose __P((nl_catd));
+# else
+#  include <nl_types.h>
+# endif
+# ifndef MCLoadBySet
+#  define MCLoadBySet 0
+# endif
+EXTERN nl_catd catd;
+# define CGETS(b, c, d)	catgets(catd, b, c, d)
+# define CSAVS(b, c, d)	strsave(CGETS(b, c, d))
+#else
+# define CGETS(b, c, d)	d
+# define CSAVS(b, c, d)	d
+#endif 
 
 #endif /* _h_sh */

@@ -121,4 +121,5 @@
 #include "config_f.h"
 
 #undef NLS
+#undef NLS_CATALOGS
 #endif /* _h_config */
