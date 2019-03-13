@@ -49,7 +49,7 @@ RCSID("$tcsh: sh.proc.c,v 3.114 2011/01/09 16:25:29 christos Exp $")
 
 #if defined(_BSD) || (defined(IRIS4D) && __STDC__) || defined(__lucid) || defined(linux) || defined(__GNU__) || defined(__GLIBC__)
 # if !defined(__ANDROID__)
-#  define BSDWAIT
+//#  define BSDWAIT
 # endif
 #endif /* _BSD || (IRIS4D && __STDC__) || __lucid || glibc */
 #ifndef WTERMSIG
