@@ -505,8 +505,9 @@ extern int readlink __P((const char *, char *, size_t));
 #ifdef linux
 extern int		tcgetpgrp	__P((int));
 extern int		tcsetpgrp	__P((int, int));
-extern int		gethostname	__P((char *, int));
-extern int		readlink	__P(());
+extern int		gethostname	__P((char *, size_t));
+//extern int		readlink	__P(());
+extern ssize_t readlink __P((const char *, char *, size_t));
 #endif /* linux */
 
 #endif /* _h_tc_os */
