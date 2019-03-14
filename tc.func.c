@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tc.func.c,v 3.126 2006/02/14 00:52:52 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/tc.func.c,v 3.131 2006/03/02 18:46:45 christos Exp $ */
 /*
  * tc.func.c: New tcsh builtins.
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.func.c,v 3.126 2006/02/14 00:52:52 christos Exp $")
+RCSID("$tcsh: tc.func.c,v 3.131 2006/03/02 18:46:45 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -40,8 +40,9 @@ RCSID("$Id: tc.func.c,v 3.126 2006/02/14 00:52:52 christos Exp $")
 #include "tc.h"
 #ifdef WINNT_NATIVE
 #include "nt.const.h"
-#endif /* WINNT_NATIVE */
+#else /* WINNT_NATIVE */
 #include <sys/wait.h>
+#endif /* WINNT_NATIVE */
 
 #ifdef AFS
 #include <afs/stds.h>
@@ -358,15 +359,16 @@ dolist(Char **v, struct command *c)
 		for (cp = tmp; *cp; cp++)
 		    Strbuf_append1(&buf, (*cp | QUOTE));
 		Strbuf_terminate(&buf);
+		dp = &buf.s[buf.len - 1];
 		if (
 #ifdef WINNT_NATIVE
-		    (dp[-1] != (Char) (':' | QUOTE)) &&
+		    (*dp != (Char) (':' | QUOTE)) &&
 #endif /* WINNT_NATIVE */
-		    (dp[-1] != (Char) ('/' | QUOTE)))
-		    *dp++ = '/';
-		else 
-		    dp[-1] &= TRIM;
-		*dp = '\0';
+		    (*dp != (Char) ('/' | QUOTE))) {
+		    Strbuf_append1(&buf, '/');
+		    Strbuf_terminate(&buf);
+		} else 
+		    *dp &= TRIM;
 		(void) t_search(&buf, LIST, TW_ZERO, 0, STRNULL, 0);
 		i = k + 1;
 	    }
@@ -638,10 +640,8 @@ xgetpass(const char *prm)
 }
 
 #ifndef NO_CRYPT
-#ifndef __NetBSD__
 #if !HAVE_DECL_CRYPT
     extern char *crypt ();
-#endif
 #endif
 #ifdef HAVE_CRYPT_H
 #include <crypt.h>
@@ -1723,7 +1723,7 @@ collate(const Char *a, const Char *b)
     char *sb = strip(strsave(b));
 #endif /* SHORT_STRINGS */
 
-#if defined(NLS) && !defined(NOSTRCOLL)
+#if defined(NLS) && defined(HAVE_STRCOLL)
     errno = 0;	/* strcoll sets errno, another brain-damage */
 
     rv = strcoll(sa, sb);
@@ -1740,7 +1740,7 @@ collate(const Char *a, const Char *b)
     }
 #else
     rv = strcmp(sa, sb);
-#endif /* NLS && !NOSTRCOLL */
+#endif /* NLS && HAVE_STRCOLL */
 
     xfree(sa);
     xfree(sb);

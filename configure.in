@@ -9,7 +9,7 @@ dnl Written by Kaveh Ghazi (ghazi@caip.rutgers.edu) 5/11/96.
 dnl
 
 AC_PREREQ([2.59])dnl Minimum Autoconf version required.
-AC_INIT([tcsh], [6.14.03], [http://bugs.gw.com/])
+AC_INIT([tcsh], [6.14.05], [http://bugs.gw.com/])
 AC_CONFIG_SRCDIR([tc.vers.c])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_TESTDIR([.], [.])
@@ -266,8 +266,7 @@ AC_SEARCH_LIBS(getspnam, sec)
 AC_SEARCH_LIBS(tgetent, termlib termcap curses ncurses)
 AC_SEARCH_LIBS(gethostbyname, nsl)
 AC_SEARCH_LIBS(connect, socket)
-AC_SEARCH_LIBS([iconv], [iconv], [AC_DEFINE([HAVE_ICONV], [1],
-	[Define to 1 if you have the iconv () interface])])
+AM_ICONV
 
 dnl Checks for header files
 AC_CHECK_HEADERS([auth.h crypt.h inttypes.h shadow.h stdint.h utmp.h utmpx.h])
@@ -338,18 +337,21 @@ AC_C_PROTOTYPES
 AC_C_VOLATILE
 
 dnl checks for library functions
-AC_CHECK_DECLS([gethostname, getpgrp], , ,
-[AC_INCLUDES_DEFAULT([])
+AC_CHECK_DECLS([crypt, environ, gethostname, getpgrp], , ,
+[#include "config_p.h"
+AC_INCLUDES_DEFAULT([])
 #ifdef HAVE_CRYPT_H
 #include <crypt.h>
 #endif
 ])
+AC_CHECK_FUNC([setlocale], [have_setlocale=yes], [have_setlocale=no])
 AC_CHECK_FUNCS([catgets dup2 getauthid getcwd gethostname getpwent] dnl
 	[getutent memmove memset nice nl_langinfo sbrk setpgid setpriority] dnl
 	[strerror strstr sysconf wcwidth])
 AC_FUNC_GETPGRP
 AC_FUNC_MBRTOWC
 AC_FUNC_SETPGRP
+AC_FUNC_STRCOLL
 
 dnl This is not good enough; we need sockaddr_storage too.
 dnl See whether we can use IPv6 related functions
@@ -398,6 +400,15 @@ dnl fi])
 dnl IPv6_CHECK_FUNC(getnameinfo, DFLAGS="$DFLAGS -DINET6")
 
 AC_SUBST(DFLAGS)
+
+dnl Checks for system services
+if test "$have_setlocale" != no; then
+  AC_ARG_ENABLE([nls], AS_HELP_STRING([--disable-nls], [Disable NLS support]),
+	        [], [enable_nls=yes])
+  if test "x$enable_nls" != xno; then
+    AC_DEFINE([NLS], [1], [Support NLS.])
+  fi
+fi
 
 AC_ARG_WITH(hesiod,
   [  --with-hesiod=PREFIX    Use Hesiod lookup for ~ expansion],

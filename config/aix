@@ -146,17 +146,6 @@
 # define _ALL_SOURCE	/* for window size etc, extra tty chars etc. */
 #endif
 
-#ifdef NLS
-# undef NLS	/* Let us decide in config_f.h... */
-#endif /* NLS */
-
-/*
- * NOSTRCOLL	We don't have strcoll()
- */
-#ifndef _IBMR2
-# define NOSTRCOLL	/* only the rs6000 has strcoll() */
-#endif
-
 /*
  * Function pointer comparisons are broken
  */
@@ -168,7 +157,6 @@
 #define _LARGE_FILES
 
 #if defined(_AIXPS2) || defined(aiws)
-# undef NLS
 # undef NLS_CATALOGS
 #endif
 

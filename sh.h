@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.h,v 3.141 2006/02/14 00:52:52 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.h,v 3.144 2006/02/16 03:11:59 christos Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -403,7 +403,9 @@ typedef int eChar;
 # if (defined(_SS_SIZE) || defined(_SS_MAXSIZE)) && defined(HAVE_STRUCT_SOCKADDR_STORAGE_SS_FAMILY)
 #  if !defined(__APPLE__) /* Damnit, where is getnameinfo() folks? */
 #   if !defined(sgi)
-#    define INET6
+#    if !defined(__CYGWIN__)
+#     define INET6
+#    endif /* __CYGWIN__ */
 #   endif /* sgi */
 #  endif /* __APPLE__ */
 # endif
@@ -440,14 +442,12 @@ typedef void pret_t;
 
 #include "sh.types.h"
 
-#ifndef __NetBSD__
 #if !HAVE_DECL_GETPGRP
 # ifndef GETPGRP_VOID
 extern pid_t getpgrp (int);
 # else
 extern pid_t getpgrp (void);
 # endif
-#endif
 #endif
 
 #ifndef lint
@@ -597,7 +597,7 @@ EXTERN clock_t clk_tck;
 #  endif /* POSIX */
 EXTERN struct tms shtimes;	/* shell and child times for process timing */
 # endif /* _SEQUENT_ */
-EXTERN long seconds0;
+EXTERN time_t seconds0;
 #endif /* BSDTIMES */
 
 #ifndef HZ
@@ -1162,7 +1162,9 @@ extern int	use_fork;
 #endif
 extern int	tellwhat;
 extern int	NoNLSRebind;
+#if !HAVE_DECL_ENVIRON
 extern char   **environ;
+#endif
 
 #include "tc.h"
 
