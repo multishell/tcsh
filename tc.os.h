@@ -532,7 +532,7 @@ typedef struct timeval timeval_t;
 
 #ifndef BSD4_4
 #ifndef NEEDgethostname
-extern int gethostname __P((char *, int));
+//extern int gethostname __P((char *, int));
 #endif /* NEEDgethostname */
 #endif /* BDS4_4 */
 
