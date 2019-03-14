@@ -228,4 +228,10 @@
     #error "SHORT_STRINGS must be defined if DSPMBYTE is defined"
 #endif
 
+/* Rename the calloc functions and others so they don't collide with ones on the system. */
+#define malloc tcsh_malloc
+#define calloc tcsh_calloc
+#define realloc tcsh_realloc
+#define free tcsh_free
+
 #endif /* _h_config_f */
