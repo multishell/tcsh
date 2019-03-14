@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.h,v 3.139 2006/01/12 19:55:38 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.h,v 3.141 2006/02/14 00:52:52 christos Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -112,12 +112,6 @@ typedef int eChar;
 #define normal_mbtowc(PWC, S, N) ((void)(N), *(PWC) = (unsigned char)*(S), 1)
 #define reset_mbtowc() ((void)0)
 # define SAVE(a) (strsave(a))
-#endif 
-#if SIZEOF_WCHAR_T >= 4
-typedef wchar_t NLSChar;
-#else
-/* Assumes sizeof (int) >= 4, unlike some parts of tcsh */
-typedef int NLSChar;
 #endif
 
 /* Elide unused argument warnings */
@@ -446,14 +440,14 @@ typedef void pret_t;
 
 #include "sh.types.h"
 
-#if !defined(__NetBSD__) && !defined(__linux__) /* XXX */
-#ifndef WINNT_NATIVE
+#ifndef __NetBSD__
+#if !HAVE_DECL_GETPGRP
 # ifndef GETPGRP_VOID
 extern pid_t getpgrp (int);
 # else
 extern pid_t getpgrp (void);
 # endif
-#endif /* !WINNT_NATIVE */
+#endif
 #endif
 
 #ifndef lint
@@ -1078,7 +1072,7 @@ EXTERN Char    PRCHROOT;	/* Prompt symbol for root */
 #define str2short(a) 		(a)
 #define blk2short(a) 		saveblk(a)
 #define short2blk(a) 		saveblk(a)
-#define short2str(a) 		strip(a)
+#define short2str(a) 		caching_strip(a)
 #else
 #ifdef WIDE_STRINGS
 #define Strchr(a, b)		wcschr(a, b)
@@ -1168,9 +1162,7 @@ extern int	use_fork;
 #endif
 extern int	tellwhat;
 extern int	NoNLSRebind;
-#ifndef __linux__
 extern char   **environ;
-#endif
 
 #include "tc.h"
 
