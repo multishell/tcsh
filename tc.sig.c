@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/tc.sig.c,v 3.37 2010/11/29 15:28:58 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/tc.sig.c,v 3.39 2012/01/16 03:40:20 christos Exp $ */
 /*
  * tc.sig.c: Signal routine emulations
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: tc.sig.c,v 3.37 2010/11/29 15:28:58 christos Exp $")
+RCSID("$tcsh: tc.sig.c,v 3.39 2012/01/16 03:40:20 christos Exp $")
 
 #include "tc.wait.h"
 
