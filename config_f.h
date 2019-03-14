@@ -1,4 +1,4 @@
-/* $Header: /u/christos/cvsroot/tcsh/config_f.h,v 3.16 1997/10/28 22:34:14 christos Exp $ */
+/* $Header: /u/christos/cvsroot/tcsh/config_f.h,v 3.19 1998/09/19 14:45:15 christos Exp $ */
 /*
  * config_f.h -- configure various defines for tcsh
  *
@@ -120,6 +120,19 @@
 #undef KANJI
 
 /*
+ * DSPMBYTE	add variable "dspmbyte" and display multi-byte string at
+ *		only output, when "dspmbyte" is set.
+ */
+#undef DSPMBYTE
+
+/*
+ * MBYTEDEBUG	when "dspmbyte" is changed, set multi-byte checktable to
+ *		variable "mbytemap".
+ *		(use for multi-byte table check)
+ */
+#undef MBYTEDEBUG
+
+/*
  * NEWGRP	Provide a newgrp builtin.
  */
 #undef NEWGRP
@@ -129,7 +142,7 @@
  *		This can be much slower and no memory statistics will be
  *		provided.
  */
-#if defined(PURIFY) || defined(MALLOC_TRACE) || defined(_OSD_POSIX)
+#if defined(__MACHTEN__) || defined(PURIFY) || defined(MALLOC_TRACE) || defined(_OSD_POSIX)
 # define SYSMALLOC
 #else
 # undef SYSMALLOC

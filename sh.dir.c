@@ -1,4 +1,4 @@
-/* $Header: /u/christos/cvsroot/tcsh/sh.dir.c,v 3.46 1998/06/27 12:27:14 christos Exp $ */
+/* $Header: /u/christos/cvsroot/tcsh/sh.dir.c,v 3.49 1998/09/18 16:09:09 christos Exp $ */
 /*
  * sh.dir.c: Directory manipulation functions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.dir.c,v 3.46 1998/06/27 12:27:14 christos Exp $")
+RCSID("$Id: sh.dir.c,v 3.49 1998/09/18 16:09:09 christos Exp $")
 
 /*
  * C Shell - directory management
@@ -78,9 +78,9 @@ dinit(hp)
     char    path[MAXPATHLEN];
 
     /* Don't believe the login shell home, because it may be a symlink */
-    tcp = (char *) getwd(path);
+    tcp = (char *) getcwd(path, sizeof(path));
     if (tcp == NULL || *tcp == '\0') {
-	xprintf("%s: %s\n", progname, path);
+	xprintf("%s: %s\n", progname, strerror(errno));
 	if (hp && *hp) {
 	    tcp = short2str(hp);
 	    dstart(tcp);
@@ -514,7 +514,7 @@ dgoto(cp)
 	dp = cp;
 
 #ifdef WINNT
-    cp = SAVE(getwd(NULL));
+    cp = SAVE(getcwd(NULL, 0));
 #else /* !WINNT */
     cp = dcanon(cp, dp);
 #endif /* WINNT */
@@ -539,7 +539,7 @@ dfollow(cp)
 	char *dptr, *ptr;
 	if (chdir(dptr = short2str(cp)) < 0) 
 	    stderror(ERR_SYSTEM, dptr, strerror(errno));
-	else if ((ptr = getwd(ebuf)) && *ptr != '\0') {
+	else if ((ptr = getcwd(ebuf, sizeof(ebuf))) && *ptr != '\0') {
 		xfree((ptr_t) cp);
 		cp = Strsave(str2short(ptr));
 		return dgoto(cp);
@@ -549,7 +549,8 @@ dfollow(cp)
     }
 #endif /* apollo */
 	    
-    (void) strcpy(ebuf, short2str(cp));
+    (void) strncpy(ebuf, short2str(cp), MAXPATHLEN);
+    ebuf[MAXPATHLEN-1] = '\0';
     /*
      * if we are ignoring symlinks, try to fix relatives now.
      * if we are expading symlinks, it should be done by now.
@@ -822,6 +823,12 @@ dcanon(cp, p)
 #endif /* S_IFLNK */
 
     /*
+     * kim: if the path given is too long abort().
+     */
+    if (Strlen(cp) >= MAXPATHLEN)
+	abort();
+
+    /*
      * christos: if the path given does not start with a slash prepend cwd. If
      * cwd does not start with a slash or the result would be too long abort().
      */
@@ -899,8 +906,10 @@ dcanon(cp, p)
 	    if (sp != cp && /* symlinks != SYM_IGNORE && */
 		(cc = readlink(short2str(cp), tlink,
 			       sizeof tlink)) >= 0) {
-		(void) Strcpy(link, str2short(tlink));
-		link[cc] = '\0';
+		tlink[cc] = '\0';
+		(void) Strncpy(link, str2short(tlink),
+		    sizeof(link) / sizeof(Char));
+		link[sizeof(link) / sizeof(Char) - 1] = '\0';
 
 		if (slash)
 		    *p = '/';
@@ -988,8 +997,10 @@ dcanon(cp, p)
 	    if (sp != cp && symlinks == SYM_CHASE &&
 		(cc = readlink(short2str(cp), tlink,
 			       sizeof tlink)) >= 0) {
-		(void) Strcpy(link, str2short(tlink));
-		link[cc] = '\0';
+		tlink[cc] = '\0';
+		(void) Strncpy(link, str2short(tlink),
+		    sizeof(link) / sizeof(Char));
+		link[sizeof(link) / sizeof(Char) - 1] = '\0';
 
 		/*
 		 * restore the '/'.
@@ -1097,7 +1108,8 @@ dcanon(cp, p)
 	/*
 	 * Start comparing dev & ino backwards
 	 */
-	p2 = Strcpy(link, cp);
+	(void) Strncpy(link, cp, sizeof(link) / sizeof(Char));
+	link[sizeof(link) / sizeof(Char) - 1] = '\0';
 	found = 0;
 	while (*p2 && stat(short2str(p2), &statbuf) != -1) {
 	    if (DEV_DEV_COMPARE(statbuf.st_dev, home_dev) &&
