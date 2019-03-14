@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.c,v 3.108 2003/05/26 07:11:06 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.c,v 3.111 2004/05/21 18:50:36 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -39,7 +39,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$Id: sh.c,v 3.108 2003/05/26 07:11:06 christos Exp $")
+RCSID("$Id: sh.c,v 3.111 2004/05/21 18:50:36 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -114,7 +114,7 @@ bool    fast = 0;
 static bool    batch = 0;
 static bool    mflag = 0;
 static bool    prompt = 1;
-static int     enterhist = 0;
+int     enterhist = 0;
 bool    tellwhat = 0;
 time_t  t_period;
 Char  *ffile = NULL;
@@ -2181,7 +2181,6 @@ process(catch)
 	freesyn(savet), savet = NULL;
 #ifdef SIG_WINDOW
 	if (windowchg || (catch && intty && !whyles && !tellwhat)) {
-	    windowchg = 0;
 	    (void) check_window_size(0);	/* for window systems */
 	}
 #endif /* SIG_WINDOW */
@@ -2387,7 +2386,7 @@ initdesc()
 {
 #ifdef NLS_BUGS
 #ifdef NLS_CATALOGS
-    (void)catclose(catd);
+    nlsclose(catd);
 #endif /* NLS_CATALOGS */
 #endif /* NLS_BUGS */
 
@@ -2462,7 +2461,7 @@ xexit(i)
      * because messages will stop working on the parent too.
      */
     if (child == 0)
-	(void) catclose(catd);
+	nlsclose();
 #endif /* NLS_CATALOGS */
 #ifdef WINNT_NATIVE
     nt_cleanup();

@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.set.c,v 3.47 2004/02/21 20:34:25 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.set.c,v 3.50 2004/07/24 21:52:49 christos Exp $ */
 /*
  * sh.set.c: Setting and Clearing of variables
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.set.c,v 3.47 2004/02/21 20:34:25 christos Exp $")
+RCSID("$Id: sh.set.c,v 3.50 2004/07/24 21:52:49 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -192,7 +192,7 @@ update_vars(vp)
 #endif
 #ifdef NLS_CATALOGS
     else if (eq(vp, STRcatalog)) {
-	(void) catclose(catd);
+	nlsclose();
 	nlsinit();
     }
 #if defined(FILEC) && defined(TIOCSTI)
@@ -779,7 +779,7 @@ unset(v, c)
     update_dspmbyte_vars();
 #endif
 #ifdef NLS_CATALOGS
-    (void) catclose(catd);
+    nlsclose();
     nlsinit();
 #endif /* NLS_CATALOGS */
 }
@@ -1112,6 +1112,10 @@ x:
     }
 }
 
+#ifdef DSPMBYTE
+bool dspmbyte_utf8;
+#endif
+
 #if defined(KANJI) && defined(SHORT_STRINGS) && defined(DSPMBYTE)
 bool dspmbyte_ls;
 
@@ -1142,6 +1146,7 @@ update_dspmbyte_vars()
 	       "Warning: unknown multibyte display; using default(euc(JP))\n"));
 	    iskcode = 2;
 	}
+	dspmbyte_utf8 = iskcode == 4;
 	if (dstr1 && vp->vec[1] && eq(vp->vec[1], STRls))
 	  dspmbyte_ls = 1;
 	else
@@ -1260,7 +1265,7 @@ autoset_dspmbyte(pcp)
 
     for (i = 0; dspmt[i].n; i++) {
 	Char *estr;
-	if (t_pmatch(pcp, dspmt[i].n, &estr, 1) > 0) {
+	if (dspmt[i].n[0] && t_pmatch(pcp, dspmt[i].n, &estr, 1) > 0) {
 	    set(CHECK_MBYTEVAR, Strsave(dspmt[i].v), VAR_READWRITE);
 	    update_dspmbyte_vars();
 	    break;

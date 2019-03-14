@@ -72,7 +72,7 @@
 .\"   used here if you can. In particular, please don't use nroff commands
 .\"   which aren't already used herein.
 .\" 
-.TH TCSH 1 "19 May 2004" "Astron 6.13.00"
+.TH TCSH 1 "24 July 2004" "Astron 6.13.01"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
@@ -3299,6 +3299,12 @@ there is no default, execution continues after the \fIendsw\fR.
 .B telltc \fR(+)
 Lists the values of all terminal capabilities (see \fItermcap\fR(5)).
 .TP 8
+.B termname \fR[\fIterminal type\fR] \fR(+)
+Tests if \fIterminal type\fR (or the current value of \fBTERM\fR if no
+\fIterminal type\fR is given) has an entry in the hosts termcap(5) or
+terminfo(5) database. Prints the terminal type to stdout and returns 0
+if an entry is present otherwise returns 1.
+.TP 8
 .B time \fR[\fIcommand\fR]
 Executes \fIcommand\fR (which must be a simple command, not an alias,
 a pipeline, a command list or a parenthesized command list)
@@ -5019,7 +5025,7 @@ pipe(2), setrlimit(2), sigvec(2), stat(2), umask(2), vfork(2), wait(2),
 malloc(3), setlocale(3), tty(4), a.out(5), termcap(5), environ(7),
 termio(7), Introduction to the C Shell
 .SH VERSION
-This manual documents tcsh 6.13.00 (Astron) 2004-05-19.
+This manual documents tcsh 6.13.01 (Astron) 2004-07-24.
 .SH AUTHORS
 .PD 0
 .TP 2
