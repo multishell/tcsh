@@ -447,9 +447,9 @@ realloc(ptr_t cp, size_t nbytes)
  * API, so we cannot use our malloc replacement without providing one.
  * Thanks a lot glibc!
  */
-size_t malloc_usable_size(const void *);
+size_t malloc_usable_size(void *);
 size_t
-malloc_usable_size(const void *ptr)
+malloc_usable_size(void *ptr)
 {
     const union overhead *op = (const union overhead *)
 	(((const char *) ptr) - MEMALIGN(sizeof(*op)));
