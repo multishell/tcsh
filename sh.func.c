@@ -1,4 +1,4 @@
-/* $Header: /u/christos/cvsroot/tcsh/sh.func.c,v 3.81 1999/05/11 13:07:48 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.func.c,v 3.83 1999/08/12 14:19:23 christos Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.func.c,v 3.81 1999/05/11 13:07:48 christos Exp $")
+RCSID("$Id: sh.func.c,v 3.83 1999/08/12 14:19:23 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -77,6 +77,14 @@ isbfunc(t)
     static struct biltins label = {"", dozip, 0, 0};
     static struct biltins foregnd = {"%job", dofg1, 0, 0};
     static struct biltins backgnd = {"%job &", dobg1, 0, 0};
+
+    /*
+     * We never match a builtin that has quoted the first
+     * character; this has been the traditional way to escape 
+     * builtin commands.
+     */
+    if (*cp & QUOTE)
+	return NULL;
 
     if (*cp != ':' && lastchr(cp) == ':') {
 	label.bname = short2str(cp);
@@ -1372,6 +1380,9 @@ dosetenv(v, c)
 
     if (eq(vp, STRNOREBIND)) {
 	NoNLSRebind = 1;
+	MapsAreInited = 0;
+	NLSMapsAreInited = 0;
+	ed_InitMaps();
 	xfree((ptr_t) lp);
 	return;
     }
@@ -1505,8 +1516,12 @@ dounsetenv(v, c)
 		 */
 		Unsetenv(name);
 
-		if (eq(name, STRNOREBIND))
+		if (eq(name, STRNOREBIND)) {
 		    NoNLSRebind = 0;
+		    MapsAreInited = 0;
+		    NLSMapsAreInited = 0;
+		    ed_InitMaps();
+		}
 #ifdef apollo
 		else if (eq(name, STRSYSTYPE))
 		    dohash(NULL, NULL);
