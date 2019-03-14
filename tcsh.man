@@ -72,7 +72,7 @@
 .\"   used here if you can. In particular, please don't use nroff commands
 .\"   which aren't already used herein.
 .\" 
-.TH TCSH 1 "8 March 2002" "Astron 6.11.01"
+.TH TCSH 1 "1 July 2002" "Astron 6.11.03"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
@@ -3630,6 +3630,7 @@ See also the \fBcwd\fR and \fBowd\fR shell variables.
 If set to `euc', it enables display and editing EUC-kanji(Japanese) code.
 If set to `sjis', it enables display and editing Shift-JIS(Japanese) code.
 If set to `big5', it enables display and editing Big5(Chinese) code.
+If set to `utf8', it enables display and editing Utf8(Unicode) code.
 If set to the following format, it enables display and editing of original
 multi-byte code format:
 .RS +8
@@ -3673,6 +3674,11 @@ The GNU fileutils version of ls cannot display multi-byte
 filenames without the -N ( --literal ) option.   If you are using
 this version, set the second word of dspmbyte to "ls".  If not, for
 example, "ls-F -l" cannot display multi-byte filenames.
+.PP
+  Note:
+.br
+This variable can only be used if KANJI and DSPMBYTE has been defined at
+compile time.
 .RE
 .TP 8
 .B dunique \fR(+)
@@ -5006,7 +5012,7 @@ pipe(2), setrlimit(2), sigvec(2), stat(2), umask(2), vfork(2), wait(2),
 malloc(3), setlocale(3), tty(4), a.out(5), termcap(5), environ(7),
 termio(7), Introduction to the C Shell
 .SH VERSION
-This manual documents tcsh 6.11.01 (Astron) 2002-03-08.
+This manual documents tcsh 6.11.03 (Astron) 2002-07-01.
 .SH AUTHORS
 .PD 0
 .TP 2

@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/ed.init.c,v 3.44 2001/02/19 23:30:44 kim Exp $ */
+/* $Header: /src/pub/tcsh/ed.init.c,v 3.46 2002/06/25 19:02:10 christos Exp $ */
 /*
  * ed.init.c: Editor initializations
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.init.c,v 3.44 2001/02/19 23:30:44 kim Exp $")
+RCSID("$Id: ed.init.c,v 3.46 2002/06/25 19:02:10 christos Exp $")
 
 #include "ed.h"
 #include "ed.term.h"
@@ -141,7 +141,7 @@ int snum;
     if (snum > 0)
       sigset(snum, window_change);
 #endif /* UNRELSIGS */
-    check_window_size(0);
+    windowchg = 1;
 #ifndef SIGVOID
     return (snum);
 #endif 
@@ -193,7 +193,7 @@ ed_Setup(rst)
     vdisable = (unsigned char) _POSIX_VDISABLE;
 #endif /* POSIX && _PC_VDISABLE && !BSD4_4 && !WINNT_NATIVE */
 	
-    if ((imode = adrof(STRinputmode)) != NULL) {
+    if ((imode = adrof(STRinputmode)) != NULL && imode->vec != NULL) {
 	if (!Strcmp(*(imode->vec), STRinsert))
 	    inputmode = MODE_INSERT;
 	else if (!Strcmp(*(imode->vec), STRoverwrite))

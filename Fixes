@@ -1,3 +1,15 @@
+ 25. V6.11.03 - 20020701
+ 35. Add Ian D. Allen's bug list.
+ 34. If we are invoked as csh, default to bsd echo (Matej Vela)
+ 33. Don't close file descriptors too early because setuid scripts fail.
+     (Jill Pryse-Davies)
+ 32. Completion updates (Tom Warzeka)
+ 31. Fix compilation issue on SunOS4 with _POSIX_VDISABLE (Tom Warzeka)
+ 30. ukrainian update (Olexander Kunytsa)
+ 29. DSPMBYTE=utf8 patch (Jean-Luc Leger)
+ 28. fix ipv4 only compilation, remove extra sigsetmask() call (Takayuki Nakao)
+ 27. window change can cause free to be re-entered causing abort (Mark Peek)
+ 26. vp->vec vetting, suggested by Ian Dall.
  25. V6.11.02 - 20020516
  24. Fix prompt bugs in $var and %c0n (TAKAI Kousuke)
  23. Add Cray SV2 config (Rafal Maszkowski)

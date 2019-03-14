@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.c,v 3.98 2002/03/08 17:36:46 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.c,v 3.102 2002/07/01 21:00:56 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -39,7 +39,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$Id: sh.c,v 3.98 2002/03/08 17:36:46 christos Exp $")
+RCSID("$Id: sh.c,v 3.102 2002/07/01 21:00:56 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -499,18 +499,20 @@ main(argc, argv)
     /*
      * Publish the selected echo style
      */
-#if ECHO_STYLE == NONE_ECHO
-    set(STRecho_style, Strsave(STRnone), VAR_READWRITE);
-#endif /* ECHO_STYLE == NONE_ECHO */
-#if ECHO_STYLE == BSD_ECHO
-    set(STRecho_style, Strsave(STRbsd), VAR_READWRITE);
-#endif /* ECHO_STYLE == BSD_ECHO */
-#if ECHO_STYLE == SYSV_ECHO
-    set(STRecho_style, Strsave(STRsysv), VAR_READWRITE);
-#endif /* ECHO_STYLE == SYSV_ECHO */
-#if ECHO_STYLE == BOTH_ECHO
-    set(STRecho_style, Strsave(STRboth), VAR_READWRITE);
-#endif /* ECHO_STYLE == BOTH_ECHO */
+#if ECHO_STYLE != BSD_ECHO
+    if (tcsh) {
+# if ECHO_STYLE == NONE_ECHO
+	set(STRecho_style, Strsave(STRnone), VAR_READWRITE);
+# endif /* ECHO_STYLE == NONE_ECHO */
+# if ECHO_STYLE == SYSV_ECHO
+	set(STRecho_style, Strsave(STRsysv), VAR_READWRITE);
+# endif /* ECHO_STYLE == SYSV_ECHO */
+# if ECHO_STYLE == BOTH_ECHO
+	set(STRecho_style, Strsave(STRboth), VAR_READWRITE);
+# endif /* ECHO_STYLE == BOTH_ECHO */
+    } else
+#endif /* ECHO_STYLE != BSD_ECHO */
+	set(STRecho_style, Strsave(STRbsd), VAR_READWRITE);
 
     /*
      * increment the shell level.
@@ -994,6 +996,13 @@ main(argc, argv)
 	 /* argc not used any more */ tempv++;
     }
 
+    /* 
+     * Call to closem() used to be part of initdesc(). Now called below where
+     * the script name argument has become stdin. Kernel may have used a file
+     * descriptor to hold the name of the script (setuid case) and this name
+     * mustn't be lost by closing the fd too soon.
+     */
+    closem();
 
     /*
      * Consider input a tty if it really is or we are interactive. but not for
@@ -1491,7 +1500,7 @@ st_save(st, unit, hflg, al, av)
      */
     if (av != NULL && *av != NULL) {
 	struct varent *vp;
-	if ((vp = adrof(STRargv)) != NULL)
+	if ((vp = adrof(STRargv)) != NULL && vp->vec != NULL)
 	    st->argv = saveblk(vp->vec);
 	else
 	    st->argv = NULL;
@@ -2119,8 +2128,10 @@ process(catch)
 	freelex(&paraml);
 	freesyn(savet), savet = NULL;
 #ifdef SIG_WINDOW
-	if (catch && intty && !whyles && !tellwhat)
-	    (void) window_change(0);	/* for window systems */
+	if (windowchg || (catch && intty && !whyles && !tellwhat)) {
+	    windowchg = 0;
+	    (void) check_window_size(0);	/* for window systems */
+	}
 #endif /* SIG_WINDOW */
 	set(STR_, Strsave(InputBuf), VAR_READWRITE | VAR_NOGLOB);
     }
@@ -2189,7 +2200,7 @@ mailchk()
     bool    new;
 
     v = adrof(STRmail);
-    if (v == 0)
+    if (v == NULL || v->vec == NULL)
 	return;
     (void) time(&t);
     vp = v->vec;
@@ -2330,7 +2341,6 @@ initdesc()
 #endif /* CLOSE_ON_EXEC */
     isdiagatty = isatty(SHDIAG);
     isoutatty = isatty(SHOUT);
-    closem();
 #ifdef NLS_BUGS
 #ifdef NLS_CATALOGS
     nlsinit();
