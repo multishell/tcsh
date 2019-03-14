@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.func.c,v 3.99 2002/05/16 13:51:04 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.func.c,v 3.102 2002/07/08 20:43:55 christos Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.func.c,v 3.99 2002/05/16 13:51:04 christos Exp $")
+RCSID("$Id: sh.func.c,v 3.102 2002/07/08 20:43:55 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -727,21 +727,23 @@ dorepeat(v, kp)
     Char  **v;
     struct command *kp;
 {
-    register int i;
+    int i = 1;
 
 #ifdef BSDSIGS
     register sigmask_t omask = 0;
-
 #endif /* BSDSIGS */
 
-    i = getn(v[1]);
+    do {
+	i *= getn(v[1]);
+	lshift(v, 2);
+    } while (v[0] != NULL && Strcmp(v[0], STRrepeat) == 0);
+
     if (setintr)
 #ifdef BSDSIGS
 	omask = sigblock(sigmask(SIGINT)) & ~sigmask(SIGINT);
 #else /* !BSDSIGS */
 	(void) sighold(SIGINT);
 #endif /* BSDSIGS */
-    lshift(v, 2);
     while (i > 0) {
 	if (setintr)
 #ifdef BSDSIGS
@@ -1309,6 +1311,16 @@ dosetenv(v, c)
 
     vp = *v++;
 
+    lp = vp;
+    if (!letter(*lp))
+        stderror(ERR_NAME | ERR_VARBEGIN);
+
+    for (; alnum(*lp); lp++)
+        continue;
+
+    if (*lp != '\0')
+	stderror(ERR_NAME | ERR_SYNTAX);
+ 
     if ((lp = *v++) == 0)
 	lp = STRNULL;
 
@@ -1837,6 +1849,10 @@ struct limits limits[] =
 # if defined(RLIMIT_OFILE) && !defined(RLIMIT_NOFILE)
     { RLIMIT_OFILE,	"openfiles",	1,	""		},
 # endif /* RLIMIT_OFILE && !defined(RLIMIT_NOFILE) */
+
+# ifdef RLIMIT_SBSIZE
+    { RLIMIT_SBSIZE,	"sbsize",	1,	""		},
+# endif /* RLIMIT_SBSIZE */
 
     { -1, 		NULL, 		0, 	NULL		}
 };

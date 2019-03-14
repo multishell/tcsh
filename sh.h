@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.h,v 3.103 2002/05/16 13:51:25 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.h,v 3.105 2002/07/02 13:13:55 christos Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -395,8 +395,10 @@ typedef int sigret_t;
 # include <netinet/in.h>
 # include <arpa/inet.h>
 # include <sys/socket.h>
-# if defined(_SS_SIZE) || defined(_SS_MAXSIZE)
-#  define INET6
+# if (defined(_SS_SIZE) || defined(_SS_MAXSIZE)) && !defined(NO_SS_FAMILY)
+#  if !defined(__APPLE__) /* Damnit, where is getnameinfo() folks? */
+#   define INET6
+#  endif /* __APPLE__ */
 # endif
 # include <sys/uio.h>	/* For struct iovec */
 #endif /* REMOTEHOST */
