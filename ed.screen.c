@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/ed.screen.c,v 3.59 2004/12/25 21:15:06 christos Exp $ */
+/* $Header: /src/pub/tcsh/ed.screen.c,v 3.62 2005/01/18 20:14:03 christos Exp $ */
 /*
  * ed.screen.c: Editor/termcap-curses interface
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.screen.c,v 3.59 2004/12/25 21:15:06 christos Exp $")
+RCSID("$Id: ed.screen.c,v 3.62 2005/01/18 20:14:03 christos Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -165,7 +165,7 @@ static struct {
 #define T_str   38
 static struct termcapstr {
     const char   *name;
-    char   *long_name;
+    const char   *long_name;
     char   *str;
 } tstr[T_str + 1];
 
@@ -179,7 +179,7 @@ static struct termcapstr {
 #define T_val	6
 static struct termcapval {
     const char   *name;
-    char   *long_name;
+    const char   *long_name;
     int     val;
 } tval[T_val + 1];
 
@@ -422,33 +422,36 @@ TCalloc(t, cap)
 
 /*ARGSUSED*/
 void
-TellTC(what)
-    const char   *what;
+TellTC()
 {
     struct termcapstr *t;
+    char *s;
 
-    USE(what);
     xprintf(CGETS(7, 1, "\n\tTcsh thinks your terminal has the\n"));
     xprintf(CGETS(7, 2, "\tfollowing characteristics:\n\n"));
     xprintf(CGETS(7, 3, "\tIt has %d columns and %d lines\n"),
 	    Val(T_co), Val(T_li));
-    xprintf(CGETS(7, 4, "\tIt has %s meta key\n"), T_HasMeta ?
-	    CGETS(7, 5, "a") : CGETS(7, 6, "no"));
-    xprintf(CGETS(7, 7, "\tIt can%s use tabs\n"), T_Tabs ?
-	    "" : CGETS(7, 8, " not"));
-    xprintf(CGETS(7, 9, "\tIt %s automatic margins\n"),
-		    (T_Margin&MARGIN_AUTO)?
-		    CGETS(7, 10, "has"):
-		    CGETS(7, 11, "does not have"));
-    if (T_Margin & MARGIN_AUTO)
-	xprintf(CGETS(7, 12, "\tIt %s magic margins\n"),
-			(T_Margin & MARGIN_MAGIC) ?
-			CGETS(7, 10, "has"):
-			CGETS(7, 11, "does not have"));
-
-    for (t = tstr; t->name != NULL; t++)
-	xprintf("\t%36s (%s) == %s\n", t->long_name, t->name,
-		t->str && *t->str ? t->str : CGETS(7, 13, "(empty)"));
+    s = strsave(T_HasMeta ? CGETS(7, 5, "a") : CGETS(7, 6, "no"));
+    xprintf(CGETS(7, 4, "\tIt has %s meta key\n"), s);
+    xfree(s);
+    s = strsave(T_Tabs ? "" : CGETS(7, 8, " not"));
+    xprintf(CGETS(7, 7, "\tIt can%s use tabs\n"), s);
+    xfree(s);
+    s = strsave((T_Margin&MARGIN_AUTO) ?
+		CGETS(7, 10, "has") : CGETS(7, 11, "does not have"));
+    xprintf(CGETS(7, 9, "\tIt %s automatic margins\n"), s);
+    xfree(s);
+    if (T_Margin & MARGIN_AUTO) {
+        s = strsave((T_Margin & MARGIN_MAGIC) ?
+			CGETS(7, 10, "has") : CGETS(7, 11, "does not have"));
+	xprintf(CGETS(7, 12, "\tIt %s magic margins\n"), s);
+	xfree(s);
+    }
+    for (t = tstr; t->name != NULL; t++) {
+        s = strsave(t->str && *t->str ? t->str : CGETS(7, 13, "(empty)"));
+	xprintf("\t%36s (%s) == %s\n", t->long_name, t->name, s);
+	xfree(s);
+    }
     xputchar('\n');
 }
 
@@ -1226,7 +1229,7 @@ so_write(cp, n)
 #ifdef DEBUG_LITERAL
 		xprintf("so: litnum %d\r\n", (int)(*cp & ~LITERAL));
 #endif /* DEBUG_LITERAL */
-		for (d = litptr + ((*cp & ~LITERAL) << 2); *d; d++)
+		for (d = litptr + (*cp & ~LITERAL) * LIT_FACTOR; *d; d++)
 		    (void) putwraw(*d);
 	    }
 	    else
@@ -1633,7 +1636,6 @@ ChangeSize(lins, cols)
 	if ((tptr = getenv("TERMCAP")) != NULL) {
 	    /* Leave 64 characters slop in case we enlarge the termcap string */
 	    Char    termcap[1024+64], backup[1024+64], *ptr;
-	    size_t len;
 
 	    ptr = str2short(tptr);
 	    (void) Strncpy(termcap, ptr, 1024);
@@ -1666,7 +1668,7 @@ ChangeSize(lins, cols)
 		(void) Strcpy(termcap, backup);
 	    }
 	    else {
-		len = (ptr - backup) + Strlen(buf);
+		size_t len = (ptr - backup) + Strlen(buf);
 		(void) Strncpy(termcap, backup, len);
 		termcap[len] = '\0';
 		(void) Itoa(Val(T_li), buf, 0, 0);

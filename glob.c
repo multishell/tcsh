@@ -51,14 +51,6 @@ static char sccsid[] = "@(#)glob.c	5.12 (Berkeley) 6/24/91";
  *	Number of matches in the current invocation of glob.
  */
 
-#ifdef notdef
-#include <sys/types.h>
-#include <sys/param.h>
-#include <sys/stat.h>
-#include <dirent.h>
-#include <ctype.h>
-typedef void * ptr_t;
-#endif
 #ifdef WINNT_NATIVE
 	#pragma warning(disable:4244)
 #endif /* WINNT_NATIVE */
@@ -388,7 +380,7 @@ glob(pattern, flags, errfunc, pglob)
 #ifdef WIDE_STRINGS
 	    int len;
 	    
-	    len = mblen(patnext - 1, MB_LEN_MAX);
+	    len = mblen((const char *)(patnext - 1), MB_LEN_MAX);
 	    if (len == -1)
 		mblen(NULL, 0);
 	    if (len > 1) {

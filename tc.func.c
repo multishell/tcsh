@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tc.func.c,v 3.114 2004/11/23 02:10:49 christos Exp $ */
+/* $Header: /src/pub/tcsh/tc.func.c,v 3.116 2005/01/18 20:14:04 christos Exp $ */
 /*
  * tc.func.c: New tcsh builtins.
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.func.c,v 3.114 2004/11/23 02:10:49 christos Exp $")
+RCSID("$Id: tc.func.c,v 3.116 2005/01/18 20:14:04 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -78,7 +78,7 @@ struct tildecache;
 static	int	 tildecompare	__P((struct tildecache *, struct tildecache *));
 static  Char    *gethomedir	__P((Char *));
 #ifdef REMOTEHOST
-static	sigret_t palarm		__P((int));
+static	RETSIGTYPE palarm		__P((int));
 static	void	 getremotehost	__P((void));
 #endif /* REMOTEHOST */
 
@@ -428,7 +428,6 @@ dolist(v, c)
     }
 }
 
-static const char *defaulttell = "ALL";
 extern int GotTermCaps;
 
 /*ARGSUSED*/
@@ -437,18 +436,11 @@ dotelltc(v, c)
     Char **v;
     struct command *c;
 {
+    USE(v);
     USE(c);
     if (!GotTermCaps)
 	GetTermCaps();
-
-    /*
-     * Avoid a compiler bug on hpux 9.05
-     * Writing the following as func(a ? b : c) breaks
-     */
-    if (v[1])
-	TellTC(short2str(v[1]));
-    else
-	TellTC(defaulttell);
+    TellTC();
 }
 
 /*ARGSUSED*/
@@ -747,7 +739,7 @@ auto_lock(n)
 
 #undef XCRYPT
 
-#if defined(PW_AUTH) && !defined(XCRYPT)
+#if defined(HAVE_AUTH_H)
 
     struct authorization *apw;
     extern char *crypt16 __P((const char *, const char *));
@@ -758,9 +750,7 @@ auto_lock(n)
         (apw = getauthuid(euid)) != NULL) 	/* enhanced ultrix passwd */
 	srpp = apw->a_password;
 
-#endif /* PW_AUTH && !XCRYPT */
-
-#if defined(PW_SHADOW) && !defined(XCRYPT)
+#elif defined(HAVE_SHADOW_H)
 
     struct spwd *spw;
 
@@ -770,9 +760,7 @@ auto_lock(n)
 	(spw = getspnam(pw->pw_name)) != NULL)	/* shadowed passwd	  */
 	srpp = spw->sp_pwdp;
 
-#endif /* PW_SHADOW && !XCRYPT */
-
-#ifndef XCRYPT
+#else
 
 #define XCRYPT(a, b) crypt(a, b)
 
@@ -781,7 +769,7 @@ auto_lock(n)
 	srpp = pw->pw_passwd;
 #endif /* !MVS */
 
-#endif /* !XCRYPT */
+#endif
 
     if (srpp == NULL) {
 	auto_logout(0);
@@ -862,7 +850,7 @@ auto_logout(n)
     goodbye(NULL, NULL);
 }
 
-sigret_t
+RETSIGTYPE
 /*ARGSUSED*/
 alrmcatch(snum)
 int snum;
@@ -876,9 +864,6 @@ int snum;
     (*alm_fun)(0);
 
     setalarm(1);
-#ifndef SIGVOID
-    return (snum);
-#endif /* !SIGVOID */
 }
 
 /*
@@ -2096,7 +2081,7 @@ hashbang(fd, vp)
 
 #ifdef REMOTEHOST
 
-static sigret_t
+static RETSIGTYPE
 palarm(snum)
     int snum;
 {
@@ -2107,10 +2092,6 @@ palarm(snum)
 #endif /* UNRELSIGS */
     (void) alarm(0);
     reset();
-
-#ifndef SIGVOID
-    return (snum);
-#endif
 }
 
 
@@ -2127,7 +2108,7 @@ getremotehost()
     struct sockaddr_in saddr;
     int len = sizeof(struct sockaddr_in);
 #endif
-#if defined(UTHOST) && !defined(HAVENOUTMP)
+#ifdef HAVE_STRUCT_UTMP_UT_HOST
     char *sptr = NULL;
 #endif
 
@@ -2154,7 +2135,7 @@ getremotehost()
 	    host = inet_ntoa(saddr.sin_addr);
 #endif
     }
-#if defined(UTHOST) && !defined(HAVENOUTMP)
+#ifdef HAVE_STRUCT_UTMP_UT_HOST
     else {
 	char *ptr;
 	char *name = utmphost();
@@ -2189,11 +2170,7 @@ getremotehost()
 		    hints.ai_family = PF_UNSPEC;
 		    hints.ai_socktype = SOCK_STREAM;
 		    hints.ai_flags = AI_PASSIVE | AI_CANONNAME;
-#if defined(UTHOST) && !defined(HAVENOUTMP)
 		    if (strlen(name) < utmphostsize())
-#else
-		    if (name != NULL)
-#endif
 		    {
 			if (getaddrinfo(name, NULL, &hints, &res) != 0)
 			    res = NULL;
@@ -2243,7 +2220,7 @@ getremotehost()
     if (host)
 	tsetenv(STRREMOTEHOST, str2short(host));
 
-#if defined(UTHOST) && !defined(HAVENOUTMP)
+#ifdef HAVE_STRUCT_UTMP_UT_HOST
     if (sptr)
 	*sptr = ':';
 #endif

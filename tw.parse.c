@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tw.parse.c,v 3.101 2004/11/23 02:10:50 christos Exp $ */
+/* $Header: /src/pub/tcsh/tw.parse.c,v 3.103 2005/01/18 20:14:04 christos Exp $ */
 /*
  * tw.parse.c: Everyone has taken a shot in this futile effort to
  *	       lexically analyze a csh line... Well we cannot good
@@ -35,7 +35,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tw.parse.c,v 3.101 2004/11/23 02:10:50 christos Exp $")
+RCSID("$Id: tw.parse.c,v 3.103 2005/01/18 20:14:04 christos Exp $")
 
 #include "tw.h"
 #include "ed.h"
@@ -1358,7 +1358,7 @@ tw_list_items(looking, numitems, list_max)
 
 
     if (max_items || max_rows) {
-	char    	 tc;
+	char    	 tc, *sname;
 	const char	*name;
 	int maxs;
 
@@ -1371,8 +1371,10 @@ tw_list_items(looking, numitems, list_max)
 	    maxs = max_rows;
 	}
 
+	sname = strsave(name);
 	xprintf(CGETS(30, 7, "There are %d %s, list them anyway? [n/y] "),
-		maxs, name);
+		maxs, sname);
+	xfree(sname);
 	flush();
 	/* We should be in Rawmode here, so no \n to catch */
 	(void) read(SHIN, &tc, 1);

@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.c,v 3.118 2004/11/23 02:10:48 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.c,v 3.121 2005/01/18 20:14:03 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -39,7 +39,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$Id: sh.c,v 3.118 2004/11/23 02:10:48 christos Exp $")
+RCSID("$Id: sh.c,v 3.121 2005/01/18 20:14:03 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -163,7 +163,7 @@ static	int		  srcfile	__P((const char *, int, int, Char **));
 #else
 int		  srcfile	__P((const char *, int, int, Char **));
 #endif /*WINNT_NATIVE*/
-static	sigret_t	  phup		__P((int));
+static	RETSIGTYPE	  phup		__P((int));
 static	void		  srcunit	__P((int, int, int, Char **));
 static	void		  mailchk	__P((void));
 #ifndef _PATH_DEFPATH
@@ -211,10 +211,9 @@ main(argc, argv)
     nlsinit();
 
 #ifdef MALLOC_TRACE
-     mal_setstatsfile(fdopen(dup2(open("/tmp/tcsh.trace", 
-				       O_WRONLY|O_CREAT|O_LARGEFILE, 0666), 25),
-				       "w"));
-     mal_trace(1);
+    mal_setstatsfile(fdopen(dmove(open("/tmp/tcsh.trace", 
+	O_WRONLY|O_CREAT|O_LARGEFILE, 0666), 25), "w"));
+    mal_trace(1);
 #endif /* MALLOC_TRACE */
 
 #if !(defined(BSDTIMES) || defined(_SEQUENT_)) && defined(POSIX)
@@ -1791,7 +1790,7 @@ exitstat()
 /*
  * in the event of a HUP we want to save the history
  */
-static  sigret_t
+static RETSIGTYPE
 phup(snum)
 int snum;
 {
@@ -1860,9 +1859,6 @@ int snum;
 #endif /* POSIXJOBS */
 
     xexit(snum);
-#ifndef SIGVOID
-    return (snum);
-#endif
 }
 
 static Char   *jobargv[2] = {STRjobs, 0};
@@ -1876,10 +1872,7 @@ static Char   *jobargv[2] = {STRjobs, 0};
  */
 int     just_signaled;		/* bugfix by Michael Bloom (mg@ttidca.TTI.COM) */
 
-#ifdef SIGVOID
-/*ARGSUSED*/
-#endif
-sigret_t
+RETSIGTYPE
 pintr(snum)
 int snum;
 {
@@ -1890,9 +1883,6 @@ int snum;
 #endif /* UNRELSIGS */
     just_signaled = 1;
     pintr1(1);
-#ifndef SIGVOID
-    return (snum);
-#endif
 }
 
 void
@@ -2336,16 +2326,18 @@ mailchk()
 			mailcount, filename);
 	}
 	else {
+	    char *type;
+	    
 	    if (stb.st_size == 0 || stb.st_atime > stb.st_mtime ||
 		(stb.st_atime <= chktim && stb.st_mtime <= chktim) ||
 		(loginsh && !new))
 		continue;
+	    type = strsave(new ? CGETS(11, 6, "new ") : "");
 	    if (cnt == 1)
-		xprintf(CGETS(11, 5, "You have %smail.\n"),
-			new ? CGETS(11, 6, "new ") : "");
+		xprintf(CGETS(11, 5, "You have %smail.\n"), type);
 	    else
-	        xprintf(CGETS(11, 7, "You have %smail in %s.\n"),
-			new ? CGETS(11, 6, "new ") : "", filename);
+	        xprintf(CGETS(11, 7, "You have %smail in %s.\n"), type);
+	    xfree(type);
 	}
     }
     chktim = t;

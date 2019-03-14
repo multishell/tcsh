@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tc.nls.c,v 3.1 2004/12/25 21:15:08 christos Exp $ */
+/* $Header: /src/pub/tcsh/tc.nls.c,v 3.3 2005/01/18 20:01:10 christos Exp $ */
 /*
  * tc.nls.c: NLS handling
  */
@@ -34,7 +34,7 @@
 #include <stdlib.h>
 #include <wchar.h>
 
-RCSID("$Id: tc.nls.c,v 3.1 2004/12/25 21:15:08 christos Exp $")
+RCSID("$Id: tc.nls.c,v 3.3 2005/01/18 20:01:10 christos Exp $")
 
 #ifdef SHORT_STRINGS
 int
@@ -108,16 +108,16 @@ NLSFrom(const Char *p, int l, NLSChar *cp)
 
     if (l == -1) {
         for (i = 0; i < MB_CUR_MAX && *p; i++)
-	    b[i] = p[i]; 
+	    b[i] = p[i] & CHAR;
     } else {
         for (i = 0; i < MB_CUR_MAX && i < (size_t)l; i++)
-	    b[i] = p[i]; 
+	    b[i] = p[i] & CHAR;
     }
     mbtowc(0, 0, 0);
     len = rt_mbtowc(&c, b, i);
     if (len <= 0) {
 	if (cp)
-	  *cp = *p ? *p | 0x40000000 : 0;
+	  *cp = *p ? *p | NLS_ILLEGAL : 0;
         return 1;
     }
     if (cp) 
@@ -283,9 +283,9 @@ NLSClassify(c, nocomb)
     if (c & NLS_ILLEGAL)
 	return NLSCLASS_ILLEGAL;
     w = NLSWidth(c);
-    if (w > 0 || (Isprint(c) && !nocomb))
+    if (w > 0 || (Iswprint(c) && !nocomb))
 	return w;
-    if (Iscntrl(c) && c < 0x100) {
+    if (Iswcntrl(c) && c < 0x100) {
 	if (c == '\n')
 	    return NLSCLASS_NL;
 	if (c == '\t')
