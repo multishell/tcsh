@@ -1,3 +1,18 @@
+ 36. V6.10.02 - 20010806
+ 35. polish nls locale (Pawe³ New)
+ 34. Fix a tcsetattr race running background jobs as the last line on an xterm
+     window (Andrew Brown)
+ 33. jobcmd alias (Greg Parker)
+ 32. hpux11 support (Joshua Weage)
+ 31. Fix SHORT_STRINGS compilation (Daniel Trinkle)
+ 30. Add kill -s (Mark Peek)
+ 29. Don't recognize all mips as dec (Bjorn Knutsson)
+ 28. Fix GLOB_QUOTE problem (noted by Per) I introduced in 6.10.01.
+ 27. Port to concurrent's powermaxos (Matt Majka)
+ 26. New builtin srcfile (Amol)
+ 25. Fix bindkey "\\" cmd (reported by Ismail H. Tuncer)
+ 24. %0Xc was broken in the prompt if the user's home directory was '/'.
+     (reported by Edward Glowacki)
  23. V6.10.01 - 20010426
  22. LARGEFILE support on Linux.
  21. Add big5 multibyte support (Yen-Ming Lee)

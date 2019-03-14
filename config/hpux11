@@ -14,6 +14,23 @@
  */
 #define POSIX
 
+#if defined(__hpux) && !defined(hpux)
+# define hpux
+#endif /* __hpux && !hpux */
+
+#if __STDC__ && !defined(__GNUC__)
+# define _POSIX_SOURCE
+# ifndef _HPUX_SOURCE
+# define  _HPUX_SOURCE
+# endif /* !_HPUX_SOURCE */
+#endif
+
+/* for access to large files from 32 bit apps
+ * define the following.  Removes the need to 
+ * redefine stat, fstat and lstat in sh.h
+ */
+#define _FILE_OFFSET_BITS 64
+
 /*
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
  *		job control facilities.
@@ -38,7 +55,7 @@
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
  */
-#undef VFORK
+#define VFORK
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and
@@ -51,7 +68,7 @@
  *		Note: POSIX systems should not define this unless they
  *		have sigvec() and friends (ie: 4.3BSD-RENO, HP-UX).
  */
-#undef BSDSIGS
+#define BSDSIGS
 
 /*
  * BSDTIMES	You have BSD-style process time stuff (like rusage)
@@ -83,22 +100,10 @@
  * SYSVREL	Your machine is SYSV based (HPUX, A/UX)
  *		NOTE: don't do this if you are on a Pyramid -- tcsh is
  *		built in a BSD universe.
- *		Set SYSVREL to 1, 2, or 3, depending the version of System V
+ *		Set SYSVREL to 1, 2, 3, or 4, depending the version of System V
  *		you are running. Or set it to 0 if you are not SYSV based
  */
-#define SYSVREL	4
-
-/*
- * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
- *		to send command output to /dev/null [they are back!]
- */
-#define YPBUGS
-
-/*
- * NISPLUS    Make sure that fd's 0, 1, and 2 always are open so that
- *            Sun's NIS+ doesn't get them, making ~-expansion hang.
- */
-#define NISPLUS
+#define SYSVREL	3
 
 /*
  * SIGVOID	Define this if your signal handlers return void.  On older
@@ -112,19 +117,9 @@
 #define HAVEDUP2
 
 /*
- * HAVEUTMPX	Define if you have extended utmp (utmpx).
- *		(common for svr4 systems)
- */
-#define HAVEUTMPX
-
-/*
  * UTHOST	Does the utmp file have a host field?
  */
-#ifdef HAVEUTMPX
-# define UTHOST
-#else
-# undef UTHOST
-#endif /* HAVEUTMPX */
+#define UTHOST
 
 /*
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
@@ -138,33 +133,14 @@
  *		SYSV_ECHO: Support only sysv escapes (\nnn)
  *		NONE_ECHO: Pure echo.
  */
-#define ECHO_STYLE BSD_ECHO	/* BSD options only */
+#define ECHO_STYLE BOTH_ECHO	/* Both BSD and SYSV options */
 
 /****************** local defines *********************/
-#ifndef BSDTIMES
-# define NEEDgethostname
-#endif
-/*
- * Shadow passwd file
- */
-#define PW_SHADOW
+#define NAMEI_BUG	/* Great! you broke that one too */
 
-#define SOLARIS2 26
-
-/* 
- * LARGE_OFFSETS (Solaris 2.6 in conjunction with NFSv3 to servers with >31 bit 
- * file offsets (e.g. Irix 6.2)
- */
-#define _FILE_OFFSET_BITS 64
-#define	_LARGE_FILE64_SOURCE 
-
-/*
- * lookupname/namei ignores tailing '/' on files
- */
-#define NAMEI_BUG
+#define HPUXVERSION  1100 /* For HP-UX version 8.00 */
 
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
-
 #endif /* _h_config */

@@ -23,7 +23,7 @@
 /*
  * POSIXSIGS	Use the POSIX signal facilities to emulate BSD signals.
  */
-#undef POSIXSIGS
+#define POSIXSIGS
 
 /*
  * VFORK	This machine has a vfork().  
@@ -38,7 +38,7 @@
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
  */
-#undef VFORK
+#define VFORK
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and
@@ -51,12 +51,13 @@
  *		Note: POSIX systems should not define this unless they
  *		have sigvec() and friends (ie: 4.3BSD-RENO, HP-UX).
  */
-#undef BSDSIGS
+#define BSDSIGS
 
 /*
  * BSDTIMES	You have BSD-style process time stuff (like rusage)
  *		This may or may not be true.  For example, Apple Unix
  *		(OREO) has BSDJOBS and BSDSIGS but not BSDTIMES.
+ *		SVR4 has a dummy rusage structure, so we don't use it.
  */
 #undef BSDTIMES
 
@@ -83,22 +84,16 @@
  * SYSVREL	Your machine is SYSV based (HPUX, A/UX)
  *		NOTE: don't do this if you are on a Pyramid -- tcsh is
  *		built in a BSD universe.
- *		Set SYSVREL to 1, 2, or 3, depending the version of System V
- *		you are running. Or set it to 0 if you are not SYSV based
+ *		Set SYSVREL to 1, 2, 3, or 4, depending on the version of SYSV
+ *		you are running, or set it to 0 if you are not SYSV based.
  */
 #define SYSVREL	4
 
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
- *		to send command output to /dev/null [they are back!]
+ *		to send command output to /dev/null
  */
-#define YPBUGS
-
-/*
- * NISPLUS    Make sure that fd's 0, 1, and 2 always are open so that
- *            Sun's NIS+ doesn't get them, making ~-expansion hang.
- */
-#define NISPLUS
+#undef YPBUGS
 
 /*
  * SIGVOID	Define this if your signal handlers return void.  On older
@@ -147,20 +142,8 @@
 /*
  * Shadow passwd file
  */
-#define PW_SHADOW
+#undef PW_SHADOW
 
-#define SOLARIS2 26
-
-/* 
- * LARGE_OFFSETS (Solaris 2.6 in conjunction with NFSv3 to servers with >31 bit 
- * file offsets (e.g. Irix 6.2)
- */
-#define _FILE_OFFSET_BITS 64
-#define	_LARGE_FILE64_SOURCE 
-
-/*
- * lookupname/namei ignores tailing '/' on files
- */
 #define NAMEI_BUG
 
 /****************** configurable hacks ****************/

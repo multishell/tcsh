@@ -76,7 +76,7 @@
 .\"   used here if you can. In particular, please don't use nroff commands
 .\"   which aren't already used herein.
 .\" 
-.TH TCSH 1 "26 April 2001" "Astron 6.10.01"
+.TH TCSH 1 "6 August 2001" "Astron 6.10.02"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
@@ -1885,10 +1885,13 @@ and described in detail under the appropriate \fBBuiltin commands\fR,
 The \fIsched\fR builtin command puts commands in a scheduled-event list,
 to be executed by the shell at a given time.
 .PP
-The \fIbeepcmd\fR, \fIcwdcmd\fR, \fIperiodic\fR, \fIprecmd\fR, and \fIpostcmd\fR
+The \fIbeepcmd\fR, \fIcwdcmd\fR, \fIperiodic\fR, \fIprecmd\fR, \fIpostcmd\fR,
+and \fIjobcmd\fR
 \fBSpecial aliases\fR can be set, respectively, to execute commands when the shell wants
 to ring the bell, when the working directory changes, every \fBtperiod\fR
-minutes, before each prompt, and before each command gets executed.
+minutes, before each prompt, before each command gets executed, after each
+command gets executed, and when a job is started or is brought into the
+foreground.
 .PP
 The \fBautologout\fR shell variable can be set to log out or lock the shell
 after a given number of minutes of inactivity.
@@ -2851,12 +2854,14 @@ Lists the active jobs.  With \fB\-l\fR, lists process
 IDs in addition to the normal information.  On TCF systems, prints
 the site on which each job is executing.
 .PP
-.B kill \fR[\fB\-\fIsignal\fR] \fB%\fIjob\fR|\fIpid\fR ...
+.PD 0
+.TP 8
+.B kill \fR[\fB\-s \fIsignal\fR] \fB%\fIjob\fR|\fIpid\fR ...
 .PD 0
 .TP 8
 .B kill \-l
-The first form sends the specified \fIsignal\fR (or, if none is given,
-the TERM (terminate) signal) to the specified jobs or processes.
+The first and second forms sends the specified \fIsignal\fR (or, if none
+is given, the TERM (terminate) signal) to the specified jobs or processes.
 \fIjob\fR may be a number, a string, `', `%', `+' or `\-' as described
 under \fBJobs\fR.
 Signals are either given by number or by name (as given in
@@ -2865,7 +2870,7 @@ There is no default \fIjob\fR; saying just `kill' does not send a signal
 to the current job.  If the signal being sent is TERM (terminate)
 or HUP (hangup), then the job or process is sent a
 CONT (continue) signal as well.
-The second form lists the signal names.
+The third form lists the signal names.
 .PD
 .ig \" Obsolete tcsh command
 .TP 8
@@ -3424,6 +3429,16 @@ only the hostname in the icon manager menu.
 Note that putting a \fIcd\fR, \fIpushd\fR or \fIpopd\fR in \fIcwdcmd\fR
 may cause an infinite loop.  It is the author's opinion that anyone doing
 so will get what they deserve.
+.RE
+.TP 8
+.B jobcmd
+Runs before each command gets executed, or when the command changes state.
+This is similar to \fIpostcmd\fR, but it does not print builtins.
+.RS +8
+.IP "" 4
+> alias jobcmd  'echo \-n "^[]2\e;\e!#^G"'
+.PP
+then executing \fIvi foo.c\fR will put the command string in the xterm title bar.
 .RE
 .TP 8
 .B helpcommand
@@ -4986,7 +5001,7 @@ pipe(2), setrlimit(2), sigvec(2), stat(2), umask(2), vfork(2), wait(2),
 malloc(3), setlocale(3), tty(4), a.out(5), termcap(5), environ(7),
 termio(7), Introduction to the C Shell
 .SH VERSION
-This manual documents tcsh 6.10.01 (Astron) 2001-04-26.
+This manual documents tcsh 6.10.02 (Astron) 2001-08-06.
 .SH AUTHORS
 .PD 0
 .TP 2
