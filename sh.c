@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.133 2006/08/23 15:03:14 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.135 2006/10/14 17:23:39 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -39,7 +39,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$tcsh: sh.c,v 3.133 2006/08/23 15:03:14 christos Exp $")
+RCSID("$tcsh: sh.c,v 3.135 2006/10/14 17:23:39 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -163,10 +163,10 @@ int
 main(int argc, char **argv)
 {
     int batch = 0;
-    int nexececho = 0;
+    volatile int nexececho = 0;
     int nofile = 0;
-    int nverbose = 0;
-    int rdirs = 0;
+    volatile int nverbose = 0;
+    volatile int rdirs = 0;
     int quitit = 0;
     Char *cp;
 #ifdef AUTOLOGOUT
@@ -1634,6 +1634,7 @@ srcunit(int unit, int onlyown, int hflg, Char **av)
      */
     if (setintr) {
 	cleanup_until(&pintr_disabled);
+	pintr_disabled++;
 	cleanup_push(&pintr_disabled, disabled_cleanup);
     }
 

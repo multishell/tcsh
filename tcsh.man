@@ -72,7 +72,7 @@
 .\"   used here if you can. In particular, please don't use nroff commands
 .\"   which aren't already used herein.
 .\" 
-.TH TCSH 1 "25 August 2006" "Astron 6.14.07"
+.TH TCSH 1 "3 March 2007" "Astron 6.15.00"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
@@ -1050,9 +1050,8 @@ Apply the following modifier once to each word.
 a (+)
 Apply the following modifier as many times as possible to a single word.
 `a' and `g' can be used together to apply a modifier globally.
-In the current implementation, using the `a' and `s' modifiers together can
-lead to an infinite loop.  For example, `:as/f/ff/' will never terminate.
-This behavior might change in the future.
+With the `s' modifier, only the patterns contained in the original word are
+substituted, not patterns that contain any substitution result.
 .TP 8
 p
 Print the new command line but do not execute it.
@@ -3993,6 +3992,10 @@ The user's real organization ID.  (Domain/OS only)
 The old working directory, equivalent to the `\-' used by \fIcd\fR and \fIpushd\fR.
 See also the \fBcwd\fR and \fBdirstack\fR shell variables.
 .TP 8
+.B padhour
+If set, enable the printing of padding '0' for hours, in 24 and 12 hour
+formats.  E.G.: 07:45:42 vs. 7:45:42
+.TP 8
 .B path
 A list of directories in which to look for executable commands.
 A null word specifies the current directory.
@@ -5073,7 +5076,7 @@ pipe(2), setrlimit(2), sigvec(2), stat(2), umask(2), vfork(2), wait(2),
 malloc(3), setlocale(3), tty(4), a.out(5), termcap(5), environ(7),
 termio(7), Introduction to the C Shell
 .SH VERSION
-This manual documents tcsh 6.14.07 (Astron) 2006-08-25.
+This manual documents tcsh 6.15.00 (Astron) 2007-03-03.
 .SH AUTHORS
 .PD 0
 .TP 2
