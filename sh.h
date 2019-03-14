@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.h,v 3.149 2009/06/25 21:15:37 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.h,v 3.155 2010/01/26 20:03:17 christos Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -89,12 +89,16 @@ typedef unsigned long intptr_t;
 #ifdef SHORT_STRINGS
 # ifdef WIDE_STRINGS
 #include <wchar.h>
+#  ifdef UTF16_STRINGS
+typedef wint_t Char;
+#  else
 typedef wchar_t Char;
+#endif
 typedef unsigned long uChar;
 typedef wint_t eChar; /* Can contain any Char value or CHAR_ERR */
 #define CHAR_ERR WEOF /* Pretty please, use bit 31... */
 #define normal_mbtowc(PWC, S, N) rt_mbtowc(PWC, S, N)
-#define reset_mbtowc() IGNORE(mbtowc(NULL, NULL, 0))
+#define reset_mbtowc() TCSH_IGNORE(mbtowc(NULL, NULL, 0))
 # else
 typedef short Char;
 typedef unsigned short uChar;
@@ -114,10 +118,13 @@ typedef int eChar;
 # define SAVE(a) (strsave(a))
 #endif
 
+#if !defined(__inline) && !defined(__GNUC__) && !defined(_MSC_VER)
+#define __inline
+#endif
 /* Elide unused argument warnings */
 #define USE(a)	(void) (a)
-#define IGNORE(a)	ignore((intptr_t)a)
-static inline void ignore(intptr_t a)
+#define TCSH_IGNORE(a)	tcsh_ignore((intptr_t)a)
+static __inline void tcsh_ignore(intptr_t a)
 {
     USE(a);
 }
@@ -219,6 +226,11 @@ static inline void ignore(intptr_t a)
 # define lstat lstat64
 #endif /* __HP_CXD_SPP && !__hpux */
 
+#ifdef HAVE_LONG_LONG
+typedef long long tcsh_number_t;
+#else
+typedef long tcsh_number_t;
+#endif
 /*
  * This macro compares the st_dev field of struct stat. On aix on ibmESA
  * st_dev is a structure, so comparison does not work. 
@@ -1091,7 +1103,7 @@ EXTERN Char    PRCHROOT;	/* Prompt symbol for root */
 #define short2blk(a) 		saveblk(a)
 #define short2str(a) 		caching_strip(a)
 #else
-#ifdef WIDE_STRINGS
+#ifndef UTF16_STRINGS
 #define Strchr(a, b)		wcschr(a, b)
 #define Strrchr(a, b)		wcsrchr(a, b)
 #define Strcat(a, b)  		wcscat(a, b)

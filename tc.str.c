@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/tc.str.c,v 3.29 2009/06/25 21:15:38 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/tc.str.c,v 3.33 2010/02/12 22:18:20 christos Exp $ */
 /*
  * tc.str.c: Short string package
  * 	     This has been a lesson of how to write buggy code!
@@ -35,7 +35,7 @@
 
 #include <limits.h>
 
-RCSID("$tcsh: tc.str.c,v 3.29 2009/06/25 21:15:38 christos Exp $")
+RCSID("$tcsh: tc.str.c,v 3.33 2010/02/12 22:18:20 christos Exp $")
 
 #define MALLOC_INCR	128
 #ifdef WIDE_STRINGS
@@ -46,7 +46,7 @@ RCSID("$tcsh: tc.str.c,v 3.29 2009/06/25 21:15:38 christos Exp $")
 
 #ifdef WIDE_STRINGS
 size_t
-one_mbtowc(wchar_t *pwc, const char *s, size_t n)
+one_mbtowc(Char *pwc, const char *s, size_t n)
 {
     int len;
 
@@ -61,7 +61,7 @@ one_mbtowc(wchar_t *pwc, const char *s, size_t n)
 }
 
 size_t
-one_wctomb(char *s, wchar_t wchar)
+one_wctomb(char *s, Char wchar)
 {
     int len;
 
@@ -69,7 +69,23 @@ one_wctomb(char *s, wchar_t wchar)
 	s[0] = wchar & 0xFF;
 	len = 1;
     } else {
-	len = wctomb(s, wchar);
+#ifdef UTF16_STRINGS
+	if (wchar >= 0x10000) {
+	    /* UTF-16 systems can't handle these values directly in calls to
+	       wctomb.  Convert value to UTF-16 surrogate and call wcstombs to
+	       convert the "string" to the correct multibyte representation,
+	       if any. */
+	    wchar_t ws[3];
+	    wchar -= 0x10000;
+	    ws[0] = 0xd800 | (wchar >> 10);
+	    ws[1] = 0xdc00 | (wchar & 0x3ff);
+	    ws[2] = 0;
+	    /* The return value of wcstombs excludes the trailing 0, so len is
+	       the correct number of multibytes for the Unicode char. */
+	    len = wcstombs (s, ws, MB_CUR_MAX + 1);
+	} else
+#endif
+	len = wctomb(s, (wchar_t) wchar);
 	if (len == -1)
 	    s[0] = wchar;
 	if (len <= 0)
@@ -79,14 +95,33 @@ one_wctomb(char *s, wchar_t wchar)
 }
 
 int
-rt_mbtowc(wchar_t *pwc, const char *s, size_t n)
+rt_mbtowc(Char *pwc, const char *s, size_t n)
 {
     int ret;
     char back[MB_LEN_MAX];
+    wchar_t tmp;
+    mbstate_t mb;
 
-    ret = mbtowc(pwc, s, n);
-    if (ret > 0 && (wctomb(back, *pwc) != ret || memcmp(s, back, ret) != 0))
-	ret = -1;
+    memset (&mb, 0, sizeof mb);
+    ret = mbrtowc(&tmp, s, n, &mb);
+    if (ret > 0) {
+	*pwc = tmp;
+#ifdef UTF16_STRINGS
+	if (tmp >= 0xd800 && tmp <= 0xdbff) {
+	    /* UTF-16 surrogate pair.  Fetch second half and compute
+	       UTF-32 value.  Dispense with the inverse test in this case. */
+	    size_t n2 = mbrtowc(&tmp, s + ret, n - ret, &mb);
+	    if (n2 == 0 || n2 == (size_t)-1 || n2 == (size_t)-2)
+		ret = -1;
+	    else {
+		*pwc = (((*pwc & 0x3ff) << 10) | (tmp & 0x3ff)) + 0x10000;
+		ret += n2;
+	    }
+	} else
+#endif
+      	if (wctomb(back, *pwc) != ret || memcmp(s, back, ret) != 0)
+	    ret = -1;
+    }
     return ret;
 }
 #endif
@@ -186,7 +221,7 @@ short2str(const Char *src)
     return (sdst);
 }
 
-#ifndef WIDE_STRINGS
+#if !defined (WIDE_STRINGS) || defined (UTF16_STRINGS)
 Char   *
 s_strcpy(Char *dst, const Char *src)
 {
@@ -334,7 +369,7 @@ int
 s_strcasecmp(const Char *str1, const Char *str2)
 {
 #ifdef WIDE_STRINGS
-    wchar_t l1 = 0, l2 = 0;
+    wint_t l1 = 0, l2 = 0;
     for (; *str1 && ((*str1 == *str2 && (l1 = l2 = 0) == 0) || 
 	(l1 = towlower(*str1)) == (l2 = towlower(*str2))); str1++, str2++)
 	continue;

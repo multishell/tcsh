@@ -9,7 +9,7 @@ dnl Written by Kaveh Ghazi (ghazi@caip.rutgers.edu) 5/11/96.
 dnl
 
 AC_PREREQ([2.59])dnl Minimum Autoconf version required.
-AC_INIT([tcsh], [6.17.00], [http://bugs.gw.com/])
+AC_INIT([tcsh], [6.17.01], [http://bugs.gw.com/])
 AC_CONFIG_SRCDIR([tc.vers.c])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_TESTDIR([.], [.])
@@ -178,8 +178,11 @@ case "${host}" in
   *-*-solaris2.[45] ) # Should handle sparc, x86 and powerpc
     tcsh_config_file=sol24
   ;;
-  *-*-solaris2.* ) # Should handle sparc, x86 and powerpc
+  *-*-solaris2.[678] ) # Should handle sparc, x86 and powerpc
     tcsh_config_file=sol26
+  ;;
+  *-*-solaris2.* ) # Should handle sparc, x86 and powerpc
+    tcsh_config_file=sol29
   ;;
 
   ## Dell SVR4
@@ -440,5 +443,5 @@ fi
 AC_SUBST(HESDEF)
 AC_SUBST(HESLIB)
 
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile nls/Makefile])
 AC_OUTPUT

@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.set.c,v 3.71 2007/08/07 10:18:52 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.set.c,v 3.73 2010/01/26 16:10:09 christos Exp $ */
 /*
  * sh.set.c: Setting and Clearing of variables
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.set.c,v 3.71 2007/08/07 10:18:52 christos Exp $")
+RCSID("$tcsh: sh.set.c,v 3.73 2010/01/26 16:10:09 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -50,7 +50,7 @@ static	void		 asx		(Char *, int, Char *);
 static	struct varent 	*getvx		(Char *, int);
 static	Char		*xset		(Char *, Char ***);
 static	Char		*operate	(int, Char *, Char *);
-static	void	 	 putn1		(unsigned);
+static	void	 	 putn1		(tcsh_number_t);
 static	struct varent	*madrof		(Char *, struct varent *);
 static	void		 unsetv1	(struct varent *);
 static	void		 exportpath	(Char **);
@@ -184,7 +184,7 @@ update_vars(Char *vp)
 	tw_cmd_free();
     }
     else if (eq(vp, STRkillring)) {
-	SetKillRing(getn(varval(vp)));
+	SetKillRing((int)getn(varval(vp)));
     }
 #ifndef HAVENOUTMP
     else if (eq(vp, STRwatch)) {
@@ -479,7 +479,7 @@ operate(int op, Char *vp, Char *p)
     Char   *vec[5];
     Char **v = vec;
     Char  **vecp = v;
-    int i;
+    tcsh_number_t i;
 
     if (op != '=') {
 	if (*vp)
@@ -500,10 +500,10 @@ operate(int op, Char *vp, Char *p)
 
 static Char *putp;
 
-Char   *
-putn(int n)
+Char *
+putn(tcsh_number_t n)
 {
-    Char nbuf[(CHAR_BIT * sizeof (n) + 2) / 3 + 2]; /* Enough even for octal */
+    Char nbuf[1024]; /* Enough even for octal */
 
     putp = nbuf;
     if (n < 0) {
@@ -516,17 +516,17 @@ putn(int n)
 }
 
 static void
-putn1(unsigned n)
+putn1(tcsh_number_t n)
 {
     if (n > 9)
 	putn1(n / 10);
     *putp++ = n % 10 + '0';
 }
 
-int
-getn(Char *cp)
+tcsh_number_t
+getn(const Char *cp)
 {
-    int n;
+    tcsh_number_t n;
     int     sign;
     int base;
 

@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.sem.c,v 3.79 2007/09/28 21:02:02 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.sem.c,v 3.81 2009/10/29 14:55:13 christos Exp $ */
 /*
  * sh.sem.c: I/O redirections and job forking. A touchy issue!
  *	     Most stuff with builtins is incorrect
@@ -33,7 +33,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.sem.c,v 3.79 2007/09/28 21:02:02 christos Exp $")
+RCSID("$tcsh: sh.sem.c,v 3.81 2009/10/29 14:55:13 christos Exp $")
 
 #include "tc.h"
 #include "tw.h"
@@ -664,31 +664,31 @@ execute(struct command *t, volatile int wanttty, int *pipein, int *pipeout,
 #endif /* !CLOSE_ON_EXEC */
 	didfds = 0;
 	wanttty = -1;
-	t->t_dspr->t_dflg |= t->t_dflg & F_NOINTERRUPT;
+	t->t_dspr->t_dflg |= t->t_dflg & (F_NOINTERRUPT | F_BACKQ);
 	execute(t->t_dspr, wanttty, NULL, NULL, do_glob);
 	exitstat();
 
     case NODE_PIPE:
 #ifdef BACKPIPE
 	t->t_dcdr->t_dflg |= F_PIPEIN | (t->t_dflg &
-			(F_PIPEOUT | F_AMPERSAND | F_NOFORK | F_NOINTERRUPT));
+	    (F_PIPEOUT | F_AMPERSAND | F_NOFORK | F_NOINTERRUPT | F_BACKQ));
 	execute(t->t_dcdr, wanttty, pv, pipeout, do_glob);
-	t->t_dcar->t_dflg |= F_PIPEOUT |
-	    (t->t_dflg & (F_PIPEIN | F_AMPERSAND | F_STDERR | F_NOINTERRUPT));
+	t->t_dcar->t_dflg |= F_PIPEOUT | (t->t_dflg &
+	    (F_PIPEIN | F_AMPERSAND | F_STDERR | F_NOINTERRUPT | F_BACKQ));
 	execute(t->t_dcar, wanttty, pipein, pv, do_glob);
 #else /* !BACKPIPE */
-	t->t_dcar->t_dflg |= F_PIPEOUT |
-	    (t->t_dflg & (F_PIPEIN | F_AMPERSAND | F_STDERR | F_NOINTERRUPT));
+	t->t_dcar->t_dflg |= F_PIPEOUT | (t->t_dflg &
+	    (F_PIPEIN | F_AMPERSAND | F_STDERR | F_NOINTERRUPT | F_BACKQ));
 	execute(t->t_dcar, wanttty, pipein, pv, do_glob);
 	t->t_dcdr->t_dflg |= F_PIPEIN | (t->t_dflg &
-			(F_PIPEOUT | F_AMPERSAND | F_NOFORK | F_NOINTERRUPT));
+	    (F_PIPEOUT | F_AMPERSAND | F_NOFORK | F_NOINTERRUPT | F_BACKQ));
 	execute(t->t_dcdr, wanttty, pv, pipeout, do_glob);
 #endif /* BACKPIPE */
 	break;
 
     case NODE_LIST:
 	if (t->t_dcar) {
-	    t->t_dcar->t_dflg |= t->t_dflg & F_NOINTERRUPT;
+	    t->t_dcar->t_dflg |= t->t_dflg & (F_NOINTERRUPT | F_BACKQ);
 	    execute(t->t_dcar, wanttty, NULL, NULL, do_glob);
 	    /*
 	     * In strange case of A&B make a new job after A
@@ -699,7 +699,7 @@ execute(struct command *t, volatile int wanttty, int *pipein, int *pipeout,
 	}
 	if (t->t_dcdr) {
 	    t->t_dcdr->t_dflg |= t->t_dflg &
-		(F_NOFORK | F_NOINTERRUPT);
+		(F_NOFORK | F_NOINTERRUPT | F_BACKQ);
 	    execute(t->t_dcdr, wanttty, NULL, NULL, do_glob);
 	}
 	break;
@@ -707,7 +707,7 @@ execute(struct command *t, volatile int wanttty, int *pipein, int *pipeout,
     case NODE_OR:
     case NODE_AND:
 	if (t->t_dcar) {
-	    t->t_dcar->t_dflg |= t->t_dflg & F_NOINTERRUPT;
+	    t->t_dcar->t_dflg |= t->t_dflg & (F_NOINTERRUPT | F_BACKQ);
 	    execute(t->t_dcar, wanttty, NULL, NULL, do_glob);
 	    if ((getn(varval(STRstatus)) == 0) !=
 		(t->t_dtyp == NODE_AND)) {
@@ -716,7 +716,7 @@ execute(struct command *t, volatile int wanttty, int *pipein, int *pipeout,
 	}
 	if (t->t_dcdr) {
 	    t->t_dcdr->t_dflg |= t->t_dflg &
-		(F_NOFORK | F_NOINTERRUPT);
+		(F_NOFORK | F_NOINTERRUPT | F_BACKQ);
 	    execute(t->t_dcdr, wanttty, NULL, NULL, do_glob);
 	}
 	break;
@@ -840,7 +840,7 @@ doio(struct command *t, int *pipein, int *pipeout)
 	}
 	else if (flags & F_PIPEIN) {
 	    xclose(0);
-	    IGNORE(dup(pipein[0]));
+	    TCSH_IGNORE(dup(pipein[0]));
 	    xclose(pipein[0]);
 	    xclose(pipein[1]);
 	}
@@ -850,7 +850,7 @@ doio(struct command *t, int *pipein, int *pipeout)
 	}
 	else {
 	    xclose(0);
-	    IGNORE(dup(OLDSTD));
+	    TCSH_IGNORE(dup(OLDSTD));
 #if defined(CLOSE_ON_EXEC) && defined(CLEX_DUPS)
 	    /*
 	     * PWP: Unlike Bezerkeley 4.3, FIONCLEX for Pyramid is preserved
@@ -903,12 +903,12 @@ doio(struct command *t, int *pipein, int *pipeout)
     }
     else if (flags & F_PIPEOUT) {
 	xclose(1);
-	IGNORE(dup(pipeout[1]));
+	TCSH_IGNORE(dup(pipeout[1]));
 	is1atty = 0;
     }
     else {
 	xclose(1);
-	IGNORE(dup(SHOUT));
+	TCSH_IGNORE(dup(SHOUT));
 	is1atty = isoutatty;
 # if defined(CLOSE_ON_EXEC) && defined(CLEX_DUPS)
 	(void) close_on_exec(1, 0);
@@ -917,11 +917,11 @@ doio(struct command *t, int *pipein, int *pipeout)
 
     xclose(2);
     if (flags & F_STDERR) {
-	IGNORE(dup(1));
+	TCSH_IGNORE(dup(1));
 	is2atty = is1atty;
     }
     else {
-	IGNORE(dup(SHDIAG));
+	TCSH_IGNORE(dup(SHDIAG));
 	is2atty = isdiagatty;
 # if defined(CLOSE_ON_EXEC) && defined(CLEX_DUPS)
 	(void) close_on_exec(2, 0);

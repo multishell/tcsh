@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.144 2009/06/24 15:32:25 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.153 2010/01/26 20:03:17 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -39,7 +39,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$tcsh: sh.c,v 3.144 2009/06/24 15:32:25 christos Exp $")
+RCSID("$tcsh: sh.c,v 3.153 2010/01/26 20:03:17 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -160,6 +160,42 @@ static	void		  st_restore	(void *);
 
 	int		  main		(int, char **);
 
+#ifndef LOCALEDIR
+#define LOCALEDIR "/usr/share/locale"
+#endif
+
+#ifdef NLS_CATALOGS
+static void
+add_localedir_to_nlspath(const char *path)
+{
+    static const char msgs[] = "/%L/LC_MESSAGES/%N.cat";
+    char *old = getenv("NLSPATH");
+    char *new;
+    size_t len = 0;
+
+    if (path == NULL)
+        return;
+
+    if (old != NULL)
+        len += strlen(old);
+
+    len += strlen(path) + sizeof(msgs);
+
+    new = xcalloc(len, 1);
+
+    if (old != NULL) {
+        (void)strncat(new, old, len);
+        (void)strncat(new, ":", len);
+    }
+
+    (void)strncat(new, path, len);
+    (void)strncat(new, msgs, len);
+
+    tsetenv(STRNLSPATH, str2short(new));
+    free(new);
+}
+#endif
+
 int
 main(int argc, char **argv)
 {
@@ -191,6 +227,13 @@ main(int argc, char **argv)
     (void) setlocale(LC_CTYPE, ""); /* for iscntrl */
 # endif /* LC_CTYPE */
 #endif /* NLS */
+
+    STR_environ = blk2short(environ);
+    environ = short2blk(STR_environ);	/* So that we can free it */
+
+#ifdef NLS_CATALOGS
+    add_localedir_to_nlspath(LOCALEDIR);
+#endif
 
     nlsinit();
 
@@ -263,8 +306,6 @@ main(int argc, char **argv)
     STR_SHELLPATH = SAVE(_PATH_CSHELL);
 # endif
 #endif
-    STR_environ = blk2short(environ);
-    environ = short2blk(STR_environ);	/* So that we can free it */
     STR_WORD_CHARS = SAVE(WORD_CHARS);
 
     HIST = '!';
@@ -319,7 +360,6 @@ main(int argc, char **argv)
 	setNS(STRloginsh);
     }
 
-    AsciiOnly = 1;
     NoNLSRebind = getenv("NOREBIND") != NULL;
 #ifdef NLS
 # ifdef SETLOCALEBUG
@@ -336,13 +376,19 @@ main(int argc, char **argv)
     fix_strcoll_bug();
 # endif /* STRCOLLBUG */
 
-    {
+    /*
+     * On solaris ISO8859-1 contains no printable characters in the upper half
+     * so we need to test only for MB_CUR_MAX == 1, otherwise for multi-byte
+     * locales we are always AsciiOnly == 0.
+     */
+    if (MB_CUR_MAX == 1) {
 	int     k;
 
-	for (k = 0200; k <= 0377 && !Isprint(CTL_ESC(k)); k++)
+	for (k = 0200; k <= 0377 && !isprint(CTL_ESC(k)); k++)
 	    continue;
-	AsciiOnly = MB_CUR_MAX == 1 && k > 0377;
-    }
+	AsciiOnly = k > 0377;
+    } else
+	AsciiOnly = 0;
 #else
     AsciiOnly = getenv("LANG") == NULL && getenv("LC_CTYPE") == NULL;
 #endif				/* NLS */
@@ -531,6 +577,12 @@ main(int argc, char **argv)
 	setv(STRoid, Itoa(oid, 0, 0), VAR_READWRITE);
 #endif /* apollo */
 
+	setv(STReuid, Itoa(euid, 0, 0), VAR_READWRITE);
+	if ((pw = xgetpwuid(euid)) == NULL)
+	    setcopy(STReuser, STRunknown, VAR_READWRITE);
+	else
+	    setcopy(STReuser, str2short(pw->pw_name), VAR_READWRITE);
+
 	setv(STRuid, Itoa(uid, 0, 0), VAR_READWRITE);
 
 	setv(STRgid, Itoa(gid, 0, 0), VAR_READWRITE);
@@ -542,7 +594,7 @@ main(int argc, char **argv)
 	else if (cln != NULL)
 	    setv(STRuser, quote(SAVE(cln)), VAR_READWRITE);
 	else if ((pw = xgetpwuid(uid)) == NULL)
-	    setcopy(STRuser, str2short("unknown"), VAR_READWRITE);
+	    setcopy(STRuser, STRunknown, VAR_READWRITE);
 	else
 	    setcopy(STRuser, str2short(pw->pw_name), VAR_READWRITE);
 	if (cln == NULL)
@@ -554,7 +606,7 @@ main(int argc, char **argv)
 	if (cgr != NULL)
 	    setv(STRgroup, quote(SAVE(cgr)), VAR_READWRITE);
 	else if ((gr = xgetgrgid(gid)) == NULL)
-	    setcopy(STRgroup, str2short("unknown"), VAR_READWRITE);
+	    setcopy(STRgroup, STRunknown, VAR_READWRITE);
 	else
 	    setcopy(STRgroup, str2short(gr->gr_name), VAR_READWRITE);
 	if (cgr == NULL)
@@ -573,7 +625,7 @@ main(int argc, char **argv)
 	    tsetenv(STRHOST, str2short(cbuff));
 	}
 	else
-	    tsetenv(STRHOST, str2short("unknown"));
+	    tsetenv(STRHOST, STRunknown);
     }
 
 
@@ -697,7 +749,7 @@ main(int argc, char **argv)
 	parseLS_COLORS(str2short(tcp));
 #endif /* COLOR_LS_F */
 
-    doldol = putn((int) getpid());	/* For $$ */
+    doldol = putn((tcsh_number_t)getpid());	/* For $$ */
 #ifdef WINNT_NATIVE
     {
 	char *tmp;
@@ -1288,6 +1340,8 @@ main(int argc, char **argv)
      */
     process(setintr);
 
+    /* Take care of these (especially HUP) here instead of inside flush. */
+    handle_pending_signals();
     /*
      * Mop-up.
      */
@@ -2018,6 +2072,7 @@ process(int catch)
     cleanup_pop_mark(omark);
     resexit(osetexit);
     exitset--;
+    handle_pending_signals();
 }
 
 /*ARGSUSED*/
@@ -2143,6 +2198,7 @@ mailchk(void)
 
 	    if (mailcount == 0)
 		continue;
+	    (void)closedir(mailbox);
 
 	    if (cnt == 1)
 		xprintf(CGETS(11, 3, "You have %d mail messages.\n"),
