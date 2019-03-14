@@ -1,3 +1,21 @@
+ 32. V6.17.02 - 20100512
+ 31. PR/79: nargs: Better handling for promptchars.
+ 30. PR/97: Add parseoctal to retain compatibility with previous versions (Jim
+     Zajkowski)
+ 29. PR/84: Performance fixes for large history merges (add
+     hashtable (Ted Anderson)
+ 28. Revert previous #23; people should use $histlit if they want this
+     feature.
+ 27. Don't kill "hup" background jobs when a child of the shell exits.
+     From Debian.
+ 26. Ignore \r\n in the command line options for OS's that don't strip
+     these from #!; from Debian
+ 25. Fix enhanced missing patch (Greg Dionne)
+ 24. Callers of rt_mbtowc don't grok -2 as a return. Return -1 for now.
+     (Corinna Vinschen)
+ 23. Turn HistLit on while recording history to avoid \!\! losing its \.
+     From Debian
+ 22. set autoexpand; set histchars="";\n<tab> crash. From Debian
  21. V6.17.01 - 20100506
  20. unset verbose while we are reading the history file to avoid echoing
      to the terminal. (Jeffrey Bastian)

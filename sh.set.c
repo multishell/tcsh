@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.set.c,v 3.73 2010/01/26 16:10:09 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.set.c,v 3.77 2010/05/12 15:19:45 christos Exp $ */
 /*
  * sh.set.c: Setting and Clearing of variables
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.set.c,v 3.73 2010/01/26 16:10:09 christos Exp $")
+RCSID("$tcsh: sh.set.c,v 3.77 2010/05/12 15:19:45 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -76,13 +76,19 @@ update_vars(Char *vp)
 	Char *pn = varval(vp);
 
 	HIST = *pn++;
-	HISTSUB = *pn;
+	if (HIST)
+	    HISTSUB = *pn;
+	else
+	    HISTSUB = HIST;
     }
     else if (eq(vp, STRpromptchars)) {
 	Char *pn = varval(vp);
 
 	PRCH = *pn++;
-	PRCHROOT = *pn;
+	if (PRCH)
+	    PRCHROOT = *pn;
+	else
+	    PRCHROOT = PRCH;
     }
     else if (eq(vp, STRhistlit)) {
 	HistLit = 1;
@@ -543,7 +549,7 @@ getn(const Char *cp)
 	    stderror(ERR_NAME | ERR_BADNUM);
     }
 
-    if (cp[0] == '0' && cp[1])
+    if (cp[0] == '0' && cp[1] && is_set(STRparseoctal))
 	base = 8;
     else
 	base = 10;
@@ -751,7 +757,7 @@ unset(Char **v, struct command *c)
     if (adrof(STRignoreeof) == 0)
 	numeof = 0;
     if (adrof(STRpromptchars) == 0) {
-	PRCH = '>';
+	PRCH = tcsh ? '>' : '%';
 	PRCHROOT = '#';
     }
     if (adrof(STRhistlit) == 0)
@@ -861,10 +867,11 @@ unsetv1(struct varent *p)
     balance(pp, f, 1);
 }
 
+/* Set variable name to NULL. */
 void
-setNS(Char *cp)
+setNS(const Char *varName)
 {
-    setcopy(cp, STRNULL, VAR_READWRITE);
+    setcopy(varName, STRNULL, VAR_READWRITE);
 }
 
 /*ARGSUSED*/

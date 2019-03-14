@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.153 2010/01/26 20:03:17 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.157 2010/05/12 15:01:12 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -39,7 +39,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$tcsh: sh.c,v 3.153 2010/01/26 20:03:17 christos Exp $")
+RCSID("$tcsh: sh.c,v 3.157 2010/05/12 15:01:12 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -290,7 +290,7 @@ main(int argc, char **argv)
 	t = t ? t + 1 : argv[0];
 	if (*t == '-') t++;
 	progname = strsave((t && *t) ? t : tcshstr);    /* never want a null */
-	tcsh = strcmp(progname, tcshstr) == 0;
+	tcsh = strncmp(progname, tcshstr, sizeof(tcshstr) - 1) == 0;
     }
 
     /*
@@ -310,8 +310,8 @@ main(int argc, char **argv)
 
     HIST = '!';
     HISTSUB = '^';
-    PRCH = '>';
-    PRCHROOT = '#';
+    PRCH = tcsh ? '>' : '%';	/* to replace %# in $prompt for normal users */
+    PRCHROOT = '#';		/* likewise for root */
     word_chars = STR_WORD_CHARS;
     bslash_quote = 0;		/* PWP: do tcsh-style backslash quoting? */
 
@@ -757,8 +757,8 @@ main(int argc, char **argv)
 	if ((tmp = getenv("TMP")) != NULL) {
 	    tmp = xasprintf("%s/%s", tmp, "sh");
 	    tmp2 = SAVE(tmp);
-	xfree(tmp);
-    }
+	    xfree(tmp);
+	}
 	else {
 	    tmp2 = SAVE(""); 
 	}
@@ -790,10 +790,11 @@ main(int argc, char **argv)
     /* PATCH IDEA FROM Issei.Suzuki VERY THANKS */
 #if defined(DSPMBYTE)
 #if defined(NLS) && defined(LC_CTYPE)
-    if (((tcp = setlocale(LC_CTYPE, NULL)) != NULL || (tcp = getenv("LANG")) != NULL) && !adrof(CHECK_MBYTEVAR)) {
+    if (((tcp = setlocale(LC_CTYPE, NULL)) != NULL || (tcp = getenv("LANG")) != NULL) && !adrof(CHECK_MBYTEVAR))
 #else
-    if ((tcp = getenv("LANG")) != NULL && !adrof(CHECK_MBYTEVAR)) {
+    if ((tcp = getenv("LANG")) != NULL && !adrof(CHECK_MBYTEVAR))
 #endif
+    {
 	autoset_dspmbyte(str2short(tcp));
     }
 #if defined(WINNT_NATIVE)
@@ -964,6 +965,8 @@ main(int argc, char **argv)
 
 	    case ' ':
 	    case '\t':
+	    case '\r':
+	    case '\n':
 		/* 
 		 * for O/S's that don't do the argument parsing right in 
 		 * "#!/foo -f " scripts
@@ -1071,10 +1074,7 @@ main(int argc, char **argv)
      * Set up the prompt.
      */
     if (prompt) {
-	if (tcsh)
-	    setcopy(STRprompt, STRdeftcshprompt, VAR_READWRITE);
-	else
-	    setcopy(STRprompt, STRdefcshprompt, VAR_READWRITE);
+	setcopy(STRprompt, STRdefprompt, VAR_READWRITE);
 	/* that's a meta-questionmark */
 	setcopy(STRprompt2, STRmquestion, VAR_READWRITE);
 	setcopy(STRprompt3, STRKCORRECT, VAR_READWRITE);
@@ -1340,11 +1340,11 @@ main(int argc, char **argv)
      */
     process(setintr);
 
-    /* Take care of these (especially HUP) here instead of inside flush. */
-    handle_pending_signals();
     /*
      * Mop-up.
      */
+    /* Take care of these (especially HUP) here instead of inside flush. */
+    handle_pending_signals();
     if (intty) {
 	if (loginsh) {
 	    xprintf("logout\n");
@@ -1731,7 +1731,7 @@ void
 exitstat(void)
 {
 #ifdef PROF
-    monitor(0);
+    _mcleanup();
 #endif
     /*
      * Note that if STATUS is corrupted (i.e. getn bombs) then error will exit
@@ -1891,7 +1891,7 @@ void
 process(int catch)
 {
     jmp_buf_t osetexit;
-    /* PWP: This might get nuked my longjmp so don't make it a register var */
+    /* PWP: This might get nuked by longjmp so don't make it a register var */
     size_t omark;
     volatile int didexitset = 0;
 
@@ -2314,12 +2314,13 @@ xexit(int i)
 
     {
 	struct process *pp, *np;
-
+	pid_t mypid = getpid();
 	/* Kill all processes marked for hup'ing */
 	for (pp = proclist.p_next; pp; pp = pp->p_next) {
 	    np = pp;
-	    do 
-		if ((np->p_flags & PHUP) && np->p_jobid != shpgrp) {
+	    do
+		if ((np->p_flags & PHUP) && np->p_jobid != shpgrp &&
+		    np->p_parentid == mypid) {
 		    if (killpg(np->p_jobid, SIGHUP) != -1) {
 			/* In case the job was suspended... */
 #ifdef SIGCONT
@@ -2406,6 +2407,7 @@ record(void)
 	recdirs(NULL, adrof(STRsavedirs) != NULL);
 	rechist(NULL, adrof(STRsavehist) != NULL);
     }
+    displayHistStats("Exiting");	/* no-op unless DEBUG_HIST */
 }
 
 /*

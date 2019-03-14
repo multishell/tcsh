@@ -72,7 +72,7 @@
 .\"   used here if you can. In particular, please don't use nroff commands
 .\"   which aren't already used herein.
 .\" 
-.TH TCSH 1 "5 May 2010" "Astron 6.17.01"
+.TH TCSH 1 "12 May 2010" "Astron 6.17.02"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
@@ -2581,7 +2581,7 @@ Finally, here's a complex example for inspiration:
 .br
 \&'n/\-name/f/' 'n/\-newer/f/' 'n/\-{,n}cpio/f/' \e
 .br
-\'n/\-exec/c/' 'n/\-ok/c/' 'n/\-user/u/' \e
+\&\'n/\-exec/c/' 'n/\-ok/c/' 'n/\-user/u/' \e
 .br
 \&'n/\-group/g/' 'n/\-fstype/(nfs 4.2)/' \e
 .br
@@ -4088,6 +4088,11 @@ See also the \fBcwd\fR and \fBdirstack\fR shell variables.
 If set, enable the printing of padding '0' for hours, in 24 and 12 hour
 formats.  E.G.: 07:45:42 vs. 7:45:42.
 .TP 8
+.B parseoctal
+To retain compatibily with older versions numeric variables starting with
+0 are not interpreted as octal. Setting this variable enables proper octal
+parsing.
+.TP 8
 .B path
 A list of directories in which to look for executable commands.
 A null word specifies the current directory.
@@ -5168,7 +5173,7 @@ pipe(2), setrlimit(2), sigvec(2), stat(2), umask(2), vfork(2), wait(2),
 malloc(3), setlocale(3), tty(4), a.out(5), termcap(5), environ(7),
 termio(7), Introduction to the C Shell
 .SH VERSION
-This manual documents tcsh 6.17.01 (Astron) 2010-05-06.
+This manual documents tcsh 6.17.02 (Astron) 2010-05-12.
 .SH AUTHORS
 .PD 0
 .TP 2

@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.decls.h,v 3.56 2010/01/26 16:10:08 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.decls.h,v 3.58 2010/05/08 00:41:58 christos Exp $ */
 /*
  * sh.decls.h	 External declarations from sh*.c
  */
@@ -212,11 +212,12 @@ extern  int	  	  t_pmatch	(const Char *, const Char *,
  * sh.hist.c
  */
 extern	void	 	  dohist	(Char **, struct command *);
-extern  struct Hist 	 *enthist	(int, struct wordent *, int, int);
+extern  struct Hist 	 *enthist	(int, struct wordent *, int, int, int);
 extern	void	 	  savehist	(struct wordent *, int);
 extern	char		 *fmthist	(int, ptr_t);
 extern	void		  rechist	(Char *, int);
 extern	void		  loadhist	(Char *, int);
+extern	void		  displayHistStats(const char *);
 
 /*
  * sh.init.c
@@ -270,7 +271,9 @@ extern	void		  setzero	(void *, size_t);
 extern	Char		 *strip		(Char *);
 extern	Char		 *quote		(Char *);
 extern	const Char	 *quote_meta	(struct Strbuf *, const Char *);
+#ifndef SHORT_STRINGS
 extern	char		 *strnsave	(const char *, size_t);
+#endif
 extern	char		 *strsave	(const char *);
 extern	void		  udvar		(Char *);
 #ifndef POSIX
@@ -380,7 +383,7 @@ extern	void		  setq		(const Char *, Char **,
 extern	void		  unset		(Char **, struct command *);
 extern	void		  unset1	(Char *[], struct varent *);
 extern	void		  unsetv	(Char *);
-extern	void		  setNS		(Char *);
+extern	void		  setNS		(const Char *);
 extern	void		  shift		(Char **, struct command *);
 extern	void		  plist		(struct varent *, int);
 extern	Char		 *unparse	(struct command *);
