@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.err.c,v 3.47 2006/02/14 00:52:52 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.err.c,v 3.49 2007/03/19 23:25:02 christos Exp $ */
 /*
  * sh.err.c: Error printing routines. 
  */
@@ -34,7 +34,7 @@
 #include "sh.h"
 #include <assert.h>
 
-RCSID("$tcsh: sh.err.c,v 3.47 2006/02/14 00:52:52 christos Exp $")
+RCSID("$tcsh: sh.err.c,v 3.49 2007/03/19 23:25:02 christos Exp $")
 
 /*
  * C Shell
@@ -202,7 +202,7 @@ errinit(void)
 
     for (i = 0; i < NO_ERRORS; i++)
 	xfree((char *)(intptr_t)elst[i]);
-#  if defined(__FreeBSD__) || defined(hpux)
+#  if defined(__FreeBSD__) || defined(hpux) || defined(__MidnightBSD__)
 #  define NLS_MAXSET 30
     for (i = 1; i <= NLS_MAXSET; i++)
 	CGETS(i, 1, "" );
@@ -593,16 +593,17 @@ stderror(unsigned int id, ...)
 	if (id >= sizeof(elst) / sizeof(elst[0]))
 	    id = ERR_INVALID;
 
-	/*
-	 * Must flush before we print as we wish output before the error to go
-	 * on (some form of) standard output, while output after goes on (some
-	 * form of) diagnostic output. If didfds then output will go to 1/2
-	 * else to FSHOUT/FSHDIAG. See flush in sh.print.c.
-	 */
-	flush();/*FIXRESET*/
-	haderr = 1;			/* Now to diagnostic output */
 
 	if (!(flags & ERR_SILENT)) {
+	    /*
+	     * Must flush before we print as we wish output before the error
+	     * to go * on (some form of) standard output, while output after
+	     * goes on (some * form of) diagnostic output. If didfds then
+	     * output will go to 1/2 * else to FSHOUT/FSHDIAG. See flush in
+	     * sh.print.c.
+	     */
+	    flush();/*FIXRESET*/
+	    haderr = 1;			/* Now to diagnostic output */
 	    if (flags & ERR_NAME)
 		xprintf("%s: ", bname);/*FIXRESET*/
 	    if ((flags & ERR_OLD)) {

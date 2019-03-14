@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.proc.c,v 3.103 2006/08/24 20:56:31 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.proc.c,v 3.105 2007/07/06 20:37:37 christos Exp $ */
 /*
  * sh.proc.c: Job manipulations
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.proc.c,v 3.103 2006/08/24 20:56:31 christos Exp $")
+RCSID("$tcsh: sh.proc.c,v 3.105 2007/07/06 20:37:37 christos Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -518,7 +518,7 @@ pjwait(struct process *pp)
 	(void) tcsetpgrp(FSHTTY, tpgrp);
 #endif /* BSDJOBS */
     if ((jobflags & (PSIGNALED | PSTOPPED | PTIME)) ||
-	!eq(dcwd->di_name, fp->p_cwd->di_name)) {
+	fp->p_cwd == NULL || !eq(dcwd->di_name, fp->p_cwd->di_name)) {
 	if (jobflags & PSTOPPED) {
 	    xputchar('\n');
 	    if (adrof(STRlistjobs)) {
@@ -1428,13 +1428,6 @@ pkill(Char **v, int signum)
     pid_t     pid;
     Char *cp, **vp, **globbed;
 
-    pchild_disabled++;
-    cleanup_push(&pchild_disabled, disabled_cleanup);
-    if (setintr) {
-	pintr_disabled++;
-	cleanup_push(&pintr_disabled, disabled_cleanup);
-    }
-
     /* Avoid globbing %?x patterns */
     for (vp = v; vp && *vp; vp++)
 	if (**vp == '%')
@@ -1444,6 +1437,12 @@ pkill(Char **v, int signum)
     globbed = v;
     cleanup_push(globbed, blk_cleanup);
 
+    pchild_disabled++;
+    cleanup_push(&pchild_disabled, disabled_cleanup);
+    if (setintr) {
+	pintr_disabled++;
+	cleanup_push(&pintr_disabled, disabled_cleanup);
+    }
 
     while (v && (cp = *v)) {
 	if (*cp == '%') {

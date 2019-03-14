@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.dol.c,v 3.69 2006/08/24 20:56:31 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.dol.c,v 3.71 2007/05/31 08:26:12 corinna Exp $ */
 /*
  * sh.dol.c: Variable substitutions
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.dol.c,v 3.69 2006/08/24 20:56:31 christos Exp $")
+RCSID("$tcsh: sh.dol.c,v 3.71 2007/05/31 08:26:12 corinna Exp $")
 
 /*
  * C shell
@@ -800,6 +800,7 @@ setDolp(Char *cp)
 	    dolmod.s[i] = 0;
 
 	    strip(lhsub);
+	    strip(rhsub);
 	    strip(cp);
 	    dp = cp;
 	    do {
@@ -973,12 +974,6 @@ again:
 #ifdef WINNT_NATIVE
     __dup_stdin = 1;
 #endif /* WINNT_NATIVE */
-#ifdef O_TEXT
-    setmode(1, O_TEXT);
-#endif
-#ifdef O_BINARY
-    setmode(0, O_BINARY);
-#endif
     cleanup_push(&lbuf, Strbuf_cleanup);
     cleanup_push(&mbuf, Strbuf_cleanup);
     for (;;) {

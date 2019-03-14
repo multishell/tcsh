@@ -1,4 +1,4 @@
-/*$Header: /p/tcsh/cvsroot/tcsh/win32/globals.c,v 1.7 2006/03/03 22:08:45 amold Exp $*/
+/*$Header: /p/tcsh/cvsroot/tcsh/win32/globals.c,v 1.8 2006/03/05 08:59:36 amold Exp $*/
 /*-
  * Copyright (c) 1980, 1991 The Regents of the University of California.
  * All rights reserved.
@@ -71,11 +71,17 @@ int fork_copy_user_mem(HANDLE hproc) {
 	
 	SIZE_T bytes,rc;
 	SIZE_T size;
+	void *low = &bookend1, *high= &bookend2;
 
-	size =(char*)&bookend2 - (char*)&bookend1;
-	rc =WriteProcessMemory(hproc,&bookend1,&bookend1,
-					(DWORD)size,
-					&bytes);
+	if(&bookend1 > &bookend2) {
+		low = &bookend2;
+		high = &bookend1;
+	}
+
+	size =(char*)high - (char*)low;
+
+
+	rc =WriteProcessMemory(hproc,low,low, (DWORD)size, &bytes);
 
 	if (!rc) {
 		rc = GetLastError();
@@ -141,7 +147,8 @@ int is_gui(char *exename) {
     // read from the coffheaderoffset;
     overlap.Offset = dh.doshdr.e_lfanew;
 
-	if (!ReadFile (hImage, &ntSignature, sizeof(ULONG), &bytes,&overlap)){
+	if (!ReadFile (hImage, &ntSignature, sizeof(ULONG), &bytes,&overlap)
+		&& GetLastError() != ERROR_IO_PENDING){
         goto done;
 	}
     if(!GetOverlappedResult(hImage,&overlap,&bytes,TRUE) ) {
@@ -154,7 +161,8 @@ int is_gui(char *exename) {
                             sizeof(IMAGE_FILE_HEADER);
 
 	if (!ReadFile(hImage, &optionalhdr,IMAGE_SIZEOF_NT_OPTIONAL_HEADER,
-                &bytes,&overlap)) {
+                &bytes,&overlap)
+		&& GetLastError() != ERROR_IO_PENDING) {
 		goto done;
 	}
 

@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/tc.const.c,v 3.83 2006/08/23 15:03:14 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/tc.const.c,v 3.86 2007/07/16 03:03:20 christos Exp $ */
 /*
  * sh.const.c: String constants for tcsh.
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: tc.const.c,v 3.83 2006/08/23 15:03:14 christos Exp $")
+RCSID("$tcsh: tc.const.c,v 3.86 2007/07/16 03:03:20 christos Exp $")
 
 Char STRlogout[]	= { 'l', 'o', 'g', 'o', 'u', 't', '\0' };
 Char STRautologout[]	= { 'a', 'u', 't', 'o', 'l', 'o', 'g', 'o', 'u', 't', 
@@ -46,7 +46,7 @@ Char STRautomatic[]	= { 'a', 'u', 't', 'o', 'm', 'a', 't', 'i', 'c',
 Char STRhangup[]	= { 'h', 'a', 'n', 'g', 'u', 'p', '\0' };
 Char STRaout[]		= { 'a', '.', 'o', 'u', 't', '\0' };
 Char STRtty[]		= { 't', 't', 'y', '\0' };
-Char STRpts[]		= { 'p', 't', 's', '\0' };
+Char STRslptssl[]	= { '/', 'p', 't', 's', '/', '\0' };
 Char STRany[]		= { 'a', 'n', 'y', '\0' };
 Char STRstatus[]	= { 's', 't', 'a', 't', 'u', 's', '\0' };
 Char STR0[]		= { '0', '\0' };
@@ -177,7 +177,7 @@ Char STRLANGBIG5[]	= { 'z', 'h', '_', 'T', 'W', '.', 'B', 'i', 'g', '5',
 			    '\0' };
 Char STRLANGEUCZH[]	= { '\0' };
 Char STRLANGEUCZHB[]	= { '\0' };
-#  elif (defined(__FreeBSD__) || defined(__NetBSD__))
+#  elif (defined(__FreeBSD__) || defined(__NetBSD__)) || defined(__MidnightBSD__)
 Char STRLANGEUCJP[]	= { 'j', 'a', '_', 'J', 'P', '.', 'e', 'u', 'c', 'J',
 			    'P', '\0' };
 Char STRLANGEUCJPB[]	= { 'j', 'a', '_', 'J', 'P', '.', 'E', 'U', 'C', '\0' };
@@ -353,6 +353,8 @@ Char STRKTERM[]		= { 'T', 'E', 'R', 'M', '\0' };
 Char STRKHOME[]		= { 'H', 'O', 'M', 'E', '\0' };
 Char STRbackslash_quote[] = { 'b', 'a', 'c', 'k', 's', 'l', 'a', 's', 'h', '_',
 			     'q', 'u', 'o', 't', 'e', '\0' };
+Char STRcompat_expr[]	= { 'c', 'o', 'm', 'p', 'a', 't', '_', 'e', 'x', 'p',
+			     'r', '\0' };
 Char STRRparen[]	= { ')', '\0' };
 Char STRmail[]		= { 'm', 'a', 'i', 'l', '\0' };
 #ifndef HAVENOUTMP
