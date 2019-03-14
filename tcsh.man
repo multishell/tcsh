@@ -76,7 +76,7 @@
 .\"   used here if you can. In particular, please don't use nroff commands
 .\"   which aren't already used herein.
 .\" 
-.TH TCSH 1 "19 November 2000" "Astron 6.10.00"
+.TH TCSH 1 "26 April 2001" "Astron 6.10.01"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
@@ -207,6 +207,9 @@ see the \fBversion\fR shell variable. (+)
 .PP
 Non-login shells read only \fI/etc/csh.cshrc\fR and \fI~/.tcshrc\fR
 or \fI~/.cshrc\fR on startup.
+.PP
+For examples of startup files, please consult
+\fIhttp://tcshrc.sourceforge.net\fR.
 .PP
 Commands like \fIstty\fR(1) and \fItset\fR(1),
 which need be run only once per login, usually go in one's \fI~/.login\fR file.
@@ -3615,6 +3618,7 @@ See also the \fBcwd\fR and \fBowd\fR shell variables.
 .B dspmbyte \fR(+)
 If set to `euc', it enables display and editing EUC-kanji(Japanese) code.
 If set to `sjis', it enables display and editing Shift-JIS(Japanese) code.
+If set to `big5', it enables display and editing Big5(Chinese) code.
 If set to the following format, it enables display and editing of original
 multi-byte code format:
 .RS +8
@@ -3779,6 +3783,19 @@ substitutions.  Tilde and variable expansions work as expected.
 .B inputmode \fR(+)
 If set to `insert' or `overwrite', puts the editor into that input mode
 at the beginning of each line.
+.TP 8
+.B killdup \fR(+)
+Controls handling of duplicate entries in the kill ring.  If set to
+`all' only unique strings are entered in the kill ring.  If set to
+`prev' and the last killed string is the same as the current killed
+string, then the current string is not entered in the ring.  If set
+to `erase' and the same string is found in the kill ring, the old
+string is erased and the current one is inserted.
+.TP 8
+.B killring \fR(+)
+Indicates the number of killed strings to keep in memory.  Set to `30'
+by default.  If unset or set to less than `2', the shell will only
+keep the most recently killed string.
 .TP 8
 .B listflags \fR(+)
 If set to `x', `a' or `A', or any combination thereof (e.g., `xA'), they
@@ -4167,13 +4184,13 @@ Some examples are in order.  First, let's set up some play directories:
 .br
 > mkdir from from/src to
 .br
-> ln \-s from/src to/dist
+> ln \-s from/src to/dst
 .PP
 Here's the behavior with \fBsymlinks\fR unset,
 .IP "" 4
-> cd /tmp/to/dist; echo $cwd
+> cd /tmp/to/dst; echo $cwd
 .br
-/tmp/to/dist
+/tmp/to/dst
 .br
 > cd ..; echo $cwd
 .br
@@ -4191,7 +4208,7 @@ here's the behavior with \fBsymlinks\fR set to `chase',
 .PP
 here's the behavior with \fBsymlinks\fR set to `ignore',
 .IP "" 4
-> cd /tmp/to/dist; echo $cwd
+> cd /tmp/to/dst; echo $cwd
 .br
 /tmp/to/dst
 .br
@@ -4201,7 +4218,7 @@ here's the behavior with \fBsymlinks\fR set to `ignore',
 .PP
 and here's the behavior with \fBsymlinks\fR set to `expand'.
 .IP "" 4
-> cd /tmp/to/dist; echo $cwd
+> cd /tmp/to/dst; echo $cwd
 .br
 /tmp/to/dst
 .br
@@ -4209,7 +4226,7 @@ and here's the behavior with \fBsymlinks\fR set to `expand'.
 .br
 /tmp/to
 .br
-> cd /tmp/to/dist; echo $cwd
+> cd /tmp/to/dst; echo $cwd
 .br
 /tmp/to/dst
 .br
@@ -4969,7 +4986,7 @@ pipe(2), setrlimit(2), sigvec(2), stat(2), umask(2), vfork(2), wait(2),
 malloc(3), setlocale(3), tty(4), a.out(5), termcap(5), environ(7),
 termio(7), Introduction to the C Shell
 .SH VERSION
-This manual documents tcsh 6.10.00 (Astron) 2000-11-19.
+This manual documents tcsh 6.10.01 (Astron) 2001-04-26.
 .SH AUTHORS
 .PD 0
 .TP 2
