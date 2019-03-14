@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.h,v 3.126 2005/01/18 20:24:50 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.h,v 3.130 2005/03/03 16:49:16 kim Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -36,15 +36,19 @@
 #include "config.h"
 
 #include <stddef.h>
+
 #ifdef HAVE_ICONV
-#include <iconv.h>
+# include <iconv.h>
 #endif
+
 #ifdef HAVE_STDINT_H
-#include <stdint.h>
+# include <stdint.h>
 #endif
+
 #ifdef HAVE_INTTYPES_H
-#include <inttypes.h>
+# include <inttypes.h>
 #endif
+
 #if !defined(HAVE_STDINT_H) && !defined(HAVE_INTTYPES_H)
 typedef unsigned long intptr_t;
 #endif

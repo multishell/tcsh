@@ -198,7 +198,7 @@ case "${host}" in
   ;;
 
   ## Siemens BS2000 Mainframe
-  bs2000-siemens-posix)
+  bs2000-siemens-*)
     tcsh_config_file=bs2000
   ;;
 
@@ -256,6 +256,7 @@ fi
 
 dnl Checks for libraries
 AC_SEARCH_LIBS(crypt, crypt)
+AC_SEARCH_LIBS(getspnam, sec)
 AC_SEARCH_LIBS(tgetent, termlib curses ncurses termcap)
 AC_SEARCH_LIBS(gethostbyname, nsl)
 AC_SEARCH_LIBS(connect, socket)
@@ -264,7 +265,7 @@ AC_SEARCH_LIBS([iconv], [iconv], [AC_DEFINE([HAVE_ICONV], [1],
 
 dnl Checks for header files
 AC_CHECK_HEADERS([auth.h inttypes.h shadow.h stdint.h])
-AC_CHECK_HEADERS([utmpx.h utmp.h], [break])
+AC_CHECK_HEADERS([utmpx.h utmp.h])
 AC_CHECK_HEADERS([wchar.h],
 	[AC_CHECK_SIZEOF([wchar_t], [], [dnl
 #include <stdio.h>
@@ -322,6 +323,7 @@ AC_C_PROTOTYPES
 AC_C_VOLATILE
 
 dnl checks for library functions
+AC_CHECK_DECLS([gethostname])
 AC_CHECK_FUNCS([dup2 getcwd gethostname getpwent memmove memset nice] dnl
 	[nl_langinfo sbrk setpgid setpriority strerror strstr sysconf] dnl
 	[utmpname wcwidth])
