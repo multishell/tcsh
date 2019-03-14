@@ -25,6 +25,12 @@
 # endif /* !_HPUX_SOURCE */
 #endif
 
+/*
+ * We need to define the following, otherwise we get:
+ * #error "Large Files (ILP32) not supported in strict ANSI mode."
+ */
+#define __STDC_EXT__ 
+
 /* for access to large files from 32 bit apps
  * define the following.  Removes the need to 
  * redefine stat, fstat and lstat in sh.h
@@ -83,12 +89,6 @@
 #define BSDLIMIT
 
 /*
- * BSDNICE	Your system uses setpriority() instead of nice, to
- *		change a processes scheduling priority
- */
-#undef BSDNICE
-
-/*
  * TERMIO	You have struct termio instead of struct sgttyb.
  * 		This is usually the case for SYSV systems, where
  *		BSD uses sgttyb. POSIX systems should define this
@@ -140,7 +140,4 @@
 
 #define HPUXVERSION  1100 /* For HP-UX version 8.00 */
 
-/****************** configurable hacks ****************/
-/* have been moved to config_f.h */
-#include "config_f.h"
 #endif /* _h_config */

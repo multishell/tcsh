@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.file.c,v 3.25 2004/08/04 17:12:29 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.file.c,v 3.27 2004/12/25 21:15:07 christos Exp $ */
 /*
  * sh.file.c: File completion for csh. This file is not used in tcsh.
  */
@@ -33,7 +33,7 @@
 #include "sh.h"
 #include "ed.h"
 
-RCSID("$Id: sh.file.c,v 3.25 2004/08/04 17:12:29 christos Exp $")
+RCSID("$Id: sh.file.c,v 3.27 2004/12/25 21:15:07 christos Exp $")
 
 #if defined(FILEC) && defined(TIOCSTI)
 
@@ -226,9 +226,6 @@ pushback(string)
     Char   *string;
 {
     Char *p;
-#ifndef WIDE_STRINGS
-    char    c;
-#endif
 #ifdef TERMIO
 # ifdef POSIX
     struct termios tty, tty_normal;
@@ -259,7 +256,6 @@ pushback(string)
     (void) ioctl(SHOUT, TCSETAW, (ioctl_t) &tty);
 # endif /* POSIX */
 
-# ifdef WIDE_STRINGS
     for (p = string; *p != '\0'; p++) {
 	char buf[MB_LEN_MAX];
 	size_t i, len;
@@ -268,10 +264,6 @@ pushback(string)
 	for (i = 0; i < len; i++)
 	    (void) ioctl(SHOUT, TIOCSTI, (ioctl_t) &buf[i]);
     }
-# else
-    for (p = string; (c = *p) != '\0'; p++)
-	(void) ioctl(SHOUT, TIOCSTI, (ioctl_t) & c);
-# endif
 # ifdef POSIX
     (void) tcsetattr(SHOUT, TCSANOW, &tty_normal);
 # else
@@ -530,11 +522,7 @@ extract_dir_and_name(path, dir, name)
 	copyn(dir, path, p - path);
     }
 }
-/* atp vmsposix - I need to remove all the setpwent 
- *		  getpwent endpwent stuff. VMS_POSIX has getpwnam getpwuid
- *		  and getlogin. This needs fixing. (There is no access to 
- *		  pw->passwd in VMS - a secure system benefit :-| )
- */
+
 static Char *
 getitem(dir_fd, looking_for_lognames)
     DIR    *dir_fd;
@@ -544,7 +532,7 @@ getitem(dir_fd, looking_for_lognames)
     struct dirent *dirp;
 
     if (looking_for_lognames) {
-#ifdef _VMS_POSIX
+#ifndef HAVE_GETPWENT
 	    return (NULL);
 #else
 	if ((pw = getpwent()) == NULL)
@@ -605,9 +593,9 @@ tsearch(word, command, max_word_length)
 
     looking_for_lognames = (*word == '~') && (Strchr(word, '/') == NULL);
     if (looking_for_lognames) {
-#ifndef _VMS_POSIX
+#ifdef HAVE_GETPWENT
 	(void) setpwent();
-#endif /*atp vmsposix */
+#endif
 	copyn(name, &word[1], MAXNAMLEN);	/* name sans ~ */
 	dir_fd = NULL;
     }
@@ -655,20 +643,20 @@ again:				/* search for matches */
     if (ignoring && numitems == 0 && nignored > 0) {
 	ignoring = FALSE;
 	nignored = 0;
-	if (looking_for_lognames)
-#ifndef _VMS_POSIX
+	if (looking_for_lognames) {
+#ifdef HAVE_GETPWENT
 	    (void) setpwent();
 #endif /* atp vmsposix */
-	else
+	} else
 	    rewinddir(dir_fd);
 	goto again;
     }
 
-    if (looking_for_lognames)
-#ifndef _VMS_POSIX
+    if (looking_for_lognames) {
+#ifndef HAVE_GETPWENT
 	(void) endpwent();
-#endif /*atp vmsposix */
-    else
+#endif
+    } else
 	(void) closedir(dir_fd);
     if (numitems == 0)
 	return (0);

@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.proc.c,v 3.83 2004/08/04 17:12:30 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.proc.c,v 3.85 2004/12/25 21:15:07 christos Exp $ */
 /*
  * sh.proc.c: Job manipulations
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.proc.c,v 3.83 2004/08/04 17:12:30 christos Exp $")
+RCSID("$Id: sh.proc.c,v 3.85 2004/12/25 21:15:07 christos Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -47,9 +47,9 @@ RCSID("$Id: sh.proc.c,v 3.83 2004/08/04 17:12:30 christos Exp $")
 # define HZ 16
 #endif /* aiws */
 
-#if defined(_BSD) || (defined(IRIS4D) && __STDC__) || defined(__lucid) || defined(linux)
+#if defined(_BSD) || (defined(IRIS4D) && __STDC__) || defined(__lucid) || defined(linux) || defined(__GNU__) || defined(__GLIBC__)
 # define BSDWAIT
-#endif /* _BSD || (IRIS4D && __STDC__) || __lucid || linux */
+#endif /* _BSD || (IRIS4D && __STDC__) || __lucid || glibc */
 #ifndef WTERMSIG
 # define WTERMSIG(w)	(((union wait *) &(w))->w_termsig)
 # ifndef BSDWAIT
@@ -213,7 +213,7 @@ loop:
         (setintr && (intty || insource) ? WNOHANG | WUNTRACED : WNOHANG), &ru);
 #   else
     /* both a wait3 and rusage */
-#    if !defined(BSDWAIT) || defined(NeXT) || defined(MACH) || defined(linux) || (defined(IRIS4D) && (__STDC__ || defined(FUNCPROTO)) && SYSVREL <= 3) || defined(__lucid) || defined(__osf__)
+#    if !defined(BSDWAIT) || defined(NeXT) || defined(MACH) || defined(linux) || defined(__GNU__) || defined(__GLIBC__) || (defined(IRIS4D) && (__STDC__ || defined(PROTOTYPES)) && SYSVREL <= 3) || defined(__lucid) || defined(__osf__)
     pid = wait3(&w,
        (setintr && (intty || insource) ? WNOHANG | WUNTRACED : WNOHANG), &ru);
 #    else /* BSDWAIT */
@@ -2008,12 +2008,12 @@ pfork(t, wanttty)
 	    (void) signal(SIGHUP, SIG_IGN);
 	if (t->t_dflg & F_NICE) {
 	    int nval = SIGN_EXTEND_CHAR(t->t_nice);
-#ifdef BSDNICE
+#ifdef HAVE_SETPRIORITY
 	    if (setpriority(PRIO_PROCESS, 0, nval) == -1 && errno)
 		    stderror(ERR_SYSTEM, "setpriority", strerror(errno));
-#else /* !BSDNICE */
+#else /* !HAVE_SETPRIORITY */
 	    (void) nice(nval);
-#endif /* !BSDNICE */
+#endif /* !HAVE_SETPRIORITY */
 	}
 #ifdef F_VER
         if (t->t_dflg & F_VER) {

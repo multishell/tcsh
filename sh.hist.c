@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.hist.c,v 3.30 2004/08/04 17:12:29 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.hist.c,v 3.32 2004/11/23 18:12:43 christos Exp $ */
 /*
  * sh.hist.c: Shell history expansions and substitutions
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.hist.c,v 3.30 2004/08/04 17:12:29 christos Exp $")
+RCSID("$Id: sh.hist.c,v 3.32 2004/11/23 18:12:43 christos Exp $")
 
 #include "tc.h"
 
@@ -373,21 +373,16 @@ fmthist(fmt, ptr, buf, bufsiz)
 	    (void) sprlex(ibuf, sizeof(ibuf) / sizeof(Char), &hp->Hlex);
 	    p = buf;
 	    ip = ibuf;
-#ifdef WIDE_STRINGS
 	    do {
 	        char xbuf[MB_LEN_MAX];
 		size_t len;
 
 		len = one_wctomb(xbuf, CHAR & *ip);
-		if ((size_t)((p - xbuf) + len) >= bufsiz)
+		if ((size_t)((p - buf) + len) >= bufsiz)
 		    break;
 		memcpy(p, xbuf, len);
 		p += len;
 	    } while ((CHAR & *ip++) != 0);
-#else	    
-	    while (p < buf + bufsiz - 1 && (*p++ = (CHAR & *ip++)) != '\0')
-		continue;
-#endif
 	    if (p <= buf + bufsiz - 1)
 	        *p = '\0';
 	}
