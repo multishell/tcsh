@@ -1,5 +1,5 @@
 #
-# $Id: complete.tcsh,v 1.29 1998/07/07 12:06:10 christos Exp $
+# $Id: complete.tcsh,v 1.31 1999/06/09 19:01:23 christos Exp $
 # example file using the new completion code
 #
 
@@ -406,6 +406,18 @@ if ($?complete) then
 
     endif
 
+    #from Dan Nicolaescu <dann@ics.uci.edu>
+    if ( $?MODULESHOME ) then
+
+	alias Compl_module ' set q = "$MODULEPATH:as/:/ /" ; find $q -name .version -o -name .modulea\* -prune -o -print  | sed `echo "-e s@"$MODULEPATH:as%:%/\*@@g -e s@%"/\*@@g"`'
+
+	complete module 'p%1%(add load unload switch display avail use unuse update purge list clear help initadd initrm initswitch initlist initclear)%' \
+    'n%unload%`echo "$LOADEDMODULES:as/:/ /"`%' \
+    'n%{lo*,sw*,di*,he*,inita*,initr*,inits*}%`eval Compl_module`%' \
+    'N%{sw*,initsw*}%`eval Compl_module`%' 'C%-%(-append)%' 'n%{use,unu*,av*}%d%' 'n%-append%d%' \
+    'C%[^-]*%`eval Compl_module`%'
+    endif
+
     # these from Tom Warzeka <waz@quahog.npt.nuwc.navy.mil>
     # you may need to set the following variables for your host
     set _elispdir = /usr/local/share/emacs/20.2/lisp # GNU Emacs lisp directory
@@ -449,8 +461,8 @@ if ($?complete) then
   n@old@'`[ -r /usr/man/mano ] && \ls -1 /usr/man/mano | sed s%\\.o.\*\$%%`'@ \
 n@local@'`[ -r /usr/man/manl ] && \ls -1 /usr/man/manl | sed s%\\.l.\*\$%%`'@ \
 n@public@'`[ -r /usr/man/manp ]&& \ls -1 /usr/man/manp | sed s%\\.p.\*\$%%`'@ \
-		c/-/"(- f k P s t)"/ n/-f/c/ n/-k/x:'<keyword>'/ n/-P/d/ \
-		N@-P@'`\ls -1 $:-1/man? | sed s%\\..\*\$%%`'@ n/*/c/
+		c/-/"(- f k M P s t)"/ n/-f/c/ n/-k/x:'<keyword>'/ n/-[MP]/d/ \
+		N@-[MP]@'`\ls -1 $:-1/man? | sed s%\\..\*\$%%`'@ n/*/c/
 
     complete ps	        c/-t/x:'<tty>'/ c/-/"(a c C e g k l S t u v w x)"/ \
 			n/-k/x:'<kernel>'/ N/-k/x:'<core_file>'/ n/*/x:'<PID>'/
