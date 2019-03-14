@@ -1,8 +1,9 @@
+# $Id$
 
 SUBDIRS=	C et finnish french german greek italian ja pl russian \
 		spanish ukrainian
 #GENCAT=	gencat --new
-#CHARSET=	charset
+CHARSET=	charset
 GENCAT=		gencat
 
 catalogs:

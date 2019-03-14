@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/ed.inputl.c,v 3.56 2004/11/23 02:10:48 christos Exp $ */
+/* $Header: /src/pub/tcsh/ed.inputl.c,v 3.58 2005/04/11 21:09:34 kim Exp $ */
 /*
  * ed.inputl.c: Input line handling.
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.inputl.c,v 3.56 2004/11/23 02:10:48 christos Exp $")
+RCSID("$Id: ed.inputl.c,v 3.58 2005/04/11 21:09:34 kim Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -48,18 +48,18 @@ extern int MapsAreInited;
 static Char mismatch[] = 
     {'!', '^' , '\\', '-', '%', '\0', '"', '\'', '`', '\0' };
 
-static	int	Repair		__P((void));
-static	int	GetNextCommand	__P((KEYCMD *, Char *));
-static	int	SpellLine	__P((int));
-static	int	CompleteLine	__P((void));
-static	void	RunCommand	__P((Char *));
-static  void 	doeval1		__P((Char **));
+static	int	Repair		(void);
+static	int	GetNextCommand	(KEYCMD *, Char *);
+static	int	SpellLine	(int);
+static	int	CompleteLine	(void);
+static	void	RunCommand	(Char *);
+static  void 	doeval1		(Char **);
 
 static int rotate = 0;
 
 
 static int
-Repair()
+Repair(void)
 {
     if (NeedsRedraw) {
 	ClearLines();
@@ -75,7 +75,7 @@ Repair()
 
 /* CCRETVAL */
 int
-Inputl()
+Inputl(void)
 {
     CCRETVAL retval;
     KEYCMD  cmdnum = 0;
@@ -132,13 +132,20 @@ Inputl()
 
     GettingInput = 1;
     NeedsRedraw = 0;
+    tellwhat = 0;
 
-    if (tellwhat) {
-	copyn(InputBuf, WhichBuf, INBUFSIZE);
-	LastChar = InputBuf + (LastWhich - WhichBuf);
-	Cursor = InputBuf + (CursWhich - WhichBuf);
-	tellwhat = 0;
-	Hist_num = HistWhich;
+    if (RestoreSaved) {
+	copyn(InputBuf, SavedBuf, INBUFSIZE);
+	LastChar = InputBuf + (LastSaved - SavedBuf);
+	Cursor = InputBuf + (CursSaved - SavedBuf);
+	Hist_num = HistSaved;
+	HistSaved = 0;
+	RestoreSaved = 0;
+    }
+    if (HistSaved) {
+	Hist_num = HistSaved;
+	GetHistLine();
+	HistSaved = 0;
     }
     if (Expand) {
 	(void) e_up_hist(0);
@@ -209,12 +216,7 @@ Inputl()
 
 	case CC_WHICH:		/* tell what this command does */
 	    tellwhat = 1;
-	    copyn(WhichBuf, InputBuf, INBUFSIZE);
-	    LastWhich = WhichBuf + (LastChar - InputBuf);
-	    CursWhich = WhichBuf + (Cursor - InputBuf);
 	    *LastChar++ = '\n';	/* for the benifit of CSH */
-	    HistWhich = Hist_num;
-	    Hist_num = 0;	/* for the history commands */
 	    num = (int) (LastChar - InputBuf);	/* number characters read */
 	    break;
 
@@ -542,8 +544,7 @@ Inputl()
 }
 
 void
-PushMacro(str)
-    Char   *str;
+PushMacro(Char *str)
 {
     if (str != NULL && MacroLvl + 1 < MAXMACROLEVELS) {
 	MacroLvl++;
@@ -561,8 +562,7 @@ PushMacro(str)
 static Char **gv = NULL, **gav = NULL;
 
 static void
-doeval1(v)
-    Char **v;
+doeval1(Char **v)
 {
     Char  **oevalvec;
     Char   *oevalp;
@@ -619,8 +619,7 @@ doeval1(v)
 }
 
 static void
-RunCommand(str)
-    Char *str;
+RunCommand(Char *str)
 {
     Char *cmd[2];
 
@@ -644,9 +643,7 @@ RunCommand(str)
 }
 
 static int
-GetNextCommand(cmdnum, ch)
-    KEYCMD *cmdnum;
-    Char *ch;
+GetNextCommand(KEYCMD *cmdnum, Char *ch)
 {
     KEYCMD  cmd = 0;
     int     num;
@@ -722,8 +719,7 @@ UngetNextChar(Char cp)
 }
 
 int
-GetNextChar(cp)
-    Char *cp;
+GetNextChar(Char *cp)
 {
     int num_read;
     int     tried = 0;
@@ -810,8 +806,7 @@ GetNextChar(cp)
  *  1: Something was corrected
  */
 static int
-SpellLine(cmdonly)
-    int     cmdonly;
+SpellLine(int cmdonly)
 {
     int     endflag, matchval;
     Char   *argptr, *OldCursor, *OldLastChar;
@@ -893,7 +888,7 @@ SpellLine(cmdonly)
  *  2: Several commands matched
  */
 static int
-CompleteLine()
+CompleteLine(void)
 {
     int     endflag, tmatch;
     Char   *argptr, *OldCursor, *OldLastChar;
