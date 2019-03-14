@@ -1,4 +1,4 @@
-/* $Header: /u/christos/cvsroot/tcsh/sh.c,v 3.75 1997/10/27 22:44:24 christos Exp $ */
+/* $Header: /u/christos/cvsroot/tcsh/sh.c,v 3.77 1998/04/08 13:58:37 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -43,7 +43,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$Id: sh.c,v 3.75 1997/10/27 22:44:24 christos Exp $")
+RCSID("$Id: sh.c,v 3.77 1998/04/08 13:58:37 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -82,7 +82,7 @@ extern bool NoNLSRebind;
  * ported to Apple Unix (TM) (OREO)  26 -- 29 Jun 1987
  */
 
-jmp_buf_t reslab IZERO_STRUCT;
+jmp_buf_t reslab INIT_ZERO_STRUCT;
 
 static const char tcshstr[] = "tcsh";
 #ifdef WINNT
@@ -906,7 +906,7 @@ main(argc, argv)
 
 	    default:		/* Unknown command option */
 		exiterr = 1;
-		stderror(ERR_TCSHUSAGE, progname, tcp-1);
+		stderror(ERR_TCSHUSAGE, tcp-1, progname);
 		break;
 
 	} while (*tcp);
@@ -2312,7 +2312,7 @@ xexit(i)
 	for (pp = proclist.p_next; pp; pp = pp->p_next) {
 	    np = pp;
 	    do 
-		if ((np->p_flags & PHUP) && np->p_jobid != shpgrp)
+		if ((np->p_flags & PHUP) && np->p_jobid != shpgrp) {
 		    if (killpg(np->p_jobid, SIGHUP) != -1) {
 			/* In case the job was suspended... */
 #ifdef SIGCONT
@@ -2320,6 +2320,7 @@ xexit(i)
 #endif
 			break;
 		    }
+		}
 	    while ((np = np->p_friends) != pp);
 	}
     }

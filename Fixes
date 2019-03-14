@@ -1,3 +1,20 @@
+ 50. V6.07.06 - 04/08/98
+ 49. Collation fix for globbing (Andrey A. Chernov)
+ 48. We might have NLS_CATALOGS and not LC_MESSAGES (Andrey A. Chernov)
+ 47. 4.4BSD header fixes (Andrey A. Chernov)
+ 46. Signed char prompt fixes (Andrey A. Chernov)
+ 45. Pattern match fix for directory searches (Mike Patnode)
+ 44. Pentium DGUX fixes (Miko Nahum)
+ 43. Spanish nls message catalogs (Luis Francisco Gonzalez)
+ 42. Fix trailing whitespace parsing in HASHBANG code (Martin Kraemer)
+ 41. Remove stray debuggin message from unmatched substitutions.
+     (from Amol Deshpande)
+ 40. Fix reversed arguments in Usagae message. (from Amol Deshpande)
+ 39. Fix bug introduced at tcsh-7.06.03 [expdollar] that affected %.n prompt
+     format.
+ 38. Fix typos introduced in last batch of changes.
+ 37. Fix interrupted script using onintr, exiting parent shell problem.
+ 36. Cleanup prototypes.
  35. V6.07.05 - 10/28/97
  34. Integrate Amol Deshpande's WINNT fixes to the tcsh source. Note that
      this is not complete yet; we are missing the NT glue code and the message

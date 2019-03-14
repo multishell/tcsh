@@ -1,4 +1,4 @@
-/* $Header: /u/christos/cvsroot/tcsh/sh.print.c,v 3.8 1996/04/26 19:20:06 christos Exp $ */
+/* $Header: /u/christos/cvsroot/tcsh/sh.print.c,v 3.10 1998/04/08 13:58:55 christos Exp $ */
 /*
  * sh.print.c: Primitive Output routines.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.print.c,v 3.8 1996/04/26 19:20:06 christos Exp $")
+RCSID("$Id: sh.print.c,v 3.10 1998/04/08 13:58:55 christos Exp $")
 
 #include "ed.h"
 
@@ -226,7 +226,8 @@ flush()
 #endif
     sz = (size_t) (linp - linbuf);
     if (write(unit, linbuf, sz) != sz && !haderr)
-	stderror(ERR_SYSTEM, progname, strerror(errno));
+	/* XXX: This ends up to cause an infinite loop if we lose our tty */
+	stderror(ERR_SILENT);
 
     linp = linbuf;
     interrupted = 0;
