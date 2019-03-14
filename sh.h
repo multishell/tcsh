@@ -35,6 +35,8 @@
 
 #include "config.h"
 
+#define SYSMALLOC
+
 #include <stddef.h>
 #include <signal.h>
 
