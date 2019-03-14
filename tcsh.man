@@ -72,7 +72,7 @@
 .\"   used here if you can. In particular, please don't use nroff commands
 .\"   which aren't already used herein.
 .\" 
-.TH TCSH 1 "12 May 2010" "Astron 6.17.02"
+.TH TCSH 1 "17 January 2011" "Astron 6.17.03"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
@@ -1339,11 +1339,14 @@ pattern.
 .PP
 In matching filenames, the character `.' at the beginning of a filename or
 immediately following a `/', as well as the character `/' must be matched
-explicitly unless 
+explicitly (unless either
 .B globdot
-is set.  The character `*' matches any string of characters, including the
-null string.  The character `?' matches any single character.  The sequence
-`[...]' matches any one of the characters enclosed.  Within `[...]', a pair of
+or
+.B globstar
+or both are set(+)).  The character `*' matches any string of characters, 
+including the null string.  The character `?' matches any single character.  
+The sequence `[...]' matches any one of the characters enclosed.  
+Within `[...]', a pair of
 characters separated by `\-' matches any character lexically between the two.
 .PP
 (+) Some glob-patterns can be negated:
@@ -1394,13 +1397,18 @@ only if there were no files in the current directory ending in `.a', `.c', or
 of patterns) which matches nothing is left unchanged rather than causing
 an error.
 .PP
-The \fBglobstar\fR shell variable can be set to allow `**' and `***' as 
-additional glob-pattern that matches filenames and directories recursively.  
-For example, `grep /usr/include/**.h' would search for all .h files in the
-directory `/usr/include' and any directory contained in `/usr/include', and 
-`touch **' would touch all the files in the current directory and each 
-subdirectory.  To prevent problems with recursion, the `**' glob-pattern will
-not descend into a symbolic link containing a directory.  To follow symlinks,
+The \fBglobstar\fR shell variable can be set to allow `**' or `***' as 
+a file glob pattern that matches any string of characters including `/',
+recursively traversing any existing sub-directories.  For example, 
+`ls **.c' will list all the .c files in the current directory tree.
+If used by itself, it will match match zero or more sub-directories
+(e.g. `ls /usr/include/**/time.h' will list any file named `time.h'
+in the /usr/include directory tree; `ls /usr/include/**time.h' will match 
+any file in the /usr/include directory tree ending in `time.h'; and
+`ls /usr/include/**time**.h' will match any .h file with `time' either
+in a subdirectory name or in the filename itself).
+To prevent problems with recursion, the `**' glob-pattern will not 
+descend into a symbolic link containing a directory.  To override this,
 use `***' (+)
 .PP
 The \fBnoglob\fR shell variable can be set to prevent filename substitution,
@@ -2937,6 +2945,10 @@ may have allocated to it at a given time
 the maximum amount of virtual memory a process
 may have allocated to it at a given time (address space)
 .TP
+\fIvmemoryuse\fR
+the maximum amount of virtual memory a process
+may have allocated to it at a given time
+.TP
 \fIheapsize\fR
 the maximum amount of memory a process
 may allocate per \fIbrk()\fR system call
@@ -2980,10 +2992,14 @@ the timeout for RT tasks in microseconds for this user.
 \fImaximum-use\fR may be given as a (floating point or
 integer) number followed by a scale factor.  For all limits
 other than \fIcputime\fR the default scale is `k' or `kilobytes'
-(1024 bytes); a scale factor of `m' or `megabytes' may also
-be used.  For \fIcputime\fR the default scaling is `seconds',
+(1024 bytes); a scale factor of `m' or `megabytes' or `g' or `gigabytes'
+may also be used.  For \fIcputime\fR the default scaling is `seconds',
 while `m' for minutes or `h' for hours, or a time of the
 form `mm:ss' giving minutes and seconds may be used.
+.PP
+If \fImaximum-use\fR  is `unlimited',
+then the limitation on the specified \fIresource\fR
+is removed (this is equivalent to the \fIunlimit\fR builtin command).
 .PP
 For both \fIresource\fR names and scale factors, unambiguous
 prefixes of the names suffice.
@@ -3864,8 +3880,12 @@ with `.' except for `.' and `..'
 .TP 8
 .B globstar \fR(+)
 If set, the `**' and `***' file glob patterns will match any string of 
-characters and traverse any sub-directories recursively.  (e.g. `ls **.c'
-will list all the .c files in the current directory and subdirectories).
+characters including `/' traversing any existing sub-directories.  (e.g. 
+`ls **.c' will list all the .c files in the current directory tree).
+If used by itself, it will match match zero or more sub-directories
+(e.g. `ls /usr/include/**/time.h' will list any file named `time.h'
+in the /usr/include directory tree; whereas `ls /usr/include/**time.h'
+will match any file in the /usr/include directory tree ending in `time.h').
 To prevent problems with recursion, the `**' glob-pattern will not 
 descend into a symbolic link containing a directory.  To override this,
 use `***'
@@ -5173,7 +5193,7 @@ pipe(2), setrlimit(2), sigvec(2), stat(2), umask(2), vfork(2), wait(2),
 malloc(3), setlocale(3), tty(4), a.out(5), termcap(5), environ(7),
 termio(7), Introduction to the C Shell
 .SH VERSION
-This manual documents tcsh 6.17.02 (Astron) 2010-05-12.
+This manual documents tcsh 6.17.03 (Astron) 2011-01-17.
 .SH AUTHORS
 .PD 0
 .TP 2

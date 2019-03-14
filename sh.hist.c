@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.hist.c,v 3.46 2010/05/12 16:20:16 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.hist.c,v 3.49 2010/05/27 04:00:23 amold Exp $ */
 /*
  * sh.hist.c: Shell history expansions and substitutions
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.hist.c,v 3.46 2010/05/12 16:20:16 christos Exp $")
+RCSID("$tcsh: sh.hist.c,v 3.49 2010/05/27 04:00:23 amold Exp $")
 
 #include <assert.h>
 #include "tc.h"
@@ -375,9 +375,11 @@ static unsigned
 hashhist(struct wordent *h0)
 {
     struct hashValue s;
-    initializeHash(&s);
     struct wordent *firstWord = h0->next;
     struct wordent *h = firstWord;
+    unsigned hash = 0;
+
+    initializeHash(&s);
     for (; h != h0; h = h->next) {
         if (h->word[0] == '\n')
             break;                      /* don't hash newline */
@@ -385,7 +387,7 @@ hashhist(struct wordent *h0)
             addCharToHash(&s, ' ');	/* space between words */
 	addWordToHash(&s, h->word);
     }
-    unsigned hash = finalizeHash(&s);
+    hash = finalizeHash(&s);
     /* Zero means no hash value, so never return zero as a hash value. */
     return hash ? hash : 0x7fffffff;	/* prime! */
 }
@@ -1266,18 +1268,9 @@ rechist(Char *fname, int ref)
     oldidfds = didfds;
     didfds = 0;
     if ((shist = adrof(STRsavehist)) != NULL && shist->vec != NULL)
-	if (shist->vec[1] && eq(shist->vec[1], STRmerge)) {
-	    /*
-	     * Unset verbose while we read the history file. From:
-	     * jbastian@redhat.com (Jeffrey Bastian)
-	     */
-	    Char *verb = varval(STRverbose);
-	    if (verb != STRNULL)
-		unsetv(STRverbose);
+	if (shist->vec[1] && eq(shist->vec[1], STRmerge))
 	    loadhist(fname, 1);
-	    if (verb != STRNULL)
-		setv(STRverbose, verb, VAR_READWRITE);
-	}
+
     fp = xcreat(short2str(fname), 0600);
     if (fp == -1) {
 	didfds = oldidfds;

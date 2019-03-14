@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/tc.str.c,v 3.34 2010/02/15 00:46:22 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/tc.str.c,v 3.37 2010/12/22 17:25:05 christos Exp $ */
 /*
  * tc.str.c: Short string package
  * 	     This has been a lesson of how to write buggy code!
@@ -35,7 +35,7 @@
 
 #include <limits.h>
 
-RCSID("$tcsh: tc.str.c,v 3.34 2010/02/15 00:46:22 christos Exp $")
+RCSID("$tcsh: tc.str.c,v 3.37 2010/12/22 17:25:05 christos Exp $")
 
 #define MALLOC_INCR	128
 #ifdef WIDE_STRINGS
@@ -100,13 +100,30 @@ rt_mbtowc(Char *pwc, const char *s, size_t n)
     int ret;
     char back[MB_LEN_MAX];
     wchar_t tmp;
+#if defined(UTF16_STRINGS) && defined(HAVE_MBRTOWC)
+# if defined(AUTOSET_KANJI)
+    static mbstate_t mb_zero, mb;
+    /*
+     * Workaround the Shift-JIS endcoding that translates unshifted 7 bit ASCII!
+     */
+    if (!adrof(STRnokanji) && n && pwc && s && (*s == '\\' || *s == '~') &&
+	!memcmp(&mb, &mb_zero, sizeof(mb)))
+    {
+	*pwc = *s;
+	return 1;
+    }
+# else
     mbstate_t mb;
+# endif
 
     memset (&mb, 0, sizeof mb);
     ret = mbrtowc(&tmp, s, n, &mb);
+#else
+    ret = mbtowc(&tmp, s, n);
+#endif
     if (ret > 0) {
 	*pwc = tmp;
-#ifdef UTF16_STRINGS
+#if defined(UTF16_STRINGS) && defined(HAVE_MBRTOWC)
 	if (tmp >= 0xd800 && tmp <= 0xdbff) {
 	    /* UTF-16 surrogate pair.  Fetch second half and compute
 	       UTF-32 value.  Dispense with the inverse test in this case. */
@@ -124,6 +141,8 @@ rt_mbtowc(Char *pwc, const char *s, size_t n)
 
     } else if (ret == -2)
 	ret = -1;
+    else if (ret == 0)
+	*pwc = '\0';
 
     return ret;
 }

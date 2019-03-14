@@ -1,3 +1,29 @@
+ 52. V6.17.03 - 20110117
+ 51. PR/102: Complain on input files with missing trailing \n
+ 50. PR/104: If atime == mtime we don't have new mail.
+ 49. PR/113: Don't allow illegal variable names to be set.
+ 48. PR/112: don't set $REMOTEHOST on the local machine.
+ 47. PR/110: exist status of the pipeline should be the status of the last
+     command.
+ 46. Android support (Corinna Vinschen)
+ 45. Add AUTOSET_KANJI which works around the Shift-JIS encoding that
+     translates unshifted 7 bit ASCII (Werner Fink)
+ 44. Handle mb{r,}towc() returning 0 by setting the return value to NUL
+     (Jean-Luc Leger)
+ 43. PR/109: make wait interruptible (Vojtech Vitek)
+ 42. resource limit fixes: signed vs. unsigned, megabyte issue, doc issues
+     (Robert Byrnes)
+ 41. remove .bat and .cmd handling for executables on cygwin (Corinna Vinschen)
+ 40. Don't echo history while history -L or history -M
+ 39. Check for EOS before ** from Greg Dionne
+ 38. Don't fork in backeval from Bryan Mason
+ 37. Better globstar support from Greg Dionne
+ 36. Error out when processing the last incomplete line instead of silently
+     ignoring it (Anders Kaseorg)
+ 35. Fix SEGV from echo ``
+ 34. Better fixes for histchars and promptchars (nargs)
+ 33. Fix win32 issue calling fmalloc/ffree from non-thread-safe context.
+     (Fabio Fabbri)
  32. V6.17.02 - 20100512
  31. PR/79: nargs: Better handling for promptchars.
  30. PR/97: Add parseoctal to retain compatibility with previous versions (Jim

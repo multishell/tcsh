@@ -9,7 +9,7 @@ dnl Written by Kaveh Ghazi (ghazi@caip.rutgers.edu) 5/11/96.
 dnl
 
 AC_PREREQ([2.59])dnl Minimum Autoconf version required.
-AC_INIT([tcsh], [6.17.02], [http://bugs.gw.com/])
+AC_INIT([tcsh], [6.17.03], [http://bugs.gw.com/])
 AC_CONFIG_SRCDIR([tc.vers.c])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_TESTDIR([.], [.])
@@ -76,6 +76,11 @@ case "${host}" in
   *-ibm-os390*)
     CC='c89'
     tcsh_config_file=os390
+  ;;
+
+  ## Android
+  *-*-android*)
+    tcsh_config_file=android
   ;;
 
   ## Linux
@@ -273,6 +278,14 @@ AC_PROG_CC
 AC_PROG_CPP
 AC_PROG_GCC_TRADITIONAL
 
+dnl Require build CC to create gethost helper when cross building
+if test "x${cross_compiling}" = xyes ; then
+  CC_FOR_GETHOST="cc"
+else
+  CC_FOR_GETHOST="\$(CC)"
+fi
+AC_SUBST(CC_FOR_GETHOST)
+
 if test "x$GCC" != xyes ; then
   DFLAGS="$DFLAGS $NON_GNU_DFLAGS"
   CFLAGS="$CFLAGS $NON_GNU_CFLAGS"
@@ -368,7 +381,11 @@ AC_CHECK_FUNCS([catgets dup2 getauthid getcwd gethostname getpwent] dnl
 	[strerror strstr sysconf wcwidth])
 AC_FUNC_GETPGRP
 AC_FUNC_MBRTOWC
-AC_FUNC_SETPGRP
+if test "x${cross_compiling}" != xyes ; then
+  AC_FUNC_SETPGRP
+else
+  ac_cv_func_setpgrp_void=yes
+fi
 AC_FUNC_STRCOLL
 
 dnl This is not good enough; we need sockaddr_storage too.

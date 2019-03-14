@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.func.c,v 3.155 2009/12/30 19:15:08 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.func.c,v 3.158 2010/12/22 17:26:04 christos Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.func.c,v 3.155 2009/12/30 19:15:08 christos Exp $")
+RCSID("$tcsh: sh.func.c,v 3.158 2010/12/22 17:26:04 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -520,12 +520,13 @@ doforeach(Char **v, struct command *c)
 
     USE(c);
     v++;
-    sp = cp = strip(*v);
-    if (!letter(*sp))
+    cp = sp = strip(*v);
+    if (!letter(*cp))
 	stderror(ERR_NAME | ERR_VARBEGIN);
-    while (*cp && alnum(*cp))
+    do {
 	cp++;
-    if (*cp)
+    } while (alnum(*cp));
+    if (*cp != '\0')
 	stderror(ERR_NAME | ERR_VARALNUM);
     cp = *v++;
     if (v[0][0] != '(' || v[blklen(v) - 1][0] != ')')
@@ -1373,13 +1374,16 @@ dosetenv(Char **v, struct command *c)
     }
 
     vp = *v++;
-
     lp = vp;
- 
-    for (; *lp != '\0' ; lp++) {
-	if (*lp == '=')
-	    stderror(ERR_NAME | ERR_SYNTAX);
-    }
+
+    if (!letter(*lp))
+	stderror(ERR_NAME | ERR_VARBEGIN);
+    do {
+	lp++;
+    } while (alnum(*lp));
+    if (*lp != '\0')
+	stderror(ERR_NAME | ERR_VARALNUM);
+
     if ((lp = *v++) == 0)
 	lp = STRNULL;
 
@@ -1423,6 +1427,9 @@ dosetenv(Char **v, struct command *c)
 # ifdef LC_CTYPE
 	(void) setlocale(LC_CTYPE, ""); /* for iscntrl */
 # endif /* LC_CTYPE */
+# if defined(AUTOSET_KANJI)
+        autoset_kanji();
+# endif /* AUTOSET_KANJI */
 # ifdef NLS_CATALOGS
 #  ifdef LC_MESSAGES
 	(void) setlocale(LC_MESSAGES, "");
@@ -1972,7 +1979,9 @@ struct limits limits[] =
 
 static struct limits *findlim	(Char *);
 static RLIM_TYPE getval		(struct limits *, Char **);
+static int strtail		(Char *, const char *);
 static void limtail		(Char *, const char *);
+static void limtail2		(Char *, const char *, const char *);
 static void plim		(struct limits *, int);
 static int setlim		(struct limits *, int, RLIM_TYPE);
 
@@ -2080,29 +2089,43 @@ getval(struct limits *lp, Char **v)
 	limtail(cp, "hours");
 	f *= 3600.0;
 	break;
+# endif /* RLIMIT_CPU */
     case 'm':
+# ifdef RLIMIT_CPU
 	if (lp->limconst == RLIMIT_CPU) {
 	    limtail(cp, "minutes");
 	    f *= 60.0;
 	    break;
 	}
-	*cp = 'm';
-	limtail(cp, "megabytes");
+# endif /* RLIMIT_CPU */
+	limtail2(cp, "megabytes", "mbytes");
 	f *= 1024.0 * 1024.0;
 	break;
+# ifdef RLIMIT_CPU
     case 's':
 	if (lp->limconst != RLIMIT_CPU)
 	    goto badscal;
 	limtail(cp, "seconds");
 	break;
 # endif /* RLIMIT_CPU */
+    case 'G':
+	*cp = 'g';
+	/*FALLTHROUGH*/
+    case 'g':
+# ifdef RLIMIT_CPU
+	if (lp->limconst == RLIMIT_CPU)
+	    goto badscal;
+# endif /* RLIMIT_CPU */
+	limtail2(cp, "gigabytes", "gbytes");
+	f *= 1024.0 * 1024.0 * 1024.0;
+	break;
     case 'M':
 # ifdef RLIMIT_CPU
 	if (lp->limconst == RLIMIT_CPU)
 	    goto badscal;
 # endif /* RLIMIT_CPU */
 	*cp = 'm';
-	limtail(cp, "megabytes");
+	limtail2(cp, "megabytes", "mbytes");
 	f *= 1024.0 * 1024.0;
 	break;
     case 'k':
@@ -2110,7 +2133,7 @@ getval(struct limits *lp, Char **v)
 	if (lp->limconst == RLIMIT_CPU)
 	    goto badscal;
 # endif /* RLIMIT_CPU */
-	limtail(cp, "kbytes");
+	limtail2(cp, "kilobytes", "kbytes");
 	f *= 1024.0;
 	break;
     case 'b':
@@ -2134,25 +2157,34 @@ badscal:
     return f == 0.0 ? (RLIM_TYPE) 0 : restrict_limit((f + 0.5));
 # else
     f += 0.5;
-    if (f > (float) RLIM_INFINITY)
+    if (f > (float) ((RLIM_TYPE) RLIM_INFINITY))
 	return ((RLIM_TYPE) RLIM_INFINITY);
     else
 	return ((RLIM_TYPE) f);
 # endif /* convex */
 }
 
+static int
+strtail(Char *cp, const char *str)
+{
+    while (*cp && *cp == (Char)*str)
+	cp++, str++;
+    return (*cp != '\0');
+}
+
 static void
 limtail(Char *cp, const char *str)
 {
-    const char *sp;
-
-    sp = str;
-    while (*cp && *cp == (Char)*str)
-	cp++, str++;
-    if (*cp)
-	stderror(ERR_BADSCALE, sp);
+    if (strtail(cp, str))
+	stderror(ERR_BADSCALE, str);
 }
 
+static void
+limtail2(Char *cp, const char *str1, const char *str2)
+{
+    if (strtail(cp, str1) && strtail(cp, str2))
+	stderror(ERR_BADSCALE, str1);
+}
 
 /*ARGSUSED*/
 static void

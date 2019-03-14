@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.157 2010/05/12 15:01:12 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.161 2011/01/09 16:25:29 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -39,7 +39,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$tcsh: sh.c,v 3.157 2010/05/12 15:01:12 christos Exp $")
+RCSID("$tcsh: sh.c,v 3.161 2011/01/09 16:25:29 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -552,7 +552,18 @@ main(int argc, char **argv)
     if ((tcp = getenv("HOME")) != NULL)
 	cp = quote(SAVE(tcp));
     else
+#ifdef __ANDROID__
+	/* On Android, $HOME usually isn't set, so we can't load user RC files.
+	   Check for the environment variable EXTERNAL_STORAGE, which contains
+	   the mount point of the external storage (SD card, mostly).  If
+	   EXTERNAL_STORAGE isn't set fall back to "/sdcard". */
+    if ((tcp = getenv("EXTERNAL_STORAGE")) != NULL)
+	cp = quote(SAVE(tcp));
+    else
+	cp = quote(SAVE("/sdcard"));
+#else
 	cp = NULL;
+#endif
 
     if (cp == NULL)
 	fast = 1;		/* No home -> can't read scripts */
@@ -802,7 +813,14 @@ main(int argc, char **argv)
       nt_autoset_dspmbyte();
 #endif /* WINNT_NATIVE */
 #endif
-
+#if defined(AUTOSET_KANJI) 
+# if defined(NLS) && defined(LC_CTYPE)
+    if (setlocale(LC_CTYPE, NULL) != NULL || getenv("LANG") != NULL)
+# else
+    if (getenv("LANG") != NULL)
+# endif
+	autoset_kanji();
+#endif /* AUTOSET_KANJI */
     fix_version();		/* publish the shell version */
 
     if (argc > 1 && strcmp(argv[1], "--version") == 0) {
@@ -1979,9 +1997,11 @@ process(int catch)
 	/*
 	 * Echo not only on VERBOSE, but also with history expansion. If there
 	 * is a lexical error then we forego history echo.
+	 * Do not echo if we're only entering history (source -h).
 	 */
 	if ((hadhist && !seterr && intty && !tellwhat && !Expand && !whyles) ||
-	    adrof(STRverbose)) {
+	    (!enterhist && adrof(STRverbose)))
+	{
 	    int odidfds = didfds;
 	    haderr = 1;
 	    didfds = 0;
