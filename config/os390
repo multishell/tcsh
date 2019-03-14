@@ -3,7 +3,7 @@
  *
  * All source files should #include this FIRST.
  *
- * This is the config file for minix-386 systems
+ * Edit this to match your system type.
  */
 
 #ifndef _h_config
@@ -18,12 +18,12 @@
  * POSIXJOBS	This system supports the optional IEEE Std 1003.1-1988 (POSIX)
  *		job control facilities.
  */
-#undef POSIXJOBS
+#define POSIXJOBS
 
 /*
  * POSIXSIGS	Use the POSIX signal facilities to emulate BSD signals.
  */
-#undef POSIXSIGS
+#define POSIXSIGS
 
 /*
  * VFORK	This machine has a vfork().  
@@ -44,7 +44,10 @@
  * BSDJOBS	You have BSD-style job control (both process groups and
  *		a tty that deals correctly
  */
-#undef BSDJOBS
+#ifdef BSDJOBS 
+# undef BSDJOBS 
+#endif 
+
 
 /*
  * BSDSIGS	You have 4.2-style signals, rather than USG style.
@@ -61,15 +64,15 @@
 #undef BSDTIMES
 
 /*
+ * BSDLIMIT	You have BSD-style resource limit stuff (getrlimit/setrlimit)
+ */
+#define BSDLIMIT
+
+/*
  * BSDNICE	Your system uses setpriority() instead of nice, to
  *		change a processes scheduling priority
  */
-#undef BSDNICE
-
-/*
- * BSDLIMIT	You have BSD-style resource limit stuff (getrlimit/setrlimit)
- */
-#undef BSDLIMIT
+#define BSDNICE
 
 /*
  * TERMIO	You have struct termio instead of struct sgttyb.
@@ -80,19 +83,25 @@
 #define TERMIO
 
 /*
- * SYSVREL	Your machine is SYSVREL compliant (HPUX, A/UX)
+ * SYSVREL	Your machine is SYSV based (HPUX, A/UX)
  *		NOTE: don't do this if you are on a Pyramid -- tcsh is
  *		built in a BSD universe.
  *		Set SYSVREL to 1, 2, or 3, depending the version of System V
  *		you are running. Or set it to 0 if you are not SYSV based
  */
-#define SYSVREL	0
+#define SYSVREL	4
 
 /*
  * YPBUGS	Work around Sun YP bugs that cause expansion of ~username
- *		to send command output to /dev/null
+ *		to send command output to /dev/null [they are back!]
  */
 #undef YPBUGS
+
+/*
+ * NISPLUS    Make sure that fd's 0, 1, and 2 always are open so that
+ *            Sun's NIS+ doesn't get them, making ~-expansion hang.
+ */
+#undef NISPLUS
 
 /*
  * SIGVOID	Define this if your signal handlers return void.  On older
@@ -106,41 +115,77 @@
 #define HAVEDUP2
 
 /*
+ * HAVEUTMPX	Define if you have extended utmp (utmpx).
+ *		(common for svr4 systems)
+ */
+#define HAVEUTMPX
+
+/*
  * UTHOST	Does the utmp file have a host field?
  */
-#undef UTHOST
+#ifdef HAVEUTMPX
+# define UTHOST
+#else
+# undef UTHOST
+#endif /* HAVEUTMPX */
 
 /*
  * DIRENT	Your system has <dirent.h> instead of <sys/dir.h>
  */
 #define DIRENT
-/****************** local defines *********************/
-
-#ifndef	i386
-#define i386  /* gcc may define this for you already. */
-#endif	/* i386 */
-
-	/*
-	 * the following symbol must be defined as a non-zero
-	 * value (not just defined) for <minix/config.h>
-	 */
-#define INTEL_32BITS	1
-
-#define HAVENOLIMIT
-#define NEEDgetcwd
-#define _POSIX_SOURCE
-#define _MINIX
 
 /*
- * define if you are on vmd system
+ * ECHO_STYLE	Optionally change the behavior of the builtin echo
+ *		BOTH_ECHO: Support both bsd options (-n) and sysv escapes (\nnn)
+ *		BSD_ECHO:  Support only -n
+ *		SYSV_ECHO: Support only sysv escapes (\nnn)
+ *		NONE_ECHO: Pure echo.
  */
-#undef _MINIX_VMD
+#define ECHO_STYLE BOTH_ECHO
+
+/****************** local defines *********************/
+#ifndef BSDTIMES
+# define NEEDgethostname
+#endif
+/*
+ * Shadow passwd file
+ */
+#undef PW_SHADOW
+
+/*
+ * OS Release dependent
+ * Work around OS deficiency which cannot start #!/bin/sh scripts
+ */
+/* #define HASHBANG */
+
+/*
+ * OS/390 c89 compilation environment varies dramatically
+ * without each of the following.
+ */
+#define MAXSIG 38
+#define _OE_SOCKETS
+#define _POSIX_SOURCE 
+#define _XOPEN_SOURCE
+#define _XOPEN_SOURCE_EXTENDED 1 
+
+/* 
+  This stuff is supposed to be needed for ioctl() but does not work yet.
+#include <types.h> 
+#include <ioctl.h> 
+#include <rtrouteh.h> 
+#include <if.h> 
+ */
+
+/* 
+ * gcc has been ported to os/390 let's make sure that OS dependent
+ * stuff works for gcc users (???)
+ */
+#ifndef __MVS__
+#define __MVS__
+#endif
 
 /****************** configurable hacks ****************/
 /* have been moved to config_f.h */
 #include "config_f.h"
 
-#undef NLS
-#undef NLS_CATALOGS
-#undef REMOTEHOST
 #endif /* _h_config */

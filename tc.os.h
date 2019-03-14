@@ -1,4 +1,4 @@
-/* $Header: /u/christos/cvsroot/tcsh/tc.os.h,v 3.81 1999/02/06 15:01:26 christos Exp $ */
+/* $Header: /src/pub/tcsh/tc.os.h,v 3.83 2000/06/11 02:14:16 kim Exp $ */
 /*
  * tc.os.h: Shell os dependent defines
  */
@@ -82,9 +82,9 @@
 # define NOFILE 256
 #endif /* NOFILE */
 
-#if defined(linux) || defined(__NetBSD__) || defined(__FreeBSD__) || SYSVREL >= 4 
+#if defined(linux) || defined(__NetBSD__) || defined(__FreeBSD__) || SYSVREL >= 4  || defined(_MINIX_VMD)
 # undef NEEDstrerror
-#endif /* linux || __NetBSD__ || __FreeBSD__ || SYSVREL >= 4 */
+#endif /* linux || __NetBSD__ || __FreeBSD__ || SYSVREL >= 4 || _MINIX_VMD */
 
 #if !defined(pyr) && !defined(sinix)
 /* Pyramid's cpp complains about the next line */
@@ -527,7 +527,8 @@ typedef struct timeval timeval_t;
 # define free tcsh_free
 #endif /* NeXT */
 
-#if !defined(BSD4_4) && !defined(__linux__) && !defined(__hpux) && !defined(sgi)
+#if !defined(BSD4_4) && !defined(__linux__) && !defined(__hpux) && \
+    !defined(sgi) && !defined(_AIX)
 #ifndef NEEDgethostname
 extern int gethostname __P((char *, int));
 #endif /* NEEDgethostname */
@@ -722,12 +723,12 @@ extern void bcopy	__P((const void *, void *, size_t));
 # ifdef REMOTEHOST
 /* Irix6 defines getpeername(int, void *, int *) which conflicts with
    the definition below. */
-#  if !defined(__sgi) && !defined(_OSD_POSIX)
+#  if !defined(__sgi) && !defined(_OSD_POSIX) && !defined(__MVS__)
 #   ifndef _SOCKLEN_T	/* Avoid Solaris 2.7 bogosity. */
 struct sockaddr;
 extern int getpeername __P((int, struct sockaddr *, int *));
 #   endif /* _SOCKLEN_T */
-#  endif /* !__sgi && !_OSD_POSIX */
+#  endif /* !__sgi && !_OSD_POSIX && !__MVS__ */
 # endif /* REMOTEHOST */
 # ifndef BSDTIMES
 extern int getrlimit __P((int, struct rlimit *));

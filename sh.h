@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.h,v 3.86 1998/10/25 15:10:16 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.h,v 3.89 2000/06/11 02:14:14 kim Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -121,12 +121,12 @@ typedef int sigret_t;
  *	MAILINTVL	How often to mailcheck; more often is more expensive
  */
 #ifdef BUFSIZE
-# if	   BUFSIZE < 1024
+# if	   BUFSIZE < 4096
 #  undef   BUFSIZE
-#  define  BUFSIZE	1024	/* buffer size should be no less than this */
+#  define  BUFSIZE	4096	/* buffer size should be no less than this */
 # endif
 #else
-# define   BUFSIZE	1024
+# define   BUFSIZE	4096
 #endif /* BUFSIZE */
 
 #define FORKSLEEP	10	/* delay loop on non-interactive fork failure */
@@ -216,14 +216,14 @@ typedef int sigret_t;
 #endif /* NLS */
 
 
-#if !defined(_MINIX) && !defined(_VMS_POSIX) && !defined(WINNT)
+#if !defined(_MINIX) && !defined(_VMS_POSIX) && !defined(WINNT) && !defined(__MVS__)
 # include <sys/param.h>
-#endif /* !_MINIX && !_VMS_POSIX && !WINNT */
+#endif /* !_MINIX && !_VMS_POSIX && !WINNT && !__MVS__ */
 #include <sys/stat.h>
 
 #if defined(BSDTIMES) || defined(BSDLIMIT)
 # include <sys/time.h>
-# if SYSVREL>3 && !defined(SCO) && !defined(sgi) && !defined(SNI) && !defined(sun) && !(defined(__alpha) && defined(__osf__)) && !defined(_SX)
+# if SYSVREL>3 && !defined(SCO) && !defined(sgi) && !defined(SNI) && !defined(sun) && !(defined(__alpha) && defined(__osf__)) && !defined(_SX) && !defined(__MVS__)
 #  include "/usr/ucbinclude/sys/resource.h"
 # else
 #  ifdef convex
@@ -320,7 +320,7 @@ typedef int sigret_t;
 #define CSWTCH _POSIX_VDISABLE
 #endif
 
-#if (!defined(FIOCLEX) && defined(SUNOS4)) || ((SYSVREL == 4) && !defined(_SEQUENT_) && !defined(SCO) && !defined(_SX))
+#if (!defined(FIOCLEX) && defined(SUNOS4)) || ((SYSVREL == 4) && !defined(_SEQUENT_) && !defined(SCO) && !defined(_SX)) && !defined(__MVS__)
 # include <sys/filio.h>
 #endif /* (!FIOCLEX && SUNOS4) || (SYSVREL == 4 && !_SEQUENT_ && !SCO && !_SX ) */
 
@@ -439,6 +439,15 @@ typedef void pret_t;
 #endif /* PURIFY */
 
 typedef int bool;
+
+/*
+ * ASCII vs. EBCDIC
+ */
+#if 'Z' - 'A' == 25
+# ifndef IS_ASCII
+#  define IS_ASCII
+# endif
+#endif
 
 #include "sh.types.h"
 
@@ -591,7 +600,9 @@ extern Char   *ffile;		/* Name of shell file for $0 */
 extern bool    dolzero;		/* if $?0 should return true... */
 
 extern char *seterr;		/* Error message from scanner/parser */
+#ifndef BSD4_4
 extern int errno;		/* Error from C library routines */
+#endif
 EXTERN Char   *shtemp IZERO;	/* Temp name for << shell files in /tmp */
 
 #ifdef BSDTIMES
@@ -768,10 +779,10 @@ EXTERN struct Bin {
  */
 struct Ain {
     int type;
-#define I_SEEK -1		/* Invalid seek */
-#define A_SEEK	0		/* Alias seek */
-#define F_SEEK	1		/* File seek */
-#define E_SEEK	2		/* Eval seek */
+#define TCSH_I_SEEK 	 0		/* Invalid seek */
+#define TCSH_A_SEEK	 1		/* Alias seek */
+#define TCSH_F_SEEK	 2		/* File seek */
+#define TCSH_E_SEEK	 3		/* Eval seek */
     union {
 	off_t _f_seek;
 	Char* _c_seek;

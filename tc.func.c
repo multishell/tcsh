@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tc.func.c,v 3.86 1999/07/01 05:45:36 christos Exp $ */
+/* $Header: /src/pub/tcsh/tc.func.c,v 3.90 2000/06/11 02:14:15 kim Exp $ */
 /*
  * tc.func.c: New tcsh builtins.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.func.c,v 3.86 1999/07/01 05:45:36 christos Exp $")
+RCSID("$Id: tc.func.c,v 3.90 2000/06/11 02:14:15 kim Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -81,6 +81,9 @@ struct tildecache;
 static	int	 tildecompare	__P((struct tildecache *, struct tildecache *));
 static  Char    *gethomedir	__P((Char *));
 #ifdef REMOTEHOST
+#ifdef INET6
+#include <utmp.h>
+#endif
 static	sigret_t palarm		__P((int));
 static	void	 getremotehost	__P((void));
 #endif /* REMOTEHOST */
@@ -90,12 +93,15 @@ static	void	 getremotehost	__P((void));
  */
 
 /*
- * expand_lex: Take the given lex and put an expanded version of it in the
- * string buf. First guy in lex list is ignored; last guy is ^J which we
- * ignore Only take lex'es from position from to position to inclusive Note:
- * csh sometimes sets bit 8 in characters which causes all kinds of problems
- * if we don't mask it here. Note: excl's in lexes have been un-back-slashed
- * and must be re-back-slashed
+ * expand_lex: Take the given lex and put an expanded version of it in
+ * the string buf. First guy in lex list is ignored; last guy is ^J
+ * which we ignore. Only take lex'es from position 'from' to position
+ * 'to' inclusive
+ *
+ * Note: csh sometimes sets bit 8 in characters which causes all kinds
+ * of problems if we don't mask it here. Note: excl's in lexes have been
+ * un-back-slashed and must be re-back-slashed
+ *
  * (PWP: NOTE: this returns a pointer to the END of the string expanded
  *             (in other words, where the NUL is).)
  */
@@ -113,6 +119,14 @@ expand_lex(buf, bufsiz, sp0, from, to)
     register Char *s, *d, *e;
     register Char prev_c;
     register int i;
+
+    /*
+     * Make sure we have enough space to expand into.  E.g. we may have
+     * "a|b" turn to "a | b" (from 3 to 5 characters) which is the worst
+     * case scenario (even "a>&! b" turns into "a > & ! b", i.e. 6 to 9
+     * characters -- am I missing any other cases?).
+     */
+    bufsiz = bufsiz / 2;
 
     buf[0] = '\0';
     prev_c = '\0';
@@ -755,8 +769,10 @@ auto_lock(n)
 
 #define XCRYPT(a, b) crypt(a, b)
 
+#if !defined(__MVS__)
     if ((pw = getpwuid(euid)) != NULL)	/* effective user passwd  */
 	srpp = pw->pw_passwd;
+#endif /* !MVS */
 
 #endif /* !XCRYPT */
 
@@ -2037,14 +2053,34 @@ static void
 getremotehost()
 {
     const char *host = NULL;
+#ifdef INET6
+    struct sockaddr_storage saddr;
+    int len = sizeof(struct sockaddr_storage);
+    static char hbuf[NI_MAXHOST];
+#else
     struct hostent* hp;
     struct sockaddr_in saddr;
     int len = sizeof(struct sockaddr_in);
+#endif
 #if defined(UTHOST) && !defined(HAVENOUTMP)
     char *sptr = NULL;
 #endif
 
     if (getpeername(SHIN, (struct sockaddr *) &saddr, &len) != -1) {
+#ifdef INET6
+#if 0
+	int flag = 0;
+#else
+	int flag = NI_NUMERICHOST;
+#endif
+
+#ifdef NI_WITHSCOPEID
+	flag |= NI_WITHSCOPEID;
+#endif
+	getnameinfo((struct sockaddr *)&saddr, len, hbuf, sizeof(hbuf),
+		    NULL, 0, flag);
+	host = hbuf;
+#else
 #if 0
 	if ((hp = gethostbyaddr((char *)&saddr.sin_addr, sizeof(struct in_addr),
 				AF_INET)) != NULL)
@@ -2052,6 +2088,7 @@ getremotehost()
 	else
 #endif
 	    host = inet_ntoa(saddr.sin_addr);
+#endif
     }
 #if defined(UTHOST) && !defined(HAVENOUTMP)
     else {
@@ -2059,14 +2096,58 @@ getremotehost()
 	char *name = utmphost();
 	/* Avoid empty names and local X displays */
 	if (name != NULL && *name != '\0' && *name != ':') {
+	    struct in_addr addr;
+
 	    /* Look for host:display.screen */
+	    /*
+	     * There is conflict with IPv6 address and X DISPLAY.  So,
+	     * we assume there is no IPv6 address in utmp and don't
+	     * touch here.
+	     */
 	    if ((sptr = strchr(name, ':')) != NULL)
 		*sptr = '\0';
-	    /* Leave IP address as is */
-	    if (isdigit(*name))
+	    /* Leave IPv4 address as is */
+	    if (inet_aton(name, &addr))
 		host = name;
 	    else {
 		if (sptr != name) {
+#ifdef INET6
+		    char *s, *domain;
+		    char dbuf[MAXHOSTNAMELEN], cbuf[MAXHOSTNAMELEN];
+		    struct addrinfo hints, *res = NULL;
+
+		    memset(&hints, 0, sizeof(hints));
+		    hints.ai_family = PF_UNSPEC;
+		    hints.ai_socktype = SOCK_STREAM;
+		    hints.ai_flags = AI_PASSIVE | AI_CANONNAME;
+		    if (strlen(name) < UT_HOSTSIZE) {
+			if (getaddrinfo(name, NULL, &hints, &res) != 0)
+			    res = NULL;
+		    } else if (gethostname(dbuf, sizeof(dbuf) - 1) == 0 &&
+			       (domain = strchr(dbuf, '.')) != NULL) {
+			for (s = strchr(name, '.');
+			     s != NULL; s = strchr(s + 1, '.')) {
+			    if (*(s + 1) != '\0' &&
+				(ptr = strstr(domain, s)) != NULL) {
+				len = s - name;
+				if (len + strlen(ptr) >= sizeof(cbuf))
+				    break;
+				strncpy(cbuf, name, len);
+				strcpy(cbuf + len, ptr);
+				if (getaddrinfo(cbuf, NULL, &hints, &res) != 0)
+				    res = NULL;
+				break;
+			    }
+			}
+		    }
+		    if (res != NULL) {
+			if (res->ai_canonname != NULL) {
+			    strncpy(hbuf, res->ai_canonname, sizeof(hbuf));
+			    host = hbuf;
+			}
+			freeaddrinfo(res);
+		    }
+#else
 		    if ((hp = gethostbyname(name)) == NULL) {
 			/* Try again eliminating the trailing domain */
 			if ((ptr = strchr(name, '.')) != NULL) {
@@ -2078,6 +2159,7 @@ getremotehost()
 		    }
 		    else
 			host = hp->h_name;
+#endif
 		}
 	    }
 	}
