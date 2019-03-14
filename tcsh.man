@@ -76,7 +76,7 @@
 .\"   used here if you can. In particular, please don't use nroff commands
 .\"   which aren't already used herein.
 .\" 
-.TH TCSH 1 "4 May 1997" "Astron 6.07.04"
+.TH TCSH 1 "20 October 1997" "Astron 6.07.05"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
@@ -2739,9 +2739,10 @@ internal hash table has been at locating commands (and avoiding
 \fIexec\fR's). An \fIexec\fR is attempted for each component of the
 \fBpath\fR where the hash function indicates a possible hit, and
 in each component which does not begin with a `/'.
-.PP
+.IP
 On machines without \fIvfork\fR(2), prints only the number and size of
 hash buckets.
+.PP
 .B history \fR[\fB\-hTr\fR] [\fIn\fR]
 .br
 .B history \-S\fR|\fB\-L|\fB\-M \fR[\fIfilename\fR] (+)
@@ -4694,7 +4695,7 @@ pipe(2), setrlimit(2), sigvec(2), stat(2), umask(2), vfork(2), wait(2),
 malloc(3), setlocale(3), tty(4), a.out(5), termcap(5), environ(7),
 termio(7), Introduction to the C Shell
 .SH VERSION
-This manual documents tcsh 6.07.04 (Astron) 1997-05-04.
+This manual documents tcsh 6.07.05 (Astron) 1997-10-08.
 .SH AUTHORS
 .PD 0
 .TP 2
@@ -4827,7 +4828,7 @@ Scott Bolte, Cray Computer Corp., 1992
 CSOS port
 .TP 2
 Kaveh R. Ghazi, Rutgers University, 1992
-Tek, m88k, Titan and Masscomp ports and fixes
+Tek, m88k, Titan and Masscomp ports and fixes. Added autoconf support.
 .TP 2
 Mark Linderman, Cornell University, 1992
 OS/2 port
@@ -4850,6 +4851,13 @@ added \fBellipsis\fR and \fBrprompt\fR.
 .TP 2
 Edward Hutchins, Silicon Graphics Inc., 1996
 Added implicit cd.
+.TP 2
+Martin Kraemer, 1997
+Ported to Siemens Nixdorf EBCDIC machine
+.TP 2
+Amol Deshpande, Microsoft, 1997
+Ported to WIN32 (Windows/95 and Windows/NT); wrote all the missing library
+and message catalog code to interface to Windows.
 .PD
 .PP
 .SH "THANKS TO"

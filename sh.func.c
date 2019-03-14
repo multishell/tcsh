@@ -1,4 +1,4 @@
-/* $Header: /u/christos/cvsroot/tcsh/sh.func.c,v 3.66 1996/10/05 17:39:10 christos Exp $ */
+/* $Header: /u/christos/cvsroot/tcsh/sh.func.c,v 3.69 1997/10/27 22:44:28 christos Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.func.c,v 3.66 1996/10/05 17:39:10 christos Exp $")
+RCSID("$Id: sh.func.c,v 3.69 1997/10/27 22:44:28 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -63,6 +63,7 @@ static	void	search		__P((int, int, Char *));
 static	int	getword		__P((Char *));
 static	void	toend		__P((void));
 static	void	xecho		__P((int, Char **));
+static	bool	islocale_var	__P((Char *));
 
 struct biltins *
 isbfunc(t)
@@ -106,8 +107,8 @@ isbfunc(t)
 	int i;
 
 	bp = bp1 + ((bp2 - bp1) >> 1);
-	if ((i = *cp - *bp->bname) == 0 &&
-	    (i = Strcmp(cp, str2short(bp->bname))) == 0)
+	if ((i = ((char) *cp) - *bp->bname) == 0 &&
+	    (i = StrQcmp(cp, str2short(bp->bname))) == 0)
 	    return bp;
 	if (i < 0)
 	    bp2 = bp;
@@ -332,6 +333,9 @@ dologin(v, c)
     struct command *c;
 {
     USE(c);
+#ifdef WINNT
+    USE(v);
+#else /* !WINNT */
     islogin();
     rechist(NULL, adrof(STRsavehist) != NULL);
     (void) signal(SIGTERM, parterm);
@@ -339,6 +343,7 @@ dologin(v, c)
     (void) execl(_PATH_USRBIN_LOGIN, "login", short2str(v[1]), NULL);
     untty();
     xexit(1);
+#endif /* !WINNT */
 }
 
 
@@ -1212,8 +1217,9 @@ done:
 }
 
 /* check whether an environment variable should invoke 'set_locale()' */
-static bool islocale_var(var)
-register Char *var;
+static bool
+islocale_var(var)
+    Char *var;
 {
     static Char *locale_vars[] = {
 	STRLANG,	STRLC_CTYPE,	STRLC_NUMERIC,	STRLC_TIME,
@@ -1346,7 +1352,13 @@ dosetenv(v, c)
 	xfree((ptr_t) lp);
 	return;
     }
-
+#ifdef WINNT
+    if (eq(vp, STRtcshlang)) {
+	nlsinit();
+	xfree((ptr_t) lp);
+	return;
+    }
+#endif /* WINNT */
     if (eq(vp, STRKTERM)) {
 	char *t;
 	set(STRterm, quote(lp), VAR_READWRITE);	/* lp memory used here */
@@ -1503,6 +1515,12 @@ dounsetenv(v, c)
 			ed_InitNLSMaps();
 
 		}
+#ifdef WINNT
+		else if (eq(name,(STRtcshlang))) {
+		    nls_dll_unload();
+		    nlsinit();
+		}
+#endif /* WINNT */
 		/*
 		 * start again cause the environment changes
 		 */
@@ -1536,6 +1554,9 @@ tsetenv(name, val)
     Char   *blk[2];
     Char  **oep = ep;
 
+#ifdef WINNT
+	nt_set_env(name,val);
+#endif /* WINNT */
     for (; *ep; ep++) {
 	for (cp = name, dp = *ep; *cp && (*cp & TRIM) == *dp; cp++, dp++)
 	    continue;
@@ -1630,7 +1651,11 @@ doumask(v, c)
 #  if defined(BSD4_4) && !defined(__386BSD__)
     typedef quad_t RLIM_TYPE;
 #  else
-    typedef unsigned long RLIM_TYPE;
+#   if defined(SOLARIS2)
+#    define RLIM_TYPE rlim_t
+#   else
+     typedef unsigned long RLIM_TYPE
+#   endif /* SOLARIS2 */
 #  endif /* BSD4_4 && !__386BSD__  */
 # endif /* BSDLIMIT */
 
@@ -2068,7 +2093,7 @@ dosuspend(v, c)
 #ifdef BSDJOBS
     int     ctpgrp;
 
-    sigret_t (*old) ();
+    signalfun_t old;
 #endif /* BSDJOBS */
     
     USE(c);
@@ -2277,6 +2302,9 @@ nlsinit()
 #ifdef NLS_CATALOGS
     catd = catopen("tcsh", MCLoadBySet);
 #endif
+#ifdef WINNT
+    nls_dll_init();
+#endif /* WINNT */
     errinit();		/* init the errorlist in correct locale */
     mesginit();		/* init the messages for signals */
     dateinit();		/* init the messages for dates */

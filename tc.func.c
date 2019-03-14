@@ -1,4 +1,4 @@
-/* $Header: /u/christos/cvsroot/tcsh/tc.func.c,v 3.69 1996/09/24 16:57:29 christos Exp $ */
+/* $Header: /u/christos/cvsroot/tcsh/tc.func.c,v 3.72 1997/10/27 22:44:35 christos Exp $ */
 /*
  * tc.func.c: New tcsh builtins.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.func.c,v 3.69 1996/09/24 16:57:29 christos Exp $")
+RCSID("$Id: tc.func.c,v 3.72 1997/10/27 22:44:35 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -67,19 +67,22 @@ static bool precmd_active = 0;
 static bool periodic_active = 0;
 static bool cwdcmd_active = 0;	/* PWP: for cwd_cmd */
 static bool beepcmd_active = 0;
-static void (*alm_fun)() = NULL;
+static signalfun_t alm_fun = NULL;
 
 static	void	 Reverse	__P((Char *));
-static	void	 auto_logout	__P((void));
+static	void	 auto_logout	__P((int));
 static	char	*xgetpass	__P((char *));
-static	void	 auto_lock	__P((void));
+static	void	 auto_lock	__P((int));
 #ifdef BSDJOBS
 static	void	 insert		__P((struct wordent *, bool));
 static	void	 insert_we	__P((struct wordent *, struct wordent *));
 static	int	 inlist		__P((Char *, Char *));
 #endif /* BSDJOBS */
+struct tildecache;
+static	int	 tildecompare	__P((struct tildecache *, struct tildecache *));
 static  Char    *gethomedir	__P((Char *));
 #ifdef REMOTEHOST
+static	sigret_t palarm		__P((int));
 static	void	 getremotehost	__P((void));
 #endif /* REMOTEHOST */
 
@@ -319,6 +322,10 @@ dolist(v, c)
     }
     else {
 	Char   *dp, *tmp, buf[MAXPATHLEN];
+#ifdef WINNT
+	char is_it_unc[3];
+	int yes_it_is = 0;
+#endif /* WINNT */
 
 	for (k = 0, i = 0; v[k] != NULL; k++) {
 	    tmp = dnormalize(v[k], symlinks == SYM_IGNORE);
@@ -328,7 +335,19 @@ dolist(v, c)
 		if (dp != &tmp[1])
 #endif /* apollo */
 		*dp = '\0';
-	    if (stat(short2str(tmp), &st) == -1) {
+#ifdef WINNT
+ 		is_it_unc[0] = (char)tmp[0];
+ 		is_it_unc[1] = (char)tmp[1];
+ 		is_it_unc[2] = 0;
+ 		yes_it_is = lstrcmp(is_it_unc,"//") == 0 ||
+			    lstrcmp(is_it_unc,"\\\\") == 0;
+#endif /* WINNT */
+	    if (
+#ifdef WINNT
+		((char)tmp[1] != ':') &&
+		(!yes_it_is) &&
+#endif /* WINNT */
+		stat(short2str(tmp), &st) == -1) {
 		if (k != i) {
 		    if (i != 0)
 			xputchar('\n');
@@ -337,7 +356,12 @@ dolist(v, c)
 		xprintf("%S: %s.\n", tmp, strerror(errno));
 		i = k + 1;
 	    }
-	    else if (S_ISDIR(st.st_mode)) {
+	    else if (
+#ifdef WINNT
+		((char)tmp[1] != ':') &&
+		(!yes_it_is) &&
+#endif /* WINNT */
+		S_ISDIR(st.st_mode)) {
 		Char   *cp;
 
 		if (k != i) {
@@ -350,7 +374,11 @@ dolist(v, c)
 		xprintf("%S:\n", tmp);
 		for (cp = tmp, dp = buf; *cp; *dp++ = (*cp++ | QUOTE))
 		    continue;
-		if (dp[-1] != (Char) ('/' | QUOTE))
+		if (
+#ifdef WINNT
+		    (dp[-1] != (Char) (':' | QUOTE)) &&
+#endif /* WINNT */
+		    (dp[-1] != (Char) ('/' | QUOTE)))
 		    *dp++ = '/';
 		else 
 		    dp[-1] &= TRIM;
@@ -635,9 +663,9 @@ xgetpass(prm)
 {
     static char pass[PASSMAX + 1];
     int fd, i;
-    sigret_t (*sigint)();
+    signalfun_t sigint;
 
-    sigint = (sigret_t (*)()) sigset(SIGINT, SIG_IGN);
+    sigint = (signalfun_t) sigset(SIGINT, SIG_IGN);
     (void) Rawmode();	/* Make sure, cause we want echo off */
     if ((fd = open("/dev/tty", O_RDWR)) == -1)
 	fd = SHIN;
@@ -667,21 +695,28 @@ xgetpass(prm)
  * If we fail to get the password, then we log the user out
  * immediately
  */
+/*ARGSUSED*/
 static void
-auto_lock()
+auto_lock(n)
+	int n;
 {
 #ifndef NO_CRYPT
 
     int i;
     char *srpp = NULL;
     struct passwd *pw;
+#ifdef POSIX
+    extern char *crypt __P((const char *, const char *));
+#else
+    extern char *crypt __P(());
+#endif
 
 #undef XCRYPT
 
 #if defined(PW_AUTH) && !defined(XCRYPT)
 
     struct authorization *apw;
-    extern char *crypt16();
+    extern char *crypt16 __P((const char *, const char *));
 
 # define XCRYPT(a, b) crypt16(a, b)
 
@@ -694,7 +729,6 @@ auto_lock()
 #if defined(PW_SHADOW) && !defined(XCRYPT)
 
     struct spwd *spw;
-    extern char *crypt();
 
 # define XCRYPT(a, b) crypt(a, b)
 
@@ -705,7 +739,6 @@ auto_lock()
 #endif /* PW_SHADOW && !XCRYPT */
 
 #ifndef XCRYPT
-    extern char *crypt();
 
 #define XCRYPT(a, b) crypt(a, b)
 
@@ -715,7 +748,7 @@ auto_lock()
 #endif /* !XCRYPT */
 
     if (srpp == NULL) {
-	auto_logout();
+	auto_logout(0);
 	/*NOTREACHED*/
 	return;
     }
@@ -769,13 +802,16 @@ auto_lock()
 	xprintf(CGETS(22, 2, "\nIncorrect passwd for %s\n"), pw->pw_name);
     }
 #endif /* NO_CRYPT */
-    auto_logout();
+    auto_logout(0);
+    USE(n);
 }
 
 
 static void
-auto_logout()
+auto_logout(n)
+    int n;
 {
+    USE(n);
     xprintf("auto-logout\n");
     /* Don't leave the tty in raw mode */
     if (editing)
@@ -800,7 +836,7 @@ int snum;
 	(void) sigset(SIGALRM, alrmcatch);
 #endif /* UNRELSIGS */
 
-    (*alm_fun)();
+    (*alm_fun)(0);
 
     setalarm(1);
 #ifndef SIGVOID
@@ -1854,6 +1890,10 @@ hashbang(fd, vp)
     char *sargv[HACKVECSZ];
     unsigned char *p, *ws;
     int sargc = 0;
+#ifdef WINNT
+    int fw = 0; 	/* found at least one word */
+    int first_word = 0;
+#endif /* WINNT */
 
     if (read(fd, (char *) lbuf, HACKBUFSZ) <= 0)
 	return -1;
@@ -1864,11 +1904,26 @@ hashbang(fd, vp)
 	switch (*p) {
 	case ' ':
 	case '\t':
+#ifdef NEW_CRLF
+	case '\r':
+#endif NEW_CRLF
 	    if (ws) {	/* a blank after a word.. save it */
 		*p = '\0';
+#ifndef WINNT
 		if (sargc < HACKVECSZ - 1)
 		    sargv[sargc++] = ws;
 		ws = NULL;
+#else /* WINNT */
+		if (sargc < HACKVECSZ - 1) {
+		    sargv[sargc] = first_word ? NULL: hb_subst(ws);
+		    if (sargv[sargc] == NULL)
+			sargv[sargc] = ws;
+		    sargc++;
+		}
+		ws = NULL;
+	    	fw = 1;
+		first_word = 1;
+#endif /* WINNT */
 	    }
 	    p++;
 	    continue;
@@ -1877,10 +1932,23 @@ hashbang(fd, vp)
 	    return -1;
 
 	case '\n':	/* The end of the line. */
-	    if (ws) {	/* terminate the last word */
+	    if (
+#ifdef WINNT
+		fw ||
+#endif /* WINNT */
+		ws) {	/* terminate the last word */
 		*p = '\0';
+#ifndef WINNT
 		if (sargc < HACKVECSZ - 1)
 		    sargv[sargc++] = ws;
+#else /* WINNT */
+		if (sargc < HACKVECSZ - 1) { /* deal with the 1-word case */
+		    sargv[sargc] = first_word? NULL : hb_subst(ws);
+		    if (sargv[sargc] == NULL)
+			sargv[sargc] = ws;
+		    sargc++;
+		}
+#endif /* !WINNT */
 		sargv[sargc] = NULL;
 		ws = NULL;
 		*vp = blk2short(sargv);
@@ -1900,15 +1968,6 @@ hashbang(fd, vp)
 #endif /* HASHBANG */
 
 #ifdef REMOTEHOST
-
-#ifdef ISC
-# undef MAXHOSTNAMELEN	/* Busted headers? */
-#endif
-
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <sys/uio.h>	/* For struct iovec */
 
 static sigret_t
 palarm(snum)
@@ -1943,11 +2002,12 @@ getremotehost()
 	else
 	    host = inet_ntoa(saddr.sin_addr);
     }
-#ifdef UTHOST
+#if defined(UTHOST) && !defined(HAVENOUTMP)
     else {
 	char *ptr, *sptr;
 	char *name = utmphost();
-	if (name != NULL && *name != '\0') {
+	/* Avoid empty names and local X displays */
+	if (name != NULL && *name != '\0' && *name != ':') {
 	    /* Look for host:display.screen */
 	    if ((sptr = strchr(name, ':')) != NULL)
 		*sptr = '\0';
@@ -1982,7 +2042,7 @@ void
 remotehost()
 {
     /* Don't get stuck if the resolver does not work! */
-    sigret_t (*osig)() = sigset(SIGALRM, palarm);
+    signalfun_t osig = sigset(SIGALRM, palarm);
 
     jmp_buf_t osetexit;
     getexit(osetexit);

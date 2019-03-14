@@ -1,4 +1,4 @@
-/* $Header: /u/christos/src/tcsh-6.06/RCS/sh.glob.c,v 3.37 1995/01/20 23:58:22 christos Exp $ */
+/* $Header: /u/christos/cvsroot/tcsh/sh.glob.c,v 3.39 1997/10/27 22:44:29 christos Exp $ */
 /*
  * sh.glob.c: Regular expression expansion
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.glob.c,v 3.37 1995/01/20 23:58:22 christos Exp $")
+RCSID("$Id: sh.glob.c,v 3.39 1997/10/27 22:44:29 christos Exp $")
 
 #include "tc.h"
 
@@ -77,6 +77,7 @@ static int pargc = 0;
  *
  */
 static	Char	 *globtilde	__P((Char **, Char *));
+static	Char     *handleone	__P((Char *, Char **, int));
 static	Char	**libglob	__P((Char **));
 static	Char	**globexpand	__P((Char **));
 static	int	  globbrace	__P((Char *, Char *, Char ***));
@@ -629,7 +630,7 @@ ginit()
 void
 rscan(t, f)
     register Char **t;
-    void    (*f) ();
+    void    (*f) __P((int));
 {
     register Char *p;
 
@@ -866,6 +867,10 @@ backeval(cp, literal)
 	    c = (*ip++ & TRIM);
 	    if (c == 0)
 		break;
+#ifdef NEW_CRLF
+	    if (c == '\r')
+	    	c = ' ';
+#endif /* NEW_CRLF */
 	    if (c == '\n') {
 		/*
 		 * Continue around the loop one more time, so that we can eat

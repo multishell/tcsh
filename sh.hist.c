@@ -1,4 +1,4 @@
-/* $Header: /u/christos/cvsroot/tcsh/sh.hist.c,v 3.22 1996/10/19 17:53:24 christos Exp $ */
+/* $Header: /u/christos/cvsroot/tcsh/sh.hist.c,v 3.24 1997/10/27 22:44:30 christos Exp $ */
 /*
  * sh.hist.c: Shell history expansions and substitutions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.hist.c,v 3.22 1996/10/19 17:53:24 christos Exp $")
+RCSID("$Id: sh.hist.c,v 3.24 1997/10/27 22:44:30 christos Exp $")
 
 #include "tc.h"
 
@@ -44,6 +44,7 @@ extern bool histvalid;
 extern Char histline[];
 Char HistLit = 0;
 
+static	bool	heq	__P((struct wordent *, struct wordent *));
 static	void	hfree	__P((struct Hist *));
 static	void	dohist1	__P((struct Hist *, int *, int));
 static	void	phist	__P((struct Hist *, int));
@@ -95,19 +96,19 @@ savehist(sp, mflg)
 
 static bool
 heq(a0, b0)
-struct wordent *a0, *b0;
+    struct wordent *a0, *b0;
 {
-  register struct wordent *a = a0->next, *b = b0->next;
+    struct wordent *a = a0->next, *b = b0->next;
 
-  for (;;)
-    {
-      if (Strcmp(a->word, b->word))
-        return 0;
-      a = a->next; b = b->next;
-      if (a == a0)
-	return (b == b0) ? 1 : 0;
-      if (b == b0)
-        return 0;
+    for (;;) {
+	if (Strcmp(a->word, b->word) != 0)
+	    return 0;
+	a = a->next;
+	b = b->next;
+	if (a == a0)
+	    return (b == b0) ? 1 : 0;
+	if (b == b0)
+	    return 0;
     } 
 }
 
@@ -357,24 +358,25 @@ phist(hp, hflg)
 
 
 void
-fmthist(fmt, ptr, buf)
+fmthist(fmt, ptr, buf, bufsiz)
     int fmt;
     ptr_t ptr;
     char *buf;
+    size_t bufsiz;
 {
     struct Hist *hp = (struct Hist *) ptr;
     switch (fmt) {
     case 'h':
-	(void) xsprintf(buf, "%6d", hp->Hnum);
+	(void) xsnprintf(buf, bufsiz, "%6d", hp->Hnum);
 	break;
     case 'R':
 	if (HistLit && hp->histline)
-	    (void) xsprintf(buf, "%S", hp->histline);
+	    (void) xsnprintf(buf, bufsiz, "%S", hp->histline);
 	else {
 	    Char ibuf[INBUFSIZE], *ip;
 	    char *p;
 	    (void) sprlex(ibuf, sizeof(ibuf), &hp->Hlex);
-	    for (p = buf, ip = ibuf; (*p++ = *ip++) != '\0'; )
+	    for (p = buf, ip = ibuf; (*p++ = (CHAR & *ip++)) != '\0'; )
 		continue;
 	}
 	break;

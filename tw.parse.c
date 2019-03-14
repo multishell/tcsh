@@ -1,4 +1,4 @@
-/* $Header: /u/christos/cvsroot/tcsh/tw.parse.c,v 3.77 1997/02/23 19:03:29 christos Exp $ */
+/* $Header: /u/christos/cvsroot/tcsh/tw.parse.c,v 3.79 1997/10/02 16:36:35 christos Exp $ */
 /*
  * tw.parse.c: Everyone has taken a shot in this futile effort to
  *	       lexically analyze a csh line... Well we cannot good
@@ -39,7 +39,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tw.parse.c,v 3.77 1997/02/23 19:03:29 christos Exp $")
+RCSID("$Id: tw.parse.c,v 3.79 1997/10/02 16:36:35 christos Exp $")
 
 #include "tw.h"
 #include "ed.h"
@@ -112,6 +112,9 @@ static	Char	 filetype		__P((Char *, Char *));
 static	int	 t_glob			__P((Char ***, int));
 static	int	 c_glob			__P((Char ***));
 static	int	 is_prefix		__P((Char *, Char *));
+#ifdef WINNT
+static	int	 is_igncase_prefixmatch	__P((Char *, Char *, int));
+#endif /* WINNT */
 static	int	 is_prefixmatch		__P((Char *, Char *));
 static	int	 is_suffix		__P((Char *, Char *));
 static	int	 recognize		__P((Char *, Char *, int, int, int));
@@ -620,6 +623,46 @@ is_prefix(check, template)
     return (TRUE);
 } /* end is_prefix */
 
+#ifdef WINNT
+/* is_igncase_prefixmatch():
+ *	return true if check matches initial chars in template
+ */
+static int
+is_igncase_prefixmatch(check, template, igncase)
+    register Char *check, *template;
+    int igncase;
+{
+    Char MCH1, MCH2;
+
+    for (; *check; check++, template++) {
+	if ((*check & TRIM) != (*template & TRIM)) {
+	    MCH1 = (*check & TRIM);
+	    MCH2 = (*template & TRIM);
+	    MCH1 = Isupper(MCH1) ? Tolower(MCH1) : MCH1;
+	    MCH2 = Isupper(MCH2) ? Tolower(MCH2) : MCH2;
+	    if ( MCH1 != MCH2) {
+		if ((!igncase) && ((*check & TRIM) == '-' || 
+				   (*check & TRIM) == '.' || 
+				   (*check & TRIM) == '_')) {
+		    MCH1 = MCH2 = (*check & TRIM);
+		    if (MCH1 == '_')
+			MCH2 = '-';
+		    else if (MCH1 == '-')
+			MCH2 = '_';
+		    for (; *template && (*template & TRIM) != MCH1 &&
+				        (*template & TRIM) != MCH2; template++)
+			continue;
+		    if (!*template)
+			return FALSE;
+		} else
+		    return FALSE;
+	    }
+	}
+    }
+    return TRUE;
+}
+#endif /* WINNT */
+
 /* is_prefixmatch():
  *	return true if check matches initial chars in template
  *	This differs from PWB imatch in that if check is null
@@ -679,9 +722,7 @@ is_suffix(check, template)
     for (;;) {
 	if (t == template)
 	    return 1;
-	--t;
-	--c;
-	if (c == check || (*t & TRIM) != (*c & TRIM))
+	if (c == check || (*--t & TRIM) != (*--c & TRIM))
 	    return 0;
     }
 } /* end is_suffix */
@@ -796,12 +837,22 @@ recognize(exp_name, item, name_length, numitems, enhanced)
     Char MCH1, MCH2;
     register Char *x, *ent;
     register int len = 0;
+#ifdef WINNT
+    struct varent *vp;
+    int igncase;
+    igncase = (vp = adrof(STRcomplete)) != NULL &&
+	Strcmp(*(vp->vec), STRigncase) == 0;
+#endif /* WINNT */
 
     if (numitems == 1) {	/* 1st match */
 	copyn(exp_name, item, MAXNAMLEN);
 	return (0);
     }
-    if (!enhanced) {
+    if (!enhanced
+#ifdef WINNT
+	&& !igncase
+#endif /* WINNT */
+    ) {
 	for (x = exp_name, ent = item; *x && (*x & TRIM) == (*ent & TRIM); x++, ent++)
 	    len++;
     } else {
@@ -858,6 +909,9 @@ tw_collect_items(command, looking, exp_dir, exp_name, target, pat, flags)
     struct varent *vp;
     int len, enhanced;
     int cnt = 0;
+#ifdef WINNT
+    int igncase;
+#endif /* WINNT */
 
 
     flags = 0;
@@ -953,8 +1007,16 @@ tw_collect_items(command, looking, exp_dir, exp_name, target, pat, flags)
 	case RECOGNIZE_ALL:
 	case RECOGNIZE_SCROLL:
 
+#ifdef WINNT
+ 	    igncase = (vp = adrof(STRcomplete)) != NULL && 
+		Strcmp(*(vp->vec), STRigncase) == 0;
+#endif /* WINNT */
 	    enhanced = (vp = adrof(STRcomplete)) != NULL && !Strcmp(*(vp->vec),STRenhance);
-	    if (enhanced) {
+	    if (enhanced
+#ifdef WINNT
+		|| igncase
+#endif /* WINNT */
+	    ) {
 	        if (!is_prefixmatch(target, item)) 
 		    break;
      	    } else {
@@ -972,7 +1034,7 @@ tw_collect_items(command, looking, exp_dir, exp_name, target, pat, flags)
 		break;
 
 	    if (gpat && !Gmatch(item, pat))
-		if (!text_check && !dir_check && !isadirectory(exp_dir, item))
+		if (!dir_check && !isadirectory(exp_dir, item))
 		    break;
 
 	    /*
@@ -1671,6 +1733,10 @@ extract_dir_and_name(path, dir, name)
     register Char *p;
 
     p = Strrchr(path, '/');
+#ifdef WINNT
+    if (p == NULL) {
+	    p = Strrchr(path, ':');
+#endif /* WINNT */
     if (p == NULL) {
 	copyn(name, path, MAXNAMLEN);
 	dir[0] = '\0';
@@ -1692,7 +1758,7 @@ dollar(new, old)
     Char   *new, *old;
 {
     Char    *p;
-    int     space;
+    size_t   space;
 
     for (space = FILSIZ, p = new; *old && space > 0;)
 	if (*old != '$') {
@@ -1703,7 +1769,7 @@ dollar(new, old)
 	    if (expdollar(&p, &old, &space, QUOTE) == NULL)
 		return NULL;
 	}
-    *new = '\0';
+    *p = '\0';
     return (new);
 } /* end dollar */
 
@@ -1998,7 +2064,7 @@ print_by_column(dir, items, count, no_file_suffix)
 
     maxwidth += no_file_suffix ? 1 : 2;	/* for the file tag and space */
     columns = TermH / maxwidth;		/* PWP: terminal size change */
-    if (!columns)
+    if (!columns || !isatty(didfds ? 1 : SHOUT))
 	columns = 1;
     rows = (count + (columns - 1)) / columns;
 

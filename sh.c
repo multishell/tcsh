@@ -1,4 +1,4 @@
-/* $Header: /u/christos/cvsroot/tcsh/sh.c,v 3.72 1996/06/22 21:44:25 christos Exp $ */
+/* $Header: /u/christos/cvsroot/tcsh/sh.c,v 3.75 1997/10/27 22:44:24 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -43,7 +43,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$Id: sh.c,v 3.72 1996/06/22 21:44:25 christos Exp $")
+RCSID("$Id: sh.c,v 3.75 1997/10/27 22:44:24 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -82,15 +82,18 @@ extern bool NoNLSRebind;
  * ported to Apple Unix (TM) (OREO)  26 -- 29 Jun 1987
  */
 
-jmp_buf_t reslab;
+jmp_buf_t reslab IZERO_STRUCT;
 
 static const char tcshstr[] = "tcsh";
+#ifdef WINNT
+static const char tcshstr_nt[] = "tcsh.exe";
+#endif /* WINNT */
 
-sigret_t (*parintr) () = 0;	/* Parents interrupt catch */
-sigret_t (*parterm) () = 0;	/* Parents terminate catch */
+signalfun_t parintr = 0;	/* Parents interrupt catch */
+signalfun_t parterm = 0;	/* Parents terminate catch */
 
 #ifdef TESLA
-int do_logout;
+int do_logout = 0;
 #endif /* TESLA */
 
 
@@ -163,7 +166,9 @@ static	Char	 	**defaultpath	__P((void));
 static	void		  record	__P((void));
 static	void		  st_save	__P((struct saved_state *, int, int,
 					     Char **, Char **));
-static void		  st_restore	__P((struct saved_state *, Char **));
+static	void		  st_restore	__P((struct saved_state *, Char **));
+
+	int		  main		__P((int, char **));
 
 int
 main(argc, argv)
@@ -182,6 +187,9 @@ main(argc, argv)
     sigvec_t osv;
 #endif /* BSDSIGS */
 
+#ifdef WINNT
+    nt_init();
+#endif /* WINNT */
 #if defined(NLS_CATALOGS) && defined(LC_MESSAGES)
     (void) setlocale(LC_MESSAGES, "");
 #endif /* NLS_CATALOGS && LC_MESSAGES */
@@ -237,6 +245,13 @@ main(argc, argv)
 	char *t;
 
 	t = strrchr(argv[0], '/');
+#ifdef WINNT
+	{
+	    char *s = strrchr(argv[0], '\\');
+	    if (s)
+		t = s;
+	}
+#endif /* WINNT */
 	t = t ? ++t : argv[0];
 	if (*t == '-') t++;
 	progname = strsave((t && *t) ? t : tcshstr);    /* never want a null */
@@ -464,8 +479,8 @@ main(argc, argv)
 	    }
 	    else
 		cp2 = cp;
-	    if (!((Strncmp(cp2, STRtty, 3) == 0) && Isalpha(cp2[3])) ||
-		!((Strncmp(cp, STRpts, 3) == 0) && cp[3] == '/')) {
+	    if (!(((Strncmp(cp2, STRtty, 3) == 0) && Isalpha(cp2[3])) ||
+		  ((Strncmp(cp, STRpts, 3) == 0) && cp[3] == '/'))) {
 		if (getenv("DISPLAY") == NULL) {
 		    /* NOT on X window shells */
 		    set(STRautologout, Strsave(STRdefautologout), 
@@ -681,7 +696,16 @@ main(argc, argv)
     }
 
     doldol = putn((int) getpid());	/* For $$ */
+#ifdef WINNT
+    {
+	char *strtmp1, strtmp2[MAXPATHLEN];
+	if ((strtmp1 = getenv("TMP")) != NULL)
+	    wsprintf(strtmp2, "%s/%s", strtmp1, "sh");
+	shtemp = Strspl(SAVE(strtmp2), doldol);	/* For << */
+    }
+#else /* !WINNT */
     shtemp = Strspl(STRtmpsh, doldol);	/* For << */
+#endif /* WINNT */
 
     /*
      * Record the interrupt states from the parent process. If the parent is
@@ -697,9 +721,9 @@ main(argc, argv)
     setzero((char*) &osv, sizeof(osv));
     /* parents interruptibility */
     (void) mysigvec(SIGINT, NULL, &osv);
-    parintr = (sigret_t(*) ()) osv.sv_handler;
+    parintr = (signalfun_t) osv.sv_handler;
     (void) mysigvec(SIGTERM, NULL, &osv);
-    parterm = (sigret_t(*) ()) osv.sv_handler;
+    parterm = (signalfun_t) osv.sv_handler;
 #else				/* BSDSIGS */
     parintr = signal(SIGINT, SIG_IGN);	/* parents interruptibility */
     (void) sigset(SIGINT, parintr);	/* ... restore */
@@ -991,7 +1015,7 @@ main(argc, argv)
     shpgrp = mygetpgrp();
     opgrp = tpgrp = -1;
     if (setintr) {
-	sigret_t (*osig)();
+	signalfun_t osig;
 	**argv = '-';
 	if (!quitit)		/* Wary! */
 	    (void) signal(SIGQUIT, SIG_IGN);
@@ -1059,7 +1083,7 @@ main(argc, argv)
     retry:
 	    if ((tpgrp = tcgetpgrp(f)) != -1) {
 		if (tpgrp != shpgrp) {
-		    sigret_t(*old) () = signal(SIGTTIN, SIG_DFL);
+		    signalfun_t old = signal(SIGTTIN, SIG_DFL);
 		    (void) kill(0, SIGTTIN);
 		    (void) signal(SIGTTIN, old);
 		    goto retry;
@@ -1180,7 +1204,7 @@ main(argc, argv)
 	/* Will have varval(STRhome) here because set fast if don't */
 	{
 	    int     osetintr = setintr;
-	    sigret_t (*oparintr)() = parintr;
+	    signalfun_t oparintr = parintr;
 
 #ifdef BSDSIGS
 	    sigmask_t omask = sigblock(sigmask(SIGINT));
@@ -1326,6 +1350,10 @@ importpath(cp)
 		else
 		    break;
 	    }
+#ifdef WINNT
+	    else if (*dp == '\\')
+		*dp = '/';
+#endif /* WINNT */
 	    dp++;
 	}
     pv[i] = 0;
@@ -1342,9 +1370,20 @@ srccat(cp, dp)
     if (cp[0] == '/' && cp[1] == '\0') 
 	return srcfile(short2str(dp), (mflag ? 0 : 1), 0, NULL);
     else {
-	register Char *ep = Strspl(cp, dp);
-	char   *ptr = short2str(ep);
+	register Char *ep;
+	char   *ptr;
 	int rv;
+
+#ifdef WINNT
+	ep = cp;
+	while(*ep)
+	    ep++;
+	if (ep[-1] == '/' && dp[0] == '/') /* silly win95 */
+	    dp++;
+#endif /* WINNT */
+
+	ep = Strspl(cp, dp);
+	ptr = short2str(ep);
 
 	rv = srcfile(ptr, (mflag ? 0 : 1), 0, NULL);
 	xfree((ptr_t) ep);
@@ -1599,7 +1638,8 @@ goodbye(v, c)
 	(void) sigset(SIGHUP, SIG_IGN);
 	setintr = 0;		/* No interrupts after "logout" */
 	/* Trap errors inside .logout */
-	if ((reenter = setexit()) != 0)
+	reenter = setexit();
+	if (reenter != 0)
 	    exitstat();
 	if (!(adrof(STRlogout)))
 	    set(STRlogout, Strsave(STRnormal), VAR_READWRITE);
@@ -1784,9 +1824,9 @@ pintr1(wantnl)
     (void) sigrelse(SIGCHLD);
 #endif
     draino();
-#ifndef _VMS_POSIX
+#if !defined(_VMS_POSIX) && !defined(WINNT)
     (void) endpwent();
-#endif /*atp vmsposix */
+#endif /* !_VMS_POSIX && !WINNT */
 
     /*
      * If we have an active "onintr" then we search for the label. Note that if
@@ -1924,7 +1964,7 @@ process(catch)
 #ifndef HAVENOUTMP
 	    watch_login(0);
 #endif /* !HAVENOUTMP */
-	    sched_run();
+	    sched_run(0);
 	    period_cmd();
 	    precmd();
 	    /*
@@ -2113,6 +2153,7 @@ mailchk()
 	return;
     for (; *vp; vp++) {
 	char *filename = short2str(*vp);
+	char *mboxdir = filename;
 
 	if (stat(filename, &stb) < 0)
 	    continue;
@@ -2121,16 +2162,35 @@ mailchk()
 #else
 	new = stb.st_mtime > time0;
 #endif
-	if ((stb.st_mode & S_IFMT) == S_IFDIR) {
+	if (S_ISDIR(stb.st_mode)) {
 	    DIR *mailbox;
 	    int mailcount = 0;
+	    char tempfilename[MAXPATHLEN];
+	    struct stat stc;
+
+	    xsnprintf(tempfilename, MAXPATHLEN, "%s/new", filename);
+
+	    if (stat(tempfilename, &stc) != -1 && S_ISDIR(stc.st_mode)) {
+		/*
+		 * "filename/new" exists and is a directory; you are
+		 * using Qmail.
+		 */
+		stb = stc;
+#if defined(BSDTIMES) || defined(_SEQUENT_)
+		new = stb.st_mtime > time0.tv_sec;
+#else
+		new = stb.st_mtime > time0;
+#endif
+		mboxdir = tempfilename;
+	    }
 
 	    if (stb.st_mtime <= chktim + 1 || (loginsh && !new))
 		continue;
 
-	    if (!(mailbox = opendir(filename)))
+	    if ((mailbox = opendir(mboxdir)) == NULL)
 		continue;
 
+	    /* skip . and .. */
 	    if (!readdir(mailbox) || !readdir(mailbox))
 		continue;
 
@@ -2140,14 +2200,12 @@ mailchk()
 	    if (mailcount == 0)
 		continue;
 
-	    if (cnt == 1) {
+	    if (cnt == 1)
 		xprintf(CGETS(11, 3, "You have %d mail messages.\n"),
 			mailcount);
-	    }
-	    else {
+	    else
 		xprintf(CGETS(11, 4, "You have %d mail messages in %s.\n"),
 			mailcount, filename);
-	    }
 	}
 	else {
 	    if (stb.st_size == 0 || stb.st_atime > stb.st_mtime ||
@@ -2275,6 +2333,9 @@ xexit(i)
     if (child == 0)
 	(void) catclose(catd);
 #endif /* NLS_CATALOGS */
+#ifdef WINNT
+    nt_cleanup();
+#endif /* WINNT */
     _exit(i);
 }
 

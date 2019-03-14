@@ -1,4 +1,4 @@
-/* $Header: /u/christos/cvsroot/tcsh/tc.os.h,v 3.66 1996/10/05 17:39:17 christos Exp $ */
+/* $Header: /u/christos/cvsroot/tcsh/tc.os.h,v 3.69 1997/10/27 22:44:36 christos Exp $ */
 /*
  * tc.os.h: Shell os dependent defines
  */
@@ -60,8 +60,11 @@
 # include <limits.h>
 #endif /* atp vmsposix */
 
-#ifdef DECOSF1
+#if defined(DECOSF1) || defined(HPUXVERSION)
 # include <sys/signal.h>
+#endif /* DECOSF1 || HPUXVERSION */
+
+#ifdef DECOSF1
 # include <sys/ioctl.h>
 #endif /* DECOSF1 */
 
@@ -147,7 +150,7 @@ struct ucred {
 # include <signal.h>
 # if !defined(hp9000s500) && !(defined(SIGRTMAX) || defined(SIGRTMIN))
 /*
- * hpux < 7 || hpux >= 10
+ * hpux < 7
  */
 #  include <sys/bsdtty.h>
 # endif /* !hp9000s500 && !(SIGRTMAX || SIGRTMIN) */
@@ -228,15 +231,19 @@ struct ucred {
  *
  * From: scott@craycos.com (Scott Bolte)
  */
-#ifdef F_SETFD
-# define close_on_exec(fd, v) fcntl((fd), F_SETFD, v)
-#else /* !F_SETFD */
-# ifdef FIOCLEX
-# define close_on_exec(fd, v) ioctl((fd), ((v) ? FIOCLEX : FIONCLEX), NULL)
-# else /* !FIOCLEX */
-# define close_on_exec(fd, v)	/* Nothing */
-# endif /* FIOCLEX */
-#endif /* F_SETFD */
+#ifndef WINNT
+# ifdef F_SETFD
+#  define close_on_exec(fd, v) fcntl((fd), F_SETFD, v)
+# else /* !F_SETFD */
+#  ifdef FIOCLEX
+#   define close_on_exec(fd, v) ioctl((fd), ((v) ? FIOCLEX : FIONCLEX), NULL)
+#  else /* !FIOCLEX */
+#   define close_on_exec(fd, v)	/* Nothing */
+#  endif /* FIOCLEX */
+# endif /* F_SETFD */
+#else /* WINNT */
+# define close_on_exec(fd, v) nt_close_on_exec((fd),(v))
+#endif /* !WINNT */
 
 /*
  * Stat
@@ -522,7 +529,7 @@ typedef struct timeval timeval_t;
 #endif /* NeXT */
 
 #ifndef NEEDgethostname
-extern int gethostname();
+extern int gethostname __P((char *, int));
 #endif /* NEEDgethostname */
 
 #if !defined(POSIX) || defined(SUNOS4) || defined(UTekV) || defined(sysV88)
@@ -545,17 +552,19 @@ extern caddr_t sbrk __P((int));
 extern int qsort();
 #  endif /* SYSVREL == 0 && !__lucid */
 # else /* !SUNOS4 */
-#  ifndef hpux
-#   if __GNUC__ != 2
+#  ifndef WINNT
+#   ifndef hpux
+#    if __GNUC__ != 2
 extern int abort();
-#   endif /* __GNUC__ != 2 */
-#   ifndef fps500
+#    endif /* __GNUC__ != 2 */
+#    ifndef fps500
 extern int qsort();
-#   endif /* !fps500 */
-#  else /* !hpux */
+#    endif /* !fps500 */
+#   else /* !hpux */
 extern void abort();
 extern void qsort();
-#  endif /* hpux */
+#   endif /* hpux */
+#  endif /* !WINNT */
 # endif	/* SUNOS4 */
 #ifndef _CX_UX
 extern void perror();
@@ -704,18 +713,19 @@ extern void bcopy	__P((const void *, void *, size_t));
 
 #if SYSVREL == 4
 # ifdef REMOTEHOST
-extern int getpeername();
+struct sockaddr;
+extern int getpeername __P((int, struct sockaddr *, int *));
 # endif /* REMOTEHOST */
 # ifndef BSDTIMES
-extern int getrlimit();
-extern int setrlimit();
+extern int getrlimit __P((int, struct rlimit *));
+extern int setrlimit __P((int, const struct rlimit *));
 # endif /* !BSDTIMES */
 # if !defined(IRIS4D) && !defined(SOLARIS2)
 extern int wait3();	/* I think some bizarre systems still need this */
 # endif /* !IRIS4D && !SOLARIS2 */
 # if defined(SOLARIS2)
 #  undef NEEDstrerror
-extern char *strerror();
+extern char *strerror __P((int));
 # endif /* SOLARIS2 */
 #endif /* SYSVREL == 4 */
 

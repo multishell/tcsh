@@ -1,4 +1,4 @@
-/* $Header: /u/christos/cvsroot/tcsh/ed.refresh.c,v 3.17 1996/04/26 19:18:09 christos Exp $ */
+/* $Header: /u/christos/cvsroot/tcsh/ed.refresh.c,v 3.20 1997/10/27 22:44:22 christos Exp $ */
 /*
  * ed.refresh.c: Lower level screen refreshing functions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.refresh.c,v 3.17 1996/04/26 19:18:09 christos Exp $")
+RCSID("$Id: ed.refresh.c,v 3.20 1997/10/27 22:44:22 christos Exp $")
 
 #include "ed.h"
 /* #define DEBUG_UPDATE */
@@ -51,6 +51,7 @@ static int rprompt_h, rprompt_v;
 
 static	void	Draw 			__P((int));
 static	void	Vdraw 			__P((int));
+static	void	RefreshPromptpart	__P((Char *));
 static	void	update_line 		__P((Char *, Char *, int));
 static	void	str_insert		__P((Char *, int, int, Char *, int));
 static	void	str_delete		__P((Char *, int, int, int));
@@ -147,13 +148,34 @@ Draw(c)				/* draw c, expand tabs, ctl chars */
 	}
     }
     else if (Iscntrl(ch)) {
+#ifndef _OSD_POSIX
 	Vdraw('^');
-	if (ch == '\177') {
+	if (ch == CTL_ESC('\177')) {
 	    Vdraw('?');
 	}
 	else {
 	    /* uncontrolify it; works only for iso8859-1 like sets */
 	    Vdraw((c | 0100));
+#else /*_OSD_POSIX*/
+	if (ch == CTL_ESC('\177')) {
+	    Vdraw('^');
+	    Vdraw('?');
+	}
+	else {
+	    if (Isupper(_toebcdic[_toascii[c]|0100])
+		|| strchr("@[\\]^_", _toebcdic[_toascii[c]|0100]) != NULL)
+	    {
+		Vdraw('^');
+		Vdraw(_toebcdic[_toascii[c]|0100]);
+	    }
+	    else
+	    {
+		Vdraw('\\');
+		Vdraw(((c >> 6) & 7) + '0');
+		Vdraw(((c >> 3) & 7) + '0');
+		Vdraw((c & 7) + '0');
+	    }
+#endif /*_OSD_POSIX*/
 	}
     }
 #ifdef KANJI
@@ -316,6 +338,9 @@ Refresh()
     for (cur_line = 0; cur_line <= new_vcv; cur_line++) {
 	/* NOTE THAT update_line MAY CHANGE Display[cur_line] */
 	update_line(Display[cur_line], Vdisplay[cur_line], cur_line);
+#ifdef WINNT
+	flush();
+#endif /* WINNT */
 
 	/*
 	 * Copy the new line to be the current one, and pad out with spaces
@@ -344,6 +369,9 @@ Refresh()
     dprintf("\r\nCursorH = %d, CursorV = %d, cur_h = %d, cur_v = %d\r\n",
 	    CursorH, CursorV, cur_h, cur_v);
 #endif /* DEBUG_REFRESH */
+#ifdef WINNT
+    flush();
+#endif /* WINNT */
     MoveToLine(cur_v);		/* go to where the cursor is */
     MoveToChar(cur_h);
     SetAttributes(0);		/* Clear all attributes */
@@ -1156,9 +1184,26 @@ RefPlusOne()
     }				/* else (only do at end of line, no TAB) */
 
     if (Iscntrl(c)) {		/* if control char, do caret */
+#ifndef _OSD_POSIX
 	mc = (c == '\177') ? '?' : (c | 0100);
 	PutPlusOne('^');
 	PutPlusOne(mc);
+#else /*_OSD_POSIX*/
+	if (_toascii[c] == '\177' || Isupper(_toebcdic[_toascii[c]|0100])
+		|| strchr("@[\\]^_", _toebcdic[_toascii[c]|0100]) != NULL)
+	{
+	    mc = (_toascii[c] == '\177') ? '?' : _toebcdic[_toascii[c]|0100];
+	    PutPlusOne('^');
+	    PutPlusOne(mc);
+	}
+	else
+	{
+	    PutPlusOne('\\');
+	    PutPlusOne(((c >> 6) & 7) + '0');
+	    PutPlusOne(((c >> 3) & 7) + '0');
+	    PutPlusOne((c & 7) + '0');
+	}
+#endif /*_OSD_POSIX*/
     }
     else if (Isprint(c)) {	/* normal char */
 	PutPlusOne(c);
