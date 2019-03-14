@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.sem.c,v 3.61 2004/05/19 18:51:02 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.sem.c,v 3.63 2004/09/28 15:38:37 christos Exp $ */
 /*
  * sh.sem.c: I/O redirections and job forking. A touchy issue!
  *	     Most stuff with builtins is incorrect
@@ -33,7 +33,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.sem.c,v 3.61 2004/05/19 18:51:02 christos Exp $")
+RCSID("$Id: sh.sem.c,v 3.63 2004/09/28 15:38:37 christos Exp $")
 
 #include "tc.h"
 #include "tw.h"
@@ -666,15 +666,19 @@ execute(t, wanttty, pipein, pipeout, do_glob)
 	/*
 	 * For () commands must put new 0,1,2 in FSH* and recurse
 	 */
-	OLDSTD = dcopy(0, FOLDSTD);
-	SHOUT = dcopy(1, FSHOUT);
+	(void)close_on_exec(OLDSTD = dcopy(0, FOLDSTD), 1);
+	(void)close_on_exec(SHOUT = dcopy(1, FSHOUT), 1);
 	isoutatty = isatty(SHOUT);
-	SHDIAG = dcopy(2, FSHDIAG);
+	(void)close_on_exec(SHDIAG = dcopy(2, FSHDIAG), 1);
 	isdiagatty = isatty(SHDIAG);
 	(void) close(SHIN);
 	SHIN = -1;
 #ifndef CLOSE_ON_EXEC
 	didcch = 0;
+#else
+	(void) close_on_exec(FSHOUT, 1);
+	(void) close_on_exec(FSHDIAG, 1);
+	(void) close_on_exec(FOLDSTD, 1);
 #endif /* !CLOSE_ON_EXEC */
 	didfds = 0;
 	wanttty = -1;
@@ -968,8 +972,8 @@ mypipe(pv)
 
     if (pipe(pv) < 0)
 	goto oops;
-    pv[0] = dmove(pv[0], -1);
-    pv[1] = dmove(pv[1], -1);
+    (void)close_on_exec(pv[0] = dmove(pv[0], -1), 1);
+    (void)close_on_exec(pv[1] = dmove(pv[1], -1), 1);
     if (pv[0] >= 0 && pv[1] >= 0)
 	return;
 oops:

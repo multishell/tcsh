@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tc.prompt.c,v 3.47 2002/07/25 17:14:59 christos Exp $ */
+/* $Header: /src/pub/tcsh/tc.prompt.c,v 3.50 2004/11/20 18:23:03 christos Exp $ */
 /*
  * tc.prompt.c: Prompt printing stuff
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.prompt.c,v 3.47 2002/07/25 17:14:59 christos Exp $")
+RCSID("$Id: tc.prompt.c,v 3.50 2004/11/20 18:23:03 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -145,6 +145,10 @@ printprompt(promptno, str)
 
     PromptBuf[0] = '\0';
     tprintf(FMT_PROMPT, PromptBuf, cp, 2 * INBUFSIZE - 2, str, lclock, NULL);
+#ifdef DSPMBYTE
+    if (dspmbyte_utf8)
+	Setutf8lit(PromptBuf, NULL);
+#endif
 
     if (!editing) {
 	for (cp = PromptBuf; *cp ; )
@@ -157,6 +161,10 @@ printprompt(promptno, str)
     if (promptno == 0) {	/* determine rprompt if using main prompt */
 	cp = varval(STRrprompt);
 	tprintf(FMT_PROMPT, RPromptBuf, cp, INBUFSIZE - 2, NULL, lclock, NULL);
+#ifdef DSPMBYTE
+	if (dspmbyte_utf8)
+	    Setutf8lit(RPromptBuf, NULL);
+#endif
 
 				/* if not editing, put rprompt after prompt */
 	if (!editing && RPromptBuf[0] != '\0') {
@@ -378,6 +386,7 @@ tprintf(what, buf, fmt, siz, str, tim, info)
 		if (Scp == '.' || Scp == 'C') {
 		    int skip;
 #ifdef WINNT_NATIVE
+		    Char *oldz = z;
 		    if (z[1] == ':') {
 		    	*p++ = attributes | *z++;
 		    	*p++ = attributes | *z++;
@@ -394,6 +403,18 @@ tprintf(what, buf, fmt, siz, str, tim, info)
 		    while (*z)				/* calc # of /'s */
 			if (*z++ == '/')
 			    updirs++;
+
+#ifdef WINNT_NATIVE
+		    /*
+		     * for format type c, prompt will be following...
+		     * c:/path                => c:/path
+		     * c:/path/to             => c:to
+		     * //machine/share        => //machine/share
+		     * //machine/share/folder => //machine:folder
+		     */
+		    if (oldz[0] == '/' && oldz[1] == '/' && updirs > 1)
+			*p++ = attributes | ':';
+#endif /* WINNT_NATIVE */
 		    if ((Scp == 'C' && *q != '/'))
 			updirs++;
 

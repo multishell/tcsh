@@ -72,7 +72,7 @@
 .\"   used here if you can. In particular, please don't use nroff commands
 .\"   which aren't already used herein.
 .\" 
-.TH TCSH 1 "4 August 2004" "Astron 6.13.02"
+.TH TCSH 1 "20 November 2004" "Astron 6.13.03"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
@@ -1308,6 +1308,10 @@ quotes (`"') retain blanks and tabs; only newlines force new words.  The single
 final newline does not force a new word in any case.  It is thus possible for a
 command substitution to yield only part of a word, even if the command outputs
 a complete line.
+.PP
+By default, the shell since version 6.12 replaces all newline and carriage 
+return characters in the command by spaces.  If this is switched off by
+unsetting \fBcsubstnonl\fR, newlines separate commands as usual.
 .SS "Filename substitution"
 If a word contains any of the characters `*', `?', `[' or `{' or begins with
 the character `~' it is a candidate for filename substitution, also known as
@@ -3497,7 +3501,7 @@ desired interpreter (e.g., `/bin/csh' or `/usr/local/bin/tcsh').
 .SS "Special shell variables"
 The variables described in this section have special meaning to the shell.
 .PP
-The shell sets \fBaddsuffix\fR, \fBargv\fR, \fBautologout\fR, \fBcommand\fR, \fBecho_style\fR,
+The shell sets \fBaddsuffix\fR, \fBargv\fR, \fBautologout\fR, \fBcsubstnonl\fR, \fBcommand\fR, \fBecho_style\fR,
 \fBedit\fR, \fBgid\fR, \fBgroup\fR, \fBhome\fR, \fBloginsh\fR, \fBoid\fR, \fBpath\fR,
 \fBprompt\fR, \fBprompt2\fR, \fBprompt3\fR, \fBshell\fR, \fBshlvl\fR,
 \fBtcsh\fR, \fBterm\fR, \fBtty\fR, \fBuid\fR, \fBuser\fR and \fBversion\fR at
@@ -3607,6 +3611,10 @@ If set to `cmd', commands are automatically spelling-corrected.
 If set to `complete', commands are automatically completed.
 If set to `all', the entire command line is corrected.
 .TP 8
+.B csubstnonl \fR(+)
+If set, newlines and carriage returns in command substitution are
+replaced by spaces.  Set by default.
+.TP 8
 .B cwd
 The full pathname of the current directory.
 See also the \fBdirstack\fR and \fBowd\fR shell variables.
@@ -3668,7 +3676,7 @@ is set to number 0,1,2 and 3.  Each number has the following meaning:
 .br
 If set to `001322', the first character (means 0x00 of the ASCII code) and
 second character (means 0x01 of ASCII code) are set to `0'.  Then, it is not
-used for multi-byte characters.  The 3rd character (0x02) is set to '2',
+used for multi-byte characters.  The 3rd character (0x02) is set to '1',
 indicating that it is used for the first byte of a multi-byte character.
 The 4th character(0x03) is set '3'.  It is used for both the first byte and
 the second byte of a multi-byte character.  The 5th and 6th characters
@@ -4973,6 +4981,9 @@ the expression is false and the command is not executed.
 and does not handle control characters in filenames well.  It cannot be
 interrupted.
 .PP
+Command substitution supports multiple commands and conditions, but not
+cycles or backward \fIgoto\fRs.
+.PP
 Report bugs to tcsh-bugs@mx.gw.com, preferably with fixes.  If you want to
 help maintain and test tcsh, send mail to listserv@mx.gw.com with the text
 `subscribe tcsh <your name>' on a line by itself in the body.  You can
@@ -5025,7 +5036,7 @@ pipe(2), setrlimit(2), sigvec(2), stat(2), umask(2), vfork(2), wait(2),
 malloc(3), setlocale(3), tty(4), a.out(5), termcap(5), environ(7),
 termio(7), Introduction to the C Shell
 .SH VERSION
-This manual documents tcsh 6.13.02 (Astron) 2004-08-04.
+This manual documents tcsh 6.13.03 (Astron) 2004-11-20.
 .SH AUTHORS
 .PD 0
 .TP 2

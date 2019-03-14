@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.c,v 3.114 2004/08/04 14:28:23 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.c,v 3.116 2004/11/20 17:40:36 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -39,7 +39,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$Id: sh.c,v 3.114 2004/08/04 14:28:23 christos Exp $")
+RCSID("$Id: sh.c,v 3.116 2004/11/20 17:40:36 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -674,6 +674,11 @@ main(argc, argv)
      */
     set(STRaddsuffix, Strsave(STRNULL), VAR_READWRITE);
 
+    /*
+     * Compatibility with tcsh >= 6.12 by default
+     */
+    set(STRcsubstnonl, Strsave(STRNULL), VAR_READWRITE);
+    
     /*
      * Random default kill ring size
      */
@@ -1515,12 +1520,21 @@ st_save(st, unit, hflg, al, av)
     st->OLDSTD = st->SHOUT = st->SHDIAG = -1;/* test later to restore these */
     if (didfds) {
 	    struct stat s1, s2;
-	    if (NEED_SAVE_FD(0,OLDSTD))
-		    st->OLDSTD = OLDSTD, OLDSTD = dmove(0, -1);
-	    if (NEED_SAVE_FD(1,SHOUT))
-		    st->SHOUT = SHOUT, SHOUT = dmove(1, -1);
-	    if (NEED_SAVE_FD(2,SHDIAG))
-		    st->SHDIAG = SHDIAG, SHDIAG = dmove(2, -1);
+	    if (NEED_SAVE_FD(0,OLDSTD)) {
+		    st->OLDSTD = OLDSTD;
+		    OLDSTD = dmove(0, -1);
+		    (void)close_on_exec(OLDSTD, 1);
+	    }
+	    if (NEED_SAVE_FD(1,SHOUT)) {
+		    st->SHOUT = SHOUT;
+		    SHOUT = dmove(1, -1);
+		    (void)close_on_exec(SHOUT, 1);
+	    }
+	    if (NEED_SAVE_FD(2,SHDIAG)) {
+		    st->SHDIAG = SHDIAG;
+		    SHDIAG = dmove(2, -1);
+		    (void)close_on_exec(SHDIAG, 1);
+	    }
 	    donefds();
     }
 

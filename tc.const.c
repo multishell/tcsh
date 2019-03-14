@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tc.const.c,v 3.75 2004/07/24 21:59:27 christos Exp $ */
+/* $Header: /src/pub/tcsh/tc.const.c,v 3.78 2004/11/20 17:30:15 christos Exp $ */
 /*
  * sh.const.c: String constants for tcsh.
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.const.c,v 3.75 2004/07/24 21:59:27 christos Exp $")
+RCSID("$Id: tc.const.c,v 3.78 2004/11/20 17:30:15 christos Exp $")
 
 Char STRlogout[]	= { 'l', 'o', 'g', 'o', 'u', 't', '\0' };
 Char STRautologout[]	= { 'a', 'u', 't', 'o', 'l', 'o', 'g', 'o', 'u', 't', 
@@ -84,6 +84,8 @@ Char STROSTYPE[]	= { 'O', 'S', 'T', 'Y', 'P', 'E', '\0' };
 Char STRedit[]		= { 'e', 'd', 'i', 't', '\0' };
 Char STRaddsuffix[]	= { 'a', 'd', 'd', 's', 'u', 'f', 'f', 'i', 'x',
 			    '\0' };
+Char STRcsubstnonl[]	= { 'c', 's', 'u', 'b', 's', 't', 'n', 'o', 'n', 'l',
+			    '\0' };
 Char STRnostat[]	= { 'n', 'o', 's', 't', 'a', 't', '\0' };
 Char STRshell[]		= { 's', 'h', 'e', 'l', 'l', '\0' };
 Char STRtmpsh[]		= { '/', 't', 'm', 'p', '/', 's', 'h', '\0' };
@@ -124,11 +126,12 @@ Char STRmmliteral[]	= { '-', 'G', '\0' };
 # else
 Char STRmmliteral[]	= { '-', '-', 'l', 'i', 't', 'e', 'r', 'a', 'l', '\0' };
 # endif
-Char STRKEUC[]		= { 'e', 'u', 'c', '\0' };
-Char STRKSJIS[]		= { 's', 'j', 'i', 's', '\0' };
-Char STRKBIG5[]         = { 'b', 'i', 'g', '5', '\0' };
-Char STRKUTF8[]         = { 'u', 't', 'f', '8', '\0' };
-Char STRSTARKUTF8[]     = { '*', 'u', 't', 'f', '*', '8', '\0' };
+Char STReuc[]		= { 'e', 'u', 'c', '\0' };
+Char STRsjis[]		= { 's', 'j', 'i', 's', '\0' };
+Char STRbig5[]		= { 'b', 'i', 'g', '5', '\0' };
+Char STRutf8[]		= { 'u', 't', 'f', '8', '\0' };
+Char STRstarutfstar8[]	= { '*', 'u', 't', 'f', '*', '8', '\0' };
+Char STRGB2312[]	= { 'g', 'b', '2', '3', '1', '2', '\0' };
 #  ifdef MBYTEDEBUG	/* Sorry, use for beta testing */
 Char STRmbytemap[]	= { 'm', 'b', 'y', 't', 'e', 'm', 'a', 'p', '\0' };
 #  endif /* MBYTEMAP */

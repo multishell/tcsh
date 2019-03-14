@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.set.c,v 3.52 2004/07/25 05:18:28 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.set.c,v 3.56 2004/11/20 18:23:03 christos Exp $ */
 /*
  * sh.set.c: Setting and Clearing of variables
  */
@@ -32,10 +32,14 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.set.c,v 3.52 2004/07/25 05:18:28 christos Exp $")
+RCSID("$Id: sh.set.c,v 3.56 2004/11/20 18:23:03 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
+
+#ifdef HAVE_NL_LANGINFO
+#include <langinfo.h>
+#endif
 
 extern bool GotTermCaps;
 int numeof = 0;
@@ -1117,6 +1121,7 @@ bool dspmbyte_utf8;
 
 #if defined(KANJI) && defined(SHORT_STRINGS) && defined(DSPMBYTE)
 bool dspmbyte_ls;
+bool dspmbyte_utf8;
 
 void
 update_dspmbyte_vars()
@@ -1129,13 +1134,13 @@ update_dspmbyte_vars()
     if ((vp = adrof(CHECK_MBYTEVAR)) && !adrof(STRnokanji)) {
 	_enable_mbdisp = 1;
 	dstr1 = vp->vec[0];
-	if(eq (dstr1, STRKSJIS))
+	if(eq (dstr1, STRsjis))
 	    iskcode = 1;
-	else if (eq(dstr1, STRKEUC))
+	else if (eq(dstr1, STReuc))
 	    iskcode = 2;
-	else if (eq(dstr1, STRKBIG5))
+	else if (eq(dstr1, STRbig5))
 	    iskcode = 3;
-	else if (eq(dstr1, STRKUTF8))
+	else if (eq(dstr1, STRutf8))
 	    iskcode = 4;
 	else if ((dstr1[0] - '0') >= 0 && (dstr1[0] - '0') <= 3) {
 	    iskcode = 0;
@@ -1243,22 +1248,44 @@ autoset_dspmbyte(pcp)
 	Char *n;
 	Char *v;
     } dspmt[] = {
-	{ STRLANGEUCJP, STRKEUC },
-	{ STRLANGEUCKR, STRKEUC },
-	{ STRLANGEUCZH, STRKEUC },
-	{ STRLANGEUCJPB, STRKEUC },
-	{ STRLANGEUCKRB, STRKEUC },
-	{ STRLANGEUCZHB, STRKEUC },
+	{ STRLANGEUCJP, STReuc },
+	{ STRLANGEUCKR, STReuc },
+	{ STRLANGEUCZH, STReuc },
+	{ STRLANGEUCJPB, STReuc },
+	{ STRLANGEUCKRB, STReuc },
+	{ STRLANGEUCZHB, STReuc },
 #ifdef linux
-	{ STRLANGEUCJPC, STRKEUC },
+	{ STRLANGEUCJPC, STReuc },
 #endif
-	{ STRLANGSJIS, STRKSJIS },
-	{ STRLANGSJISB, STRKSJIS },
-	{ STRLANGBIG5, STRKBIG5 },
-	{ STRSTARKUTF8, STRKUTF8 },
+	{ STRLANGSJIS, STRsjis },
+	{ STRLANGSJISB, STRsjis },
+	{ STRLANGBIG5, STRbig5 },
+	{ STRstarutfstar8, STRutf8 },
 	{ NULL, NULL }
     };
+#ifdef HAVE_NL_LANGINFO
+    struct dspm_autoset_Table dspmc[] = {
+	{ STRstarutfstar8, STRutf8` },
+	{ STReuc, STReuc },
+	{ STRGB2312, STReuc },
+	{ STRLANGBIG5, STRbig5 },
+	{ NULL, NULL }
+    };
+    Char *codeset;
 
+    codeset = str2short(nl_langinfo(CODESET));
+    if (*codeset != '\0') {
+	for (i = 0; dspmc[i].n; i++) {
+	    Char *estr;
+	    if (dspmc[i].n[0] && t_pmatch(pcp, dspmc[i].n, &estr, 0) > 0) {
+		set(CHECK_MBYTEVAR, Strsave(dspmc[i].v), VAR_READWRITE);
+		update_dspmbyte_vars();
+		return;
+	    }
+	}
+    }
+#endif
+    
     if (*pcp == '\0')
 	return;
 

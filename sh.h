@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.h,v 3.117 2004/08/04 14:28:23 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.h,v 3.119 2004/08/08 06:42:28 christos Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -83,11 +83,6 @@
 
 #ifdef SHORT_STRINGS
 # ifdef WIDE_STRINGS
-/* This belongs in config_f.h, but SIZEOF_WCHAR_T is only defined after
-   including config_h.h */
-#  if SIZEOF_WCHAR_T < 4
-#   error "wchar_t must be at least 4 bytes for WIDE_STRINGS"
-#  endif
 #include <wchar.h>
 typedef wchar_t Char;
 typedef unsigned long uChar;
@@ -629,6 +624,9 @@ EXTERN bool    arun IZERO;	/* Currently running multi-line-aliases */
 EXTERN int     implicit_cd IZERO;/* implicit cd enabled?(1=enabled,2=verbose) */
 EXTERN bool    inheredoc IZERO;	/* Currently parsing a heredoc */
 EXTERN bool    windowchg IZERO;	/* We received a window change event */
+#if defined(KANJI) && defined(SHORT_STRINGS) && defined(DSPMBYTE)
+EXTERN bool    dspmbyte_ls;
+#endif
 
 /*
  * Global i/o info
@@ -789,7 +787,7 @@ extern signalfun_t parterm;	/* Parents terminate catch */
 # define	CHAR		0x001FFFFF /* Mask to mask out the character */
 #elif defined (SHORT_STRINGS)
 # define	QUOTE 	((Char)	0100000)/* 16nth char bit used for 'ing */
-# define	TRIM		0077777	/* Mask to strip quote bit */
+# define	TRIM		0073777	/* Mask to strip quote/lit bit */
 # define	UNDER		0040000	/* Underline flag */
 # define	BOLD		0020000	/* Bold flag */
 # define	STANDOUT	0010000	/* Standout flag */

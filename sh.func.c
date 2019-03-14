@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.func.c,v 3.115 2004/08/04 14:28:23 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.func.c,v 3.117 2004/08/08 06:42:28 christos Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.func.c,v 3.115 2004/08/04 14:28:23 christos Exp $")
+RCSID("$Id: sh.func.c,v 3.117 2004/08/08 06:42:28 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -1630,7 +1630,7 @@ dounsetenv(v, c)
 
 void
 tsetenv(name, val)
-    Char   *name, *val;
+    const Char *name, *val;
 {
 #ifdef SETENV_IN_LIB
 /*
@@ -1649,6 +1649,7 @@ tsetenv(name, val)
     setenv(nameBuf, short2str(val), 1);
 #else /* !SETENV_IN_LIB */
     Char **ep = STR_environ;
+    const Char *ccp;
     Char *cp, *dp;
     Char   *blk[2];
     Char  **oep = ep;
@@ -1658,13 +1659,13 @@ tsetenv(name, val)
 #endif /* WINNT_NATIVE */
     for (; *ep; ep++) {
 #ifdef WINNT_NATIVE
-	for (cp = name, dp = *ep; *cp && Tolower(*cp & TRIM) == Tolower(*dp);
-				cp++, dp++)
+	for (ccp = name, dp = *ep; *ccp && Tolower(*ccp & TRIM) == Tolower(*dp);
+				ccp++, dp++)
 #else
-	for (cp = name, dp = *ep; *cp && (*cp & TRIM) == *dp; cp++, dp++)
+	for (ccp = name, dp = *ep; *ccp && (*ccp & TRIM) == *dp; ccp++, dp++)
 #endif /* WINNT_NATIVE */
 	    continue;
-	if (*cp != 0 || *dp != '=')
+	if (*ccp != 0 || *dp != '=')
 	    continue;
 	cp = Strspl(STRequal, val);
 	xfree((ptr_t) * ep);
@@ -2323,9 +2324,9 @@ doeval(v, c)
 	trim(gav);
     }
 
-    saveIN = dcopy(SHIN, -1);
-    saveOUT = dcopy(SHOUT, -1);
-    saveDIAG = dcopy(SHDIAG, -1);
+    (void)close_on_exec(saveIN = dcopy(SHIN, -1), 1);
+    (void)close_on_exec(saveOUT = dcopy(SHOUT, -1), 1);
+    (void)close_on_exec(saveDIAG = dcopy(SHDIAG, -1), 1);
 
     getexit(osetexit);
 
@@ -2339,9 +2340,9 @@ doeval(v, c)
 #endif /* cray */
 	evalvec = gav;
 	evalp = 0;
-	SHIN = dcopy(0, -1);
-	SHOUT = dcopy(1, -1);
-	SHDIAG = dcopy(2, -1);
+	(void)close_on_exec(SHIN = dcopy(0, -1), 1);
+	(void)close_on_exec(SHOUT = dcopy(1, -1), 1);
+	(void)close_on_exec(SHDIAG = dcopy(2, -1), 1);
 #ifndef CLOSE_ON_EXEC
 	didcch = 0;
 #endif /* CLOSE_ON_EXEC */
@@ -2359,9 +2360,9 @@ doeval(v, c)
     (void) close(SHIN);
     (void) close(SHOUT);
     (void) close(SHDIAG);
-    SHIN = dmove(saveIN, oSHIN);
-    SHOUT = dmove(saveOUT, oSHOUT);
-    SHDIAG = dmove(saveDIAG, oSHDIAG);
+    (void)close_on_exec (SHIN = dmove(saveIN, oSHIN), 1);
+    (void)close_on_exec (SHOUT = dmove(saveOUT, oSHOUT), 1);
+    (void)close_on_exec (SHDIAG = dmove(saveDIAG, oSHDIAG), 1);
 
     if (gv)
 	blkfree(gv);
