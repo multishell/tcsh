@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.139 2007/07/16 03:03:19 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.143 2009/04/24 14:38:23 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -39,7 +39,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$tcsh: sh.c,v 3.139 2007/07/16 03:03:19 christos Exp $")
+RCSID("$tcsh: sh.c,v 3.143 2009/04/24 14:38:23 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -139,6 +139,7 @@ struct saved_state {
     Char	  HIST;
     int	  cantell;
     struct Bin	  B;
+    int		  justpr;
 };
 
 static	int		  srccat	(Char *, Char *);
@@ -458,7 +459,7 @@ main(int argc, char **argv)
 	    else
 		cp2 = cp;
 	    if (!(((Strncmp(cp2, STRtty, 3) == 0) && Isalpha(cp2[3])) ||
-	          Strstr(cp, STRslptssl) != NULL)) {
+	          Strstr(cp, STRptssl) != NULL)) {
 		if (getenv("DISPLAY") == NULL) {
 		    /* NOT on X window shells */
 		    setcopy(STRautologout, STRdefautologout, VAR_READWRITE);
@@ -1103,17 +1104,7 @@ main(int argc, char **argv)
 	    }
 #endif /* NeXT */
 #ifdef BSDJOBS			/* if we have tty job control */
-    retry:
-	    if ((tpgrp = tcgetpgrp(f)) != -1) {
-		if (tpgrp != shpgrp) {
-		    struct sigaction old;
-
-		    sigaction(SIGTTIN, NULL, &old);
-		    signal(SIGTTIN, SIG_DFL);
-		    (void) kill(0, SIGTTIN);
-		    sigaction(SIGTTIN, &old, NULL);
-		    goto retry;
-		}
+	    if (grabpgrp(f, shpgrp) != -1) {
 		/*
 		 * Thanks to Matt Day for the POSIX references, and to
 		 * Paul Close for the SGI clarification.
@@ -1480,6 +1471,7 @@ st_save(struct saved_state *st, int unit, int hflg, Char **al, Char **av)
     st->alvec		= alvec;
     st->onelflg		= onelflg;
     st->enterhist	= enterhist;
+    st->justpr		= justpr;
     if (hflg)
 	st->HIST	= HIST;
     else
@@ -1578,6 +1570,7 @@ st_restore(void *xst)
 	HIST	= st->HIST;
     enterhist	= st->enterhist;
     cantell	= st->cantell;
+    justpr	= st->justpr;
 
     if (st->argv != NULL)
 	setq(STRargv, st->argv, &shvhed, VAR_READWRITE);
@@ -1647,6 +1640,7 @@ goodbye(Char **v, struct command *c)
 	size_t omark;
 	sigset_t set;
 
+	sigemptyset(&set);
 	signal(SIGQUIT, SIG_IGN);
 	sigaddset(&set, SIGQUIT);
 	sigprocmask(SIG_UNBLOCK, &set, NULL);
@@ -2355,4 +2349,29 @@ record(void)
 	recdirs(NULL, adrof(STRsavedirs) != NULL);
 	rechist(NULL, adrof(STRsavehist) != NULL);
     }
+}
+
+/*
+ * Grab the tty repeatedly, and give up if we are not in the correct
+ * tty process group.
+ */
+int
+grabpgrp(int fd, pid_t desired)
+{
+    struct sigaction old;
+    pid_t pgrp;
+    size_t i;
+
+    for (i = 0; i < 100; i++) {
+	if ((pgrp = tcgetpgrp(fd)) == -1)
+	    return -1;
+	if (pgrp == desired)
+	    return 0;
+	(void)sigaction(SIGTTIN, NULL, &old);
+	(void)signal(SIGTTIN, SIG_DFL);
+	(void)kill(0, SIGTTIN);
+	(void)sigaction(SIGTTIN, &old, NULL);
+    }
+    errno = EPERM;
+    return -1;
 }

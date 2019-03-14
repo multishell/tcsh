@@ -1,3 +1,22 @@
+ 14. V6.16.01 - 20090624
+ 13. add missing sigemptyset in goodbye()
+ 12. add rlimit swapsize from FreeBSD.
+ 11. restore behavior where a[n-] never prints an error.
+ 10. always save the whole command, not just the first 80 chars of it.
+  9. fix short2str/short2qstr length adjustment in wide chars
+     (Vitezslav Crhonek)
+  8. set histfile=/tmp/history.temp; set savehist=(100 merge);
+     alias precmd history -S. After that justpr is not restored and commands
+     don't execute. (Andriy Gapon)
+  7. Fix "as" $ modifier from corrupting memory.
+     set t=demfonsftraftionf; echo $t:as/f//
+  6. Make $% work with environment variable (Ron Johnston)
+  5. Dragonfly script support (Matthias Schmidt, m65)
+  4. Add autoexpand=onlyhistory (Don Estabrook, m66)
+  3. Add history in loops (Lawrence Darby, m48)
+  2. Add missing colorls "rs" variable (Shlomi Fish, m70)
+  1. Fix pts detection issue (Ruslan Ermilov)
+
  33. V6.16.00 - 20080930
  32. longjmp clobbered variable fixes.
  31. __GNX__ addition

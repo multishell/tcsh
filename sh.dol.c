@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.dol.c,v 3.73 2008/02/28 22:13:20 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.dol.c,v 3.76 2009/02/03 16:26:56 christos Exp $ */
 /*
  * sh.dol.c: Variable substitutions
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.dol.c,v 3.73 2008/02/28 22:13:20 christos Exp $")
+RCSID("$tcsh: sh.dol.c,v 3.76 2009/02/03 16:26:56 christos Exp $")
 
 /*
  * C shell
@@ -587,9 +587,13 @@ Dgetdol(void)
 
 	    cleanup_until(name);
 	    fixDolMod();
-	    xfree(env_val);
-	    env_val = Strsave(np);
-	    setDolp(env_val);
+	    if (length) {
+		    addla(putn(Strlen(np)));
+	    } else {
+		    xfree(env_val);
+		    env_val = Strsave(np);
+		    setDolp(env_val);
+	    }
 	    goto eatbrac;
 	}
 	udvar(name->s);
@@ -621,7 +625,7 @@ Dgetdol(void)
 
 	    for (i = 0; Isdigit(*np); i = i * 10 + *np++ - '0')
 		continue;
-	    if (i < 0 || i > upb) {
+	    if (i < 0 || i > upb && !any("-*", *np)) {
 		cleanup_until(name);
 		dolerror(vp->v_name);
 		return;
@@ -815,8 +819,8 @@ setDolp(Char *cp)
 		dp = Strstr(dp, lhsub);
 		if (dp) {
 		    ptrdiff_t diff = dp - cp;
-		    np = xmalloc((Strlen(cp) + 1 - lhlen + rhlen) *
-				 sizeof(Char));
+		    size_t len = (Strlen(cp) + 1 - lhlen + rhlen);
+		    np = xmalloc(len * sizeof(Char));
 		    (void) Strncpy(np, cp, diff);
 		    (void) Strcpy(np + diff, rhsub);
 		    (void) Strcpy(np + diff + rhlen, dp + lhlen);
@@ -824,7 +828,10 @@ setDolp(Char *cp)
 		    dp = np + diff + 1;
 		    xfree(cp);
 		    cp = np;
+		    cp[--len] = '\0';
 		    didmod = 1;
+		    if (diff >= len)
+			break;
 		} else {
 		    /* should this do a seterror? */
 		    break;

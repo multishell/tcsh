@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/tc.const.c,v 3.87 2007/09/28 21:02:03 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/tc.const.c,v 3.90 2008/10/17 20:25:00 christos Exp $ */
 /*
  * sh.const.c: String constants for tcsh.
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: tc.const.c,v 3.87 2007/09/28 21:02:03 christos Exp $")
+RCSID("$tcsh: tc.const.c,v 3.90 2008/10/17 20:25:00 christos Exp $")
 
 Char STRlogout[]	= { 'l', 'o', 'g', 'o', 'u', 't', '\0' };
 Char STRautologout[]	= { 'a', 'u', 't', 'o', 'l', 'o', 'g', 'o', 'u', 't', 
@@ -46,7 +46,7 @@ Char STRautomatic[]	= { 'a', 'u', 't', 'o', 'm', 'a', 't', 'i', 'c',
 Char STRhangup[]	= { 'h', 'a', 'n', 'g', 'u', 'p', '\0' };
 Char STRaout[]		= { 'a', '.', 'o', 'u', 't', '\0' };
 Char STRtty[]		= { 't', 't', 'y', '\0' };
-Char STRslptssl[]	= { '/', 'p', 't', 's', '/', '\0' };
+Char STRptssl[]		= { 'p', 't', 's', '/', '\0' };
 Char STRany[]		= { 'a', 'n', 'y', '\0' };
 Char STRstatus[]	= { 's', 't', 'a', 't', 'u', 's', '\0' };
 Char STR0[]		= { '0', '\0' };
@@ -326,7 +326,6 @@ Char STRspLarrowsp[]	= { ' ', '<', ' ', '\0' };
 Char STRspRarrow2[]	= { ' ', '>', '>', '\0' };
 Char STRspRarrow[]	= { ' ', '>', '\0' };
 Char STRgt[]		= { '>', '\0' };
-Char STRsp3dots[]	= { ' ', '.', '.', '.', '\0' };
 Char STRcent2[]		= { '%', '%', '\0' };
 Char STRcentplus[]	= { '%', '+', '\0' };
 Char STRcentminus[]	= { '%', '-', '\0' };
@@ -504,3 +503,5 @@ Char STRshwordsep[]	= { ' ', '\t', '&', '|', ';', '<', '>', '(', ')', '\0' };
 Char STRrepeat[]	= { 'r', 'e', 'p', 'e', 'a', 't', '\0' };
 
 Char STReof[]		= { '^', 'D', '\b', '\b', '\0' };
+Char STRonlyhistory[]	= { 'o', 'n', 'l', 'y', 'h', 'i', 's', 't', 'o', 'r',
+			    'y', '\0' };

@@ -72,7 +72,7 @@
 .\"   used here if you can. In particular, please don't use nroff commands
 .\"   which aren't already used herein.
 .\" 
-.TH TCSH 1 "30 September 2008" "Astron 6.16.00"
+.TH TCSH 1 "24 June 2009" "Astron 6.16.01"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
@@ -2929,6 +2929,9 @@ the maximum number of simultaneous processes for this user id
 .TP
 \fIsbsize\fR
 the maximum size of socket buffer usage for this user
+.TP 
+\fIswapsize\fR 
+the maximum amount of swap space reserved or used for this user 
 .PP
 \fImaximum-use\fR may be given as a (floating point or
 integer) number followed by a scale factor.  For all limits
@@ -3375,13 +3378,14 @@ executed programs.
 .B universe \fIuniverse\fR (+)
 Sets the universe to \fIuniverse\fR.  (Masscomp/RTU only)
 .TP 8
-.B unlimit \fR[\fB\-h\fR] [\fIresource\fR]
+.B unlimit \fR[\fB\-hf\fR] [\fIresource\fR]
 Removes the limitation on \fIresource\fR or, if no \fIresource\fR is
 specified, all \fIresource\fR limitations.
 With \fB\-h\fR, the corresponding hard limits are removed.
 Only the super-user may do this.
 Note that \fBunlimit\fR may not exit successful, since most systems
 do not allow \fIdescriptors\fR to be unlimited.
+With \fB\-f\fR errors are ignored.
 .TP 8
 .B unset \fIpattern
 Removes all variables whose names match \fIpattern\fR, unless they are read-only.
@@ -3574,7 +3578,8 @@ each completion attempt.
 .TP 8
 .B autoexpand \fR(+)
 If set, the \fIexpand-history\fR editor command is invoked automatically
-before each completion attempt.
+before each completion attempt. If this is set to \fIonlyhistory\fR, then
+only history will be expanded and a second completion will expand filenames.
 .TP 8
 .B autolist \fR(+)
 If set, possibilities are listed after an ambiguous completion.
@@ -5086,7 +5091,7 @@ pipe(2), setrlimit(2), sigvec(2), stat(2), umask(2), vfork(2), wait(2),
 malloc(3), setlocale(3), tty(4), a.out(5), termcap(5), environ(7),
 termio(7), Introduction to the C Shell
 .SH VERSION
-This manual documents tcsh 6.16.00 (Astron) 2008-09-30.
+This manual documents tcsh 6.16.01 (Astron) 2009-06-24.
 .SH AUTHORS
 .PD 0
 .TP 2
