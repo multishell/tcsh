@@ -10,9 +10,6 @@
 /* Define to 1 if you have the <auth.h> header file. */
 #undef HAVE_AUTH_H
 
-/* Define to 1 if you have the `catgets' function. */
-#undef HAVE_CATGETS
-
 /* Define to 1 if you have the <crypt.h> header file. */
 #undef HAVE_CRYPT_H
 
@@ -39,6 +36,9 @@
 /* Define to 1 if you have the `dup2' function. */
 #undef HAVE_DUP2
 
+/* Define to 1 if you have the <features.h> header file. */
+#undef HAVE_FEATURES_H
+
 /* Define to 1 if you have the `getauthid' function. */
 #undef HAVE_GETAUTHID
 
@@ -63,6 +63,9 @@
 /* Define to 1 if the system has the type `long long'. */
 #undef HAVE_LONG_LONG
 
+/* Define to 1 if you have the `mallinfo' function. */
+#undef HAVE_MALLINFO
+
 /* Define to 1 if mbrtowc and mbstate_t are properly declared. */
 #undef HAVE_MBRTOWC
 
@@ -86,6 +89,9 @@
 
 /* Define to 1 if you have the `nl_langinfo' function. */
 #undef HAVE_NL_LANGINFO
+
+/* Define to 1 if you have the <paths.h> header file. */
+#undef HAVE_PATHS_H
 
 /* Define to 1 if you have the `sbrk' function. */
 #undef HAVE_SBRK
@@ -179,6 +185,9 @@
 
 /* Support NLS. */
 #undef NLS
+
+/* Support NLS catalogs. */
+#undef NLS_CATALOGS
 
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT

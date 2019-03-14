@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/config_f.h,v 3.43 2010/02/09 20:28:17 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/config_f.h,v 3.46 2011/02/04 22:16:06 christos Exp $ */
 /*
  * config_f.h -- configure various defines for tcsh
  *
@@ -55,17 +55,6 @@
 # if SIZEOF_WCHAR_T < 4
 #  define UTF16_STRINGS
 # endif
-#endif
-
-/*
- * NLS_CATALOGS:Use Native Language System catalogs for
- *		international messages.
- *		Routines like catopen() are needed
- *		if you don't have <nl_types.h>, you don't want
- *		to define this.
- */
-#if defined (NLS) && defined (HAVE_CATGETS)
-# define NLS_CATALOGS
 #endif
 
 /*
@@ -146,7 +135,7 @@
  *		This can be much slower and no memory statistics will be
  *		provided.
  */
-#if defined(__MACHTEN__) || defined(PURIFY) || defined(MALLOC_TRACE) || defined(_OSD_POSIX) || defined(__MVS__)
+#if defined(__MACHTEN__) || defined(PURIFY) || defined(MALLOC_TRACE) || defined(_OSD_POSIX) || defined(__MVS__) || defined (__CYGWIN__) || defined(__GLIBC__)
 # define SYSMALLOC
 #else
 # undef SYSMALLOC

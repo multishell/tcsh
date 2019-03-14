@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.h,v 3.161 2011/01/24 18:17:07 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.h,v 3.164 2011/02/05 16:14:20 christos Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -256,7 +256,6 @@ typedef long tcsh_number_t;
 # include <locale.h>
 #endif /* NLS */
 
-
 #if !defined(_MINIX) && !defined(_VMS_POSIX) && !defined(WINNT_NATIVE) && !defined(__MVS__)
 # include <sys/param.h>
 #endif /* !_MINIX && !_VMS_POSIX && !WINNT_NATIVE && !__MVS__ */
@@ -290,7 +289,7 @@ typedef long tcsh_number_t;
 #  else
 #   include <termio.h>
 #  endif /* _UWIN */
-#  if SYSVREL > 3
+#  if SYSVREL > 3 || defined(__linux__)
 #   undef TIOCGLTC	/* we don't need those, since POSIX has them */
 #   undef TIOCSLTC
 #   undef CSWTCH
@@ -311,7 +310,7 @@ typedef long tcsh_number_t;
  * redefines malloc(), so we define the following
  * to avoid it.
  */
-# if defined(SYSMALLOC) || defined(linux) || defined(__GNU__) || defined(__GLIBC__) || defined(sgi) || defined(_OSD_POSIX)
+# if defined(SYSMALLOC) || defined(__linux__) || defined(__GNU__) || defined(__GLIBC__) || defined(sgi) || defined(_OSD_POSIX)
 #  define NO_FIX_MALLOC
 #  include <stdlib.h>
 # else /* glibc */
@@ -329,7 +328,7 @@ typedef long tcsh_number_t;
 #endif /* POSIX && !WINNT_NATIVE */
 #include <limits.h>
 
-#if SYSVREL > 0 || defined(_IBMR2) || defined(_MINIX) || defined(linux) || defined(__GNU__) || defined(__GLIBC__)
+#if SYSVREL > 0 || defined(_IBMR2) || defined(_MINIX) || defined(__linux__) || defined(__GNU__) || defined(__GLIBC__)
 # if !defined(pyr) && !defined(stellar)
 #  include <time.h>
 #  ifdef _MINIX
@@ -344,6 +343,12 @@ typedef long tcsh_number_t;
 #if !((defined(SUNOS4) || defined(_MINIX) /* || defined(DECOSF1) */) && defined(TERMIO))
 # if !defined(_VMS_POSIX) && !defined(WINNT_NATIVE)
 #  include <sys/ioctl.h>
+#  if SYSVREL > 3 || defined(__linux__)
+#   undef TIOCGLTC	/* we don't need those, since POSIX has them */
+#   undef TIOCSLTC
+#   undef CSWTCH
+#   define CSWTCH _POSIX_VDISABLE	/* So job control works */
+#  endif /* SYSVREL > 3 */
 # endif
 #endif 
 
@@ -573,6 +578,7 @@ EXTERN int    havhash IZERO;	/* path hashing is available */
 EXTERN int    editing IZERO;	/* doing filename expansion and line editing */
 EXTERN int    noediting IZERO;	/* initial $term defaulted to noedit */
 EXTERN int    bslash_quote IZERO;/* PWP: tcsh-style quoting?  (in sh.c) */
+EXTERN int    anyerror IZERO;	/* propagate errors from pipelines/backq */
 EXTERN int    compat_expr IZERO;/* csh-style expressions? */
 EXTERN int    isoutatty IZERO;	/* is SHOUT a tty */
 EXTERN int    isdiagatty IZERO;/* is SHDIAG a tty */
@@ -1204,33 +1210,18 @@ extern char   **environ;
 
 #ifndef WINNT_NATIVE
 # ifdef NLS_CATALOGS
-#  if defined(linux) || defined(__GNU__) || defined(__GLIBC__)
-#   include <locale.h>
-#   ifdef notdef
-#    include <localeinfo.h>	/* Has this changed ? */
-#   endif
+#  ifdef HAVE_FEATURES_H
 #   include <features.h>
 #  endif
-#  ifdef SUNOS4
-   /* Who stole my nl_types.h? :-( 
-    * All this stuff is in the man pages, but nowhere else?
-    * This does not link right now...
-    */
-   typedef void *nl_catd; 
-   extern const char * catgets (nl_catd, int, int, const char *);
-   nl_catd catopen (const char *, int);
-   int catclose (nl_catd);
-#  else
-#   ifdef __uxps__
-#    define gettxt gettxt_ds
-#   endif
-#   include <nl_types.h>
-#   ifdef __uxps__
-#    undef gettxt
-#   endif
+#  ifdef HAVE_NL_LANGINFO
+#   include <langinfo.h>
 #  endif
-#  ifndef MCLoadBySet
-#   define MCLoadBySet 0
+#  ifdef __uxps__
+#   define gettxt gettxt_ds
+#  endif
+#  include <nl_types.h>
+#  ifdef __uxps__
+#   undef gettxt
 #  endif
 EXTERN nl_catd catd;
 #  if defined(HAVE_ICONV) && defined(HAVE_NL_LANGINFO)

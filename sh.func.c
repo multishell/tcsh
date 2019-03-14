@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.func.c,v 3.158 2010/12/22 17:26:04 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.func.c,v 3.161 2011/02/05 16:14:20 christos Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.func.c,v 3.158 2010/12/22 17:26:04 christos Exp $")
+RCSID("$tcsh: sh.func.c,v 3.161 2011/02/05 16:14:20 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -41,8 +41,7 @@ RCSID("$tcsh: sh.func.c,v 3.158 2010/12/22 17:26:04 christos Exp $")
 #include "nt.const.h"
 #endif /* WINNT_NATIVE */
 
-#if defined (NLS_CATALOGS) && defined(HAVE_ICONV) && defined(HAVE_NL_LANGINFO)
-#include <langinfo.h>
+#if defined (NLS_CATALOGS) && defined(HAVE_ICONV)
 static iconv_t catgets_iconv; /* Or (iconv_t)-1 */
 #endif
 
@@ -588,6 +587,7 @@ dowhile(Char **v, struct command *c)
 	nwp->w_start = lineloc;
 	nwp->w_end.type = TCSH_F_SEEK;
 	nwp->w_end.f_seek = 0;
+	nwp->w_end.a_seek = 0;
 	nwp->w_next = whyles;
 	whyles = nwp;
 	zlast = TC_WHILE;
@@ -764,6 +764,7 @@ search(int type, int level, Char *goal)
 	struct Ain a;
 	a.type = TCSH_F_SEEK;
 	a.f_seek = 0;
+	a.a_seek = 0;
 	bseek(&a);
     }
     cleanup_push(&word, Strbuf_cleanup);
@@ -2626,13 +2627,24 @@ nlsinit(void)
 
     if (adrof(STRcatalog) != NULL)
 	catalog = xasprintf("tcsh.%s", short2str(varval(STRcatalog)));
+#ifdef NL_CAT_LOCALE /* POSIX-compliant. */
+    /*
+     * Check if LC_MESSAGES is set in the environment and use it, if so.
+     * If not, fall back to the setting of LANG.
+     */
+    catd = catopen(catalog, tgetenv(STRLC_MESSAGES) ? NL_CAT_LOCALE : 0);
+#else /* pre-POSIX */
+# ifndef MCLoadBySet
+#  define MCLoadBySet 0
+#  endif
     catd = catopen(catalog, MCLoadBySet);
+#endif
     if (catalog != default_catalog)
 	xfree(catalog);
 #if defined(HAVE_ICONV) && defined(HAVE_NL_LANGINFO)
     /* xcatgets (), not CGETS, the charset name should be in ASCII anyway. */
     catgets_iconv = iconv_open (nl_langinfo (CODESET),
-				xcatgets(catd, 255, 1, "ASCII"));
+				xcatgets(catd, 255, 1, "UTF-8"));
 #endif /* HAVE_ICONV && HAVE_NL_LANGINFO */
 #endif /* NLS_CATALOGS */
 #ifdef WINNT_NATIVE

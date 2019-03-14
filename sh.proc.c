@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.proc.c,v 3.114 2011/01/09 16:25:29 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.proc.c,v 3.118 2011/03/24 14:06:59 christos Exp $ */
 /*
  * sh.proc.c: Job manipulations
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.proc.c,v 3.114 2011/01/09 16:25:29 christos Exp $")
+RCSID("$tcsh: sh.proc.c,v 3.118 2011/03/24 14:06:59 christos Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -47,7 +47,7 @@ RCSID("$tcsh: sh.proc.c,v 3.114 2011/01/09 16:25:29 christos Exp $")
 # define HZ 16
 #endif /* aiws */
 
-#if defined(_BSD) || (defined(IRIS4D) && __STDC__) || defined(__lucid) || defined(linux) || defined(__GNU__) || defined(__GLIBC__)
+#if defined(_BSD) || (defined(IRIS4D) && __STDC__) || defined(__lucid) || defined(__linux__) || defined(__GNU__) || defined(__GLIBC__)
 # if !defined(__ANDROID__)
 #  define BSDWAIT
 # endif
@@ -190,7 +190,7 @@ loop:
         (setintr && (intty || insource) ? WNOHANG | WUNTRACED : WNOHANG), &ru);
 #   else
     /* both a wait3 and rusage */
-#    if !defined(BSDWAIT) || defined(NeXT) || defined(MACH) || defined(linux) || defined(__GNU__) || defined(__GLIBC__) || (defined(IRIS4D) && SYSVREL <= 3) || defined(__lucid) || defined(__osf__)
+#    if !defined(BSDWAIT) || defined(NeXT) || defined(MACH) || defined(__linux__) || defined(__GNU__) || defined(__GLIBC__) || (defined(IRIS4D) && SYSVREL <= 3) || defined(__lucid) || defined(__osf__)
     pid = wait3(&w,
        (setintr && (intty || insource) ? WNOHANG | WUNTRACED : WNOHANG), &ru);
 #    else /* BSDWAIT */
@@ -557,6 +557,11 @@ pjwait(struct process *pp)
     reason = 0;
     fp = pp;
     do {
+	/* In case of pipelines only the result of the last
+	 * command should be taken in account */
+	if (!anyerror && !(fp->p_flags & PBRACE)
+		&& ((fp->p_flags & PPOU) || (fp->p_flags & PBACKQ)))
+	    continue;
 	if (fp->p_reason)
 	    reason = fp->p_flags & (PSIGNALED | PINTERRUPTED) ?
 		fp->p_reason | META : fp->p_reason;
@@ -734,6 +739,8 @@ palloc(pid_t pid, struct command *t)
 	pp->p_flags |= PBACKQ;
     if (t->t_dflg & F_HUP)
 	pp->p_flags |= PHUP;
+    if (t->t_dcom && t->t_dcom[0] && (*t->t_dcom[0] == '{'))
+	pp->p_flags |= PBRACE;
     if (cmdmax == 0)
 	morecommand(CMD_INIT);
     cmdp = cmdstr;
@@ -918,6 +925,7 @@ pendjob(void)
 
     if (pcurrjob && (pcurrjob->p_flags & (PFOREGND | PSTOPPED)) == 0) {
 	pp = pcurrjob;
+	pcurrjob = NULL;
 	while (pp->p_procid != pp->p_jobid)
 	    pp = pp->p_friends;
 	xprintf("[%d]", pp->p_index);

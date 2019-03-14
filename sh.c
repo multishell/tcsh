@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.168 2011/01/25 19:32:02 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.172 2011/02/25 23:56:35 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -39,7 +39,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$tcsh: sh.c,v 3.168 2011/01/25 19:32:02 christos Exp $")
+RCSID("$tcsh: sh.c,v 3.172 2011/02/25 23:56:35 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -170,17 +170,26 @@ add_localedir_to_nlspath(const char *path)
 {
     static const char msgs_LOC[] = "/%L/LC_MESSAGES/%N.cat";
     static const char msgs_lang[] = "/%l/LC_MESSAGES/%N.cat";
-    char *old = getenv("NLSPATH");
+    char *old;
     char *new, *new_p;
-    size_t len = 0;
+    size_t len;
     int add_LOC = 1;
     int add_lang = 1;
+    char trypath[MAXPATHLEN];
+    struct stat st;
 
     if (path == NULL)
         return;
 
-    if (old != NULL)
-        len += strlen(old) + 1;	/* don't forget the colon. */
+    (void) xsnprintf(trypath, sizeof(trypath), "%s/en/LC_MESSAGES/tcsh.cat",
+	path);
+    if (stat(trypath, &st) == -1)
+	return;
+
+    if ((old = getenv("NLSPATH")) != NULL)
+        len = strlen(old) + 1;	/* don't forget the colon. */
+    else
+	len = 0;
 
     len += 2 * strlen(path) +
 	   sizeof(msgs_LOC) + sizeof(msgs_lang); /* includes the extra colon */
@@ -2103,9 +2112,14 @@ process(int catch)
 	 * Parse the words of the input into a parse tree.
 	 */
 	t = syntax(paraml.next, &paraml, 0);
-	cleanup_push(t, syntax_cleanup);
-	if (seterr)
+	/*
+	 * We cannot cleanup push here, because cd /blah; echo foo
+	 * would rewind t on the chdir error, and free the rest of the command
+	 */
+	if (seterr) {
+	    freesyn(t);
 	    stderror(ERR_OLD);
+	}
 
 	postcmd();
 	/*
@@ -2113,6 +2127,7 @@ process(int catch)
 	 * <mlschroe@immd4.informatik.uni-erlangen.de> was execute(t, tpgrp);
 	 */
 	execute(t, (tpgrp > 0 ? tpgrp : -1), NULL, NULL, TRUE);
+	freesyn(t);
 
 	/*
 	 * Made it!
@@ -2250,8 +2265,10 @@ mailchk(void)
 		continue;
 
 	    /* skip . and .. */
-	    if (!readdir(mailbox) || !readdir(mailbox))
+	    if (!readdir(mailbox) || !readdir(mailbox)) {
+		(void)closedir(mailbox);
 		continue;
+	    }
 
 	    while (readdir(mailbox))
 		mailcount++;
@@ -2338,8 +2355,14 @@ initdesc(void)
 #ifndef CLOSE_ON_EXEC
     didcch = 0;			/* Havent closed for child */
 #endif /* CLOSE_ON_EXEC */
-    isdiagatty = isatty(SHDIAG);
-    isoutatty = isatty(SHOUT);
+    if (SHDIAG >= 0)
+	isdiagatty = isatty(SHDIAG);
+    else
+    	isdiagatty = 0;
+    if (SHDIAG >= 0)
+	isoutatty = isatty(SHOUT);
+    else
+    	isoutatty = 0;
 #ifdef NLS_BUGS
 #ifdef NLS_CATALOGS
     nlsinit();

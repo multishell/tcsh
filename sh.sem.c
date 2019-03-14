@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.sem.c,v 3.83 2010/05/23 17:20:32 amold Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.sem.c,v 3.85 2011/02/04 18:00:26 christos Exp $ */
 /*
  * sh.sem.c: I/O redirections and job forking. A touchy issue!
  *	     Most stuff with builtins is incorrect
@@ -33,7 +33,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.sem.c,v 3.83 2010/05/23 17:20:32 amold Exp $")
+RCSID("$tcsh: sh.sem.c,v 3.85 2011/02/04 18:00:26 christos Exp $")
 
 #include "tc.h"
 #include "tw.h"
@@ -50,7 +50,7 @@ RCSID("$tcsh: sh.sem.c,v 3.83 2010/05/23 17:20:32 amold Exp $")
 #endif /* CLOSE_ON_EXEC */
 
 #if defined(__sparc__) || defined(sparc)
-# if !defined(MACH) && SYSVREL == 0 && !defined(Lynx) && !defined(BSD4_4) && !defined(linux) && !defined(__GNU__) && !defined(__GLIBC__)
+# if !defined(MACH) && SYSVREL == 0 && !defined(Lynx) && !defined(BSD4_4) && !defined(__linux__) && !defined(__GNU__) && !defined(__GLIBC__)
 #  include <vfork.h>
 # endif /* !MACH && SYSVREL == 0 && !Lynx && !BSD4_4 && !glibc */
 #endif /* __sparc__ || sparc */
@@ -656,11 +656,16 @@ execute(struct command *t, volatile int wanttty, int *pipein, int *pipeout,
 	/*
 	 * For () commands must put new 0,1,2 in FSH* and recurse
 	 */
-	(void)close_on_exec(OLDSTD = dcopy(0, FOLDSTD), 1);
-	(void)close_on_exec(SHOUT = dcopy(1, FSHOUT), 1);
-	isoutatty = isatty(SHOUT);
-	(void)close_on_exec(SHDIAG = dcopy(2, FSHDIAG), 1);
-	isdiagatty = isatty(SHDIAG);
+	if ((OLDSTD = dcopy(0, FOLDSTD)) >= 0)
+	    (void)close_on_exec(OLDSTD, 1);
+	if ((SHOUT = dcopy(1, FSHOUT)) >= 0) {
+	    (void)close_on_exec(SHOUT, 1);
+	    isoutatty = isatty(SHOUT);
+	}
+	if ((SHDIAG = dcopy(2, FSHDIAG)) >= 0) {
+	    (void)close_on_exec(SHDIAG, 1);
+	    isdiagatty = isatty(SHDIAG);
+    	}
 	xclose(SHIN);
 	SHIN = -1;
 #ifndef CLOSE_ON_EXEC

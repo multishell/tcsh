@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/pathnames.h,v 3.18 2002/03/08 17:36:46 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/pathnames.h,v 3.21 2011/02/04 22:16:06 christos Exp $ */
 /*
  * pathnames.h: Location of things to find
  */
@@ -33,7 +33,7 @@
 #ifndef _h_pathnames
 #define _h_pathnames
 
-#ifdef BSD4_4
+#ifdef HAVE_PATHS_H
 # include <paths.h>
 #endif
 

@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/ed.term.c,v 1.35 2006/01/12 19:55:38 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/ed.term.c,v 1.37 2011/02/25 23:20:41 christos Exp $ */
 /*
  * ed.term.c: Low level terminal interface
  */
@@ -33,8 +33,8 @@
 #include "sh.h"
 #ifndef WINNT_NATIVE
 
-RCSID("$tcsh: ed.term.c,v 1.35 2006/01/12 19:55:38 christos Exp $")
-
+RCSID("$tcsh: ed.term.c,v 1.37 2011/02/25 23:20:41 christos Exp $")
+#include <assert.h>
 #include "ed.h"
 
 int didsetty = 0;
@@ -633,6 +633,7 @@ dosetty(Char **v, struct command *t)
 		i = m->m_type;
 		st = len = strlen(ttylist[z][m->m_type].t_name);
 	    }
+	    assert(i != -1);
 
 	    x = (ttylist[z][i].t_setmask & m->m_value) ? '+' : '\0';
 	    x = (ttylist[z][i].t_clrmask & m->m_value) ? '-' : x;

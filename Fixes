@@ -1,3 +1,18 @@
+ 80. V6.17.06 - 20110415
+ 79. PR/110: Add $anyerror to select behavior. Default to the new one.
+ 78. Don't try to spell commands that are correct (Rouben Rostamian)
+     [./tcsh -f; set path=($path 2); mkdir foo2; cd foo2; touch foo;
+      chmod +x foo; set correct=cmd; ./foo -> ../foo]
+ 77. Don't push the syntax struct on the cleanup stack, because on foo;bar
+     if foo fails, we will free bar prematurely (Ben Miller)
+ 76. Avoid infinite loop while trying to print the pid of a dying process
+     to a closed file (Bob Arendt)
+ 75. Handle completion of ${ variables (Anthony Mallet)
+ 74. Add --disable-nls-catalogs (Corinna Vinschen)
+ 73. convert message catalogs to UTF-8 (Werner Fink)
+ 72. check that the NLS path works before setting $NLSPATH.
+ 71. use SYSMALLOC for GLIBC (Werner Fink)
+ 70. use mallinfo for SYSMALLOC (Corinna Vinschen)
  69. V6.17.05 - 20110201
  68. Use mkstemp() if there for here docs (Werner Fink)
  67. Fix handling of errors and exit values in builtins (Werner Fink)
