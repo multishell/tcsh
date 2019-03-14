@@ -5,9 +5,9 @@
  *
  * Edit this to match your system type.
  */
+
 #ifndef _h_config
 #define _h_config
-
 /****************** System dependant compilation flags ****************/
 /*
  * POSIX	This system supports IEEE Std 1003.1-1988 (POSIX).
@@ -38,10 +38,7 @@
  *		Note that some machines eg. rs6000 have a vfork, but not
  *		with the berkeley semantics, so we cannot use it there either.
  */
- /*
-  *		We undef this for OSF/1 because it causes pipeline failures.
-  */
-#undef VFORK
+#define VFORK
 
 /*
  * BSDJOBS	You have BSD-style job control (both process groups and
@@ -118,19 +115,23 @@
  */
 #define DIRENT
 /****************** local defines *********************/
-#define _BSD	/* BSD emulation */
-
-#undef PW_AUTH	/* Define this if you are running the security gunk */
-
-#ifdef notdef
-# define DECOSF1	120	/* For version 1.2  */
-#endif
-# define DECOSF1	200	/* For version 2.00 */
-
-#define YPBUGS
-
 /****************** configurable hacks ****************/
+
+#ifdef __bsdi__
+/*
+ * _PATH_TCSHELL      if you've change the installation location (vix)
+ */
+# define _PATH_TCSHELL "/usr/contrib/bin/tcsh"
+
+# undef NLS
+# undef NLS_CATALOGS
+#endif
+
+#ifdef __MACHTEN__
+# define _PATH_TCSHELL "/usr/bin/tcsh"
+# define SYSMALLOC
+#endif
+
 /* have been moved to config_f.h */
 #include "config_f.h"
-
 #endif /* _h_config */

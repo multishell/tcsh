@@ -1,4 +1,4 @@
-/* $Header: /u/christos/cvsroot/tcsh/tw.parse.c,v 3.81 1998/04/08 13:59:15 christos Exp $ */
+/* $Header: /u/christos/cvsroot/tcsh/tw.parse.c,v 3.83 1998/04/21 16:08:57 christos Exp $ */
 /*
  * tw.parse.c: Everyone has taken a shot in this futile effort to
  *	       lexically analyze a csh line... Well we cannot good
@@ -39,7 +39,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tw.parse.c,v 3.81 1998/04/08 13:59:15 christos Exp $")
+RCSID("$Id: tw.parse.c,v 3.83 1998/04/21 16:08:57 christos Exp $")
 
 #include "tw.h"
 #include "ed.h"
@@ -870,9 +870,7 @@ tw_collect_items(command, looking, exp_dir, exp_name, target, pat, flags)
     struct varent *vp;
     int len, enhanced;
     int cnt = 0;
-#ifdef WINNT
-    int igncase;
-#endif /* WINNT */
+    int igncase = 0;
 
 
     flags = 0;
@@ -973,12 +971,8 @@ tw_collect_items(command, looking, exp_dir, exp_name, target, pat, flags)
 		Strcmp(*(vp->vec), STRigncase) == 0;
 #endif /* WINNT */
 	    enhanced = (vp = adrof(STRcomplete)) != NULL && !Strcmp(*(vp->vec),STRenhance);
-	    if (enhanced
-#ifdef WINNT
-		|| igncase
-#endif /* WINNT */
-	    ) {
-	        if (!is_prefixmatch(target, item, 0)) 
+	    if (enhanced || igncase) {
+	        if (!is_prefixmatch(target, item, igncase)) 
 		    break;
      	    } else {
 	        if (!is_prefix(target, item)) 
@@ -1720,7 +1714,8 @@ extract_dir_and_name(path, dir, name)
  */
 Char *
 dollar(new, old)
-    Char   *new, *old;
+    Char   *new;
+    const Char *old;
 {
     Char    *p;
     size_t   space;
@@ -2041,6 +2036,19 @@ print_by_column(dir, items, count, no_file_suffix)
 	    if (i < count) {
 		w = (unsigned int) Strlen(items[i]);
 
+#ifdef COLOR_LS_F
+		if (no_file_suffix) {
+		    /* Print the command name */
+		    Char f = items[i][w - 1];
+		    items[i][w - 1] = 0;
+		    print_with_color(items[i], w - 1, f);
+		}
+		else {
+		    /* Print filename followed by '/' or '*' or ' ' */
+		    print_with_color(items[i], w, filetype(dir, items[i]));
+		    w++;
+		}
+#else /* ifndef COLOR_LS_F */
 		if (no_file_suffix) {
 		    /* Print the command name */
 		    xprintf("%S", items[i]);
@@ -2051,6 +2059,7 @@ print_by_column(dir, items, count, no_file_suffix)
 			    filetype(dir, items[i]));
 		    w++;
 		}
+#endif /* COLOR_LS_F */
 
 		if (c < (columns - 1))	/* Not last column? */
 		    for (; w < maxwidth; w++)

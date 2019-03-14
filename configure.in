@@ -55,6 +55,14 @@ case "${tcsh_cv_canonical}" in
     tcsh_config_file=ultrix
   ;;
 
+  ## DGUX
+  *-dg-dguxR4* )
+    tcsh_config_file=dgux5.4
+  ;;
+  m88k-dg-dgux5.4R* )
+    tcsh_config_file=dgux5.4
+  ;;
+
   ## HP/UX
   *-hp-hpux7* )
     tcsh_config_file=hpux7
@@ -108,6 +116,14 @@ case "${tcsh_cv_canonical}" in
   *-sgi-iri* )
     tcsh_config_file=sgi
     NON_GNU_DFLAGS='-D__STDC__'
+    case "${tcsh_cv_canonical}" in
+      *-irix[34]*)
+        LIBS='-lsun -lbsd -lc_s'
+      ;;
+      *-irix[56]*)
+        LIBS='-lsun -lbsd'
+      ;;
+    esac
   ;;
 
   ## Suns
@@ -132,8 +148,11 @@ case "${tcsh_cv_canonical}" in
   *-sun-solaris2.3* ) # Sparc only release
     tcsh_config_file=sol23
   ;;
-  *-*-solaris2.[456]* ) # Should handle sparc, x86 and powerpc
+  *-*-solaris2.[45]* ) # Should handle sparc, x86 and powerpc
     tcsh_config_file=sol24
+  ;;
+  *-*-solaris2.6* ) # Should handle sparc, x86 and powerpc
+    tcsh_config_file=sol26
   ;;
 
   ## Dell SVR4
