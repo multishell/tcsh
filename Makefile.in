@@ -149,7 +149,7 @@ LDFLAGS= @LDFLAGS@		## This is set by autoconf.
 ################################################################
 ## LIBES.  Pick one, or roll your own.
 ################################################################
-LIBES= @LIBS@	 			 ## This is set by autoconf.
+LIBES= @LIBS@ -lcrypt	 			 ## This is set by autoconf.
 #LIBES= -ltermcap 			 ## BSD style things
 #LIBES= -ltermcap			 ## SunOS, HP-UX, pyramid
 #LIBES= -ltermcap			 ## Linux
