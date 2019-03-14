@@ -1,4 +1,4 @@
-# $tcsh: Makefile.in,v 3.48 2011/02/05 16:14:20 christos Exp $
+# $tcsh: Makefile.in,v 3.53 2014/03/09 00:20:12 christos Exp $
 #	Makefile.in	4.3	6/11/83
 #
 # C Shell with process control; VM/UNIX VAX Makefile
@@ -315,8 +315,8 @@ CPP = @CPP@
 # on the suns does not know how to make dynamically linked binaries.
 # This is set by autoconf.
 CC = @CC@
-#CC= gcc -Wall -Wmissing-prototypes -Wstrict-prototypes -Wpointer-arith -Werror -Wmissing-declarations -Wredundant-decls -Wnested-externs -Wsign-compare -Wcast-qual -Wreturn-type -Wswitch -Wshadow -Wwrite-strings -Wextra
-# -ansi -pedantic
+#CC= gcc -Wall -Wmissing-prototypes -Wstrict-prototypes -Wpointer-arith -Werror -Wmissing-declarations -Wredundant-decls -Wnested-externs -Wsign-compare -Wcast-qual -Wreturn-type -Wswitch -Wshadow -Wwrite-strings -Wextra -Wcast-qual -Wwrite-strings -Wold-style-definition -Wuninitialized -Wpointer-sign
+# -Wconversion -Wformat=2 -ansi -pedantic
 #CC=	gcc -Wall -pipe -B/bin/
 # Generate code for Intel 486 (linux)
 #CC=	gcc -m486 -pipe -Wall
@@ -377,14 +377,14 @@ ASSRCS=	sh.c sh.dir.c sh.dol.c sh.err.c sh.exec.c sh.char.c \
 	sh.lex.c sh.misc.c sh.parse.c sh.print.c sh.proc.c sh.sem.c \
 	sh.set.c sh.time.c sh.char.h sh.dir.h sh.proc.h sh.h \
 	tw.color.c
-PSSRCS= sh.decls.h glob.c glob.h mi.termios.c mi.wait.h mi.varargs.h ma.setp.c \
+PSSRCS= sh.decls.h glob.c glob.h dotlock.c dotlock.h mi.termios.c mi.wait.h mi.varargs.h ma.setp.c \
 	vms.termcap.c
 SHSRCS= ${ASSRCS} ${PSSRCS}
 SHOBJS=	sh.${SUF} sh.dir.${SUF} sh.dol.${SUF} sh.err.${SUF} sh.exec.${SUF} \
 	sh.char.${SUF} sh.exp.${SUF} sh.file.${SUF} sh.func.${SUF} \
 	sh.glob.${SUF} sh.hist.${SUF} sh.init.${SUF} sh.lex.${SUF} \
 	sh.misc.${SUF} sh.parse.${SUF} sh.print.${SUF} sh.proc.${SUF} \
-	sh.sem.${SUF} sh.set.${SUF} sh.time.${SUF} glob.${SUF} \
+	sh.sem.${SUF} sh.set.${SUF} sh.time.${SUF} glob.${SUF} dotlock.${SUF} \
 	mi.termios.${SUF} ma.setp.${SUF} vms.termcap.${SUF}
 
 TWSRCS= tw.decls.h tw.h tw.help.c tw.init.c tw.parse.c tw.spell.c \
@@ -411,8 +411,8 @@ AVSRCS= Fixes MAKEDIFFS MAKESHAR NewThings README FAQ \
 	WishList config_f.h eight-bit.me glob.3 patchlevel.h \
 	pathnames.h tcsh.man Ported src.desc Imakefile imake.config \
 	README.imake complete.tcsh vmsreadme.txt termcap.vms snames.h \
-	host.defs gethost.c tcsh.man2html configure.in configure config.h.in \
-	tests/testsuite.at
+	host.defs gethost.c tcsh.man2html configure.ac configure config.h.in \
+	tests/testsuite.at aclocal.m4
 TESTFILES= tests/aliases.at tests/arguments.at tests/commands.at \
 	tests/expr.at tests/lexical.at tests/mb-eucjp.at \
 	tests/mb-utf8.at tests/noexec.at tests/syntax.at tests/subst.at \
@@ -449,7 +449,7 @@ pure:$(P) ${OBJS}
 
 gethost:  gethost.c sh.err.h tc.const.h sh.h
 	rm -f gethost
-	${CC_FOR_GETHOST} -o gethost ${CPPFLAGS} $(srcdir)/gethost.c
+	${CC_FOR_GETHOST} -o gethost ${CPPFLAGS} ${CFLAGS} $(srcdir)/gethost.c
 
 tc.defs.c:	gethost host.defs
 	@rm -f $@.tmp
@@ -537,7 +537,7 @@ tc.const.h: tc.const.c sh.char.h config.h config_f.h sh.types.h sh.err.h
 	@echo '#endif /* _h_tc_const */' >> $@.tmp
 	@if [ -f $@ ] && cmp -s $@.tmp $@; then echo $@ unchanged.; rm -f $@.tmp; else mv -f $@.tmp $@; echo $@ recreated.; fi
 
-$(srcdir)/tests/package.m4: $(srcdir)/configure.in
+$(srcdir)/tests/package.m4: $(srcdir)/configure.ac
 	{								   \
 	  echo '# Signature of the current package.';			   \
 	  echo 'm4_define([AT_PACKAGE_NAME],      [@PACKAGE_NAME@])';	   \
@@ -594,12 +594,12 @@ vgrind:
 	@vgrind -t -x -h Index index >/crp/bill/csh/index.t
 
 install-strip: install
+	-strip ${DESTBIN}/tcsh$(EXEEXT)
 
 install: tcsh$(EXEEXT) install.catalogs install.man
 	-mkdir -p ${DESTBIN}
 	-mv -f ${DESTBIN}/tcsh$(EXEEXT)  ${DESTBIN}/tcsh.old
 	cp tcsh$(EXEEXT) ${DESTBIN}/tcsh$(EXEEXT)
-	-strip ${DESTBIN}/tcsh$(EXEEXT)
 	chmod 755 ${DESTBIN}/tcsh$(EXEEXT)
 
 install.catalogs:
@@ -748,11 +748,11 @@ ftp: tcsh-${VERSION}.tar.Z tcsh.tahoe-${VERSION}.tar.Z
 
 autoconfigure: $(srcdir)/configure $(srcdir)/config.h.in
 
-$(srcdir)/configure: $(srcdir)/configure.in
+$(srcdir)/configure: $(srcdir)/configure.ac
 	cd $(srcdir) && autoconf
 
 $(srcdir)/config.h.in: $(srcdir)/stamp-h.in
-$(srcdir)/stamp-h.in: $(srcdir)/configure.in
+$(srcdir)/stamp-h.in: $(srcdir)/configure.ac
 	cd $(srcdir) && autoheader
 	@echo timestamp > $(srcdir)/stamp-h.in
 
@@ -786,6 +786,9 @@ ${TWOBJS} ${TWINC}: ${TWH}
 
 # glob.h
 glob.${SUF} sh.glob.${SUF}: glob.h
+
+# dotlock.h
+dotlock.${SUF}: dotlock.h
 
 # ed.defns.h
 EDDINC=tc.bind.${SUF} tc.func.${SUF} tc.os.${SUF}

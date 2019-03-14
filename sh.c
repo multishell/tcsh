@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.173 2011/03/30 16:22:15 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.177 2013/03/28 15:06:31 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -39,7 +39,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$tcsh: sh.c,v 3.173 2011/03/30 16:22:15 christos Exp $")
+RCSID("$tcsh: sh.c,v 3.177 2013/03/28 15:06:31 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -355,6 +355,7 @@ main(int argc, char **argv)
 
     /* Default history size to 100 */
     setcopy(STRhistory, str2short("100"), VAR_READWRITE);
+    sethistory(100);
 
     tempv = argv;
     ffile = SAVE(tempv[0]);
@@ -797,6 +798,8 @@ main(int argc, char **argv)
 #ifdef COLOR_LS_F
     if ((tcp = getenv("LS_COLORS")) != NULL)
 	parseLS_COLORS(str2short(tcp));
+    if ((tcp = getenv("LSCOLORS")) != NULL)
+	parseLSCOLORS(str2short(tcp));
 #endif /* COLOR_LS_F */
 
     doldol = putn((tcsh_number_t)getpid());	/* For $$ */
@@ -818,7 +821,7 @@ main(int argc, char **argv)
 #else /* !WINNT_NATIVE */
 #ifdef HAVE_MKSTEMP
     {
-	char *tmpdir = getenv ("TMPDIR");
+	const char *tmpdir = getenv ("TMPDIR");
 	if (!tmpdir)
 	    tmpdir = "/tmp";
 	shtemp = Strspl(SAVE(tmpdir), SAVE("/sh" TMP_TEMPLATE)); /* For << */
@@ -1215,14 +1218,14 @@ main(int argc, char **argv)
 
 #ifdef NeXT
 	    /* NeXT 2.0 /usr/etc/rlogind, does not set our process group! */
-	    if (shpgrp == 0) {
+	    if (f != -1 && shpgrp == 0) {
 	        shpgrp = getpid();
 		(void) setpgid(0, shpgrp);
 	        (void) tcsetpgrp(f, shpgrp);
 	    }
 #endif /* NeXT */
 #ifdef BSDJOBS			/* if we have tty job control */
-	    if (grabpgrp(f, shpgrp) != -1) {
+	    if (f != -1 && grabpgrp(f, shpgrp) != -1) {
 		/*
 		 * Thanks to Matt Day for the POSIX references, and to
 		 * Paul Close for the SGI clarification.

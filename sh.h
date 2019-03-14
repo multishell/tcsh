@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.h,v 3.164 2011/02/05 16:14:20 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.h,v 3.166 2012/06/21 18:49:11 christos Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -428,9 +428,7 @@ typedef long tcsh_number_t;
 # if (defined(_SS_SIZE) || defined(_SS_MAXSIZE)) && defined(HAVE_STRUCT_SOCKADDR_STORAGE_SS_FAMILY)
 #  if !defined(__APPLE__) /* Damnit, where is getnameinfo() folks? */
 #   if !defined(sgi)
-#    if !defined(__CYGWIN__)
-#     define INET6
-#    endif /* __CYGWIN__ */
+#    define INET6
 #   endif /* sgi */
 #  endif /* __APPLE__ */
 # endif
@@ -440,21 +438,7 @@ typedef long tcsh_number_t;
 #ifdef PURIFY
 /* exit normally, allowing purify to trace leaks */
 # define _exit		exit
-typedef  int		pret_t;
-#else /* !PURIFY */
-/*
- * If your compiler complains, then you can either
- * throw it away and get gcc or, use the following define
- * and get rid of the typedef.
- * [The 4.2/3BSD vax compiler does not like that]
- * Both MULTIFLOW and PCC compilers exhbit this bug.  -- sterling@netcom.com
- */
-# if (defined(vax) || defined(uts) || defined(MULTIFLOW) || defined(PCC)) && !defined(__GNUC__)
-#  define pret_t void
-# else /* !((vax || uts || MULTIFLOW || PCC) && !__GNUC__) */
-typedef void pret_t;
-# endif /* (vax || uts || MULTIFLOW || PCC) && !__GNUC__ */
-#endif /* PURIFY */
+#endif /* !PURIFY */
 
 /*
  * ASCII vs. EBCDIC
@@ -1019,10 +1003,6 @@ EXTERN Char  **alvec IZERO_STRUCT,
 /*
  * Filename/command name expansion variables
  */
-
-#ifdef __CYGWIN__
-# undef MAXPATHLEN
-#endif /* __CYGWIN__ */
 
 #ifndef MAXPATHLEN
 # ifdef PATH_MAX

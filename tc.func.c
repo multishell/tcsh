@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/tc.func.c,v 3.148 2011/12/14 16:33:23 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/tc.func.c,v 3.151 2013/05/17 15:46:47 christos Exp $ */
 /*
  * tc.func.c: New tcsh builtins.
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: tc.func.c,v 3.148 2011/12/14 16:33:23 christos Exp $")
+RCSID("$tcsh: tc.func.c,v 3.151 2013/05/17 15:46:47 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -193,7 +193,7 @@ void
 dolist(Char **v, struct command *c)
 {
     Char **globbed;
-    int     i, k;
+    int     i, k, ret = 0;
     struct stat st;
 
     USE(c);
@@ -333,8 +333,11 @@ dolist(Char **v, struct command *c)
 			xputchar('\n');
 		    print_by_column(STRNULL, &v[i], k - i, FALSE);
 		}
+		haderr = 1;
 		xprintf("%S: %s.\n", tmp, strerror(err));
+		haderr = 0;
 		i = k + 1;
+		ret = 1;
 	    }
 	    else if (S_ISDIR(st.st_mode)) {
 		Char   *cp;
@@ -372,6 +375,8 @@ dolist(Char **v, struct command *c)
 		xputchar('\n');
 	    print_by_column(STRNULL, &v[i], k - i, FALSE);
 	}
+	if (ret)
+	    stderror(ERR_SILENT);
     }
 
     cleanup_until(globbed);
@@ -733,7 +738,7 @@ auto_lock(void)
 	pp = xgetpass("Password:");
 
 	crpp = XCRYPT(pw, pp, srpp);
-	if ((strcmp(crpp, srpp) == 0)
+	if ((crpp && strcmp(crpp, srpp) == 0)
 #ifdef AFS
 	    || (ka_UserAuthenticateGeneral(KA_USERAUTH_VERSION,
 					   afsname,     /* name */
@@ -1109,7 +1114,7 @@ rmstar(struct wordent *cp)
 #endif /* RMDEBUG */
     Char   *charac;
     char    c;
-    int     ask, doit, star = 0, silent = 0;
+    int     ask, doit, star = 0, silent = 0, opintr_disabled;
 
     if (!adrof(STRrmstar))
 	return;
@@ -1119,6 +1124,8 @@ rmstar(struct wordent *cp)
     we = cp->next;
     while (*we->word == ';' && we != cp)
 	we = we->next;
+    opintr_disabled = pintr_disabled;
+    pintr_disabled = 0;
     while (we != cp) {
 #ifdef RMDEBUG
 	if (*tag)
@@ -1195,6 +1202,7 @@ rmstar(struct wordent *cp)
 	    xprintf("%S ", we->word);
     }
 #endif /* RMDEBUG */
+    pintr_disabled = opintr_disabled;
     return;
 }
 
