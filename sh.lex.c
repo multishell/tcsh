@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.lex.c,v 3.69 2006/02/23 18:19:37 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.lex.c,v 3.73 2006/07/05 15:07:03 mitr Exp $ */
 /*
  * sh.lex.c: Lexical analysis into tokens
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.lex.c,v 3.69 2006/02/23 18:19:37 christos Exp $")
+RCSID("$tcsh: sh.lex.c,v 3.73 2006/07/05 15:07:03 mitr Exp $")
 
 #include "ed.h"
 
@@ -1527,7 +1527,7 @@ static ssize_t
 wide_read(int fildes, Char *buf, size_t nchars, int use_fclens)
 {
     char cbuf[BUFSIZE + 1];
-    ssize_t res, r;
+    ssize_t res, r = 0;
     size_t partial;
     
     if (nchars == 0)
@@ -1550,10 +1550,10 @@ wide_read(int fildes, Char *buf, size_t nchars, int use_fclens)
 	partial += r;
 	i = 0;
 	while (i < partial && nchars != 0) {
-	    int len;
+	    int tlen;
 
-	    len = normal_mbtowc(buf + res, cbuf + i, partial - i);
-	    if (len == -1) {
+	    tlen = normal_mbtowc(buf + res, cbuf + i, partial - i);
+	    if (tlen == -1) {
 	        reset_mbtowc();
 		if ((partial - i) < MB_LEN_MAX && r > 0)
 		    /* Maybe a partial character and there is still a chance
@@ -1561,13 +1561,13 @@ wide_read(int fildes, Char *buf, size_t nchars, int use_fclens)
 		    break;
 		buf[res] = (unsigned char)cbuf[i] | INVALID_BYTE;
 	    }
-	    if (len <= 0)
-		len = 1;
+	    if (tlen <= 0)
+		tlen = 1;
 #ifdef WIDE_STRINGS
 	    if (use_fclens)
-		fclens[res] = len;
+		fclens[res] = tlen;
 #endif
-	    i += len;
+	    i += tlen;
 	    res++;
 	    nchars--;
 	}
@@ -1575,7 +1575,9 @@ wide_read(int fildes, Char *buf, size_t nchars, int use_fclens)
 	    memmove(cbuf, cbuf + i, partial - i);
 	partial -= i;
     } while (partial != 0 && nchars > 0);
-    /* Throwing away possible partial multibyte characters on error */
+    /* Throwing away possible partial multibyte characters on error if the
+       stream is not seekable */
+    lseek(fildes, -(off_t)partial, L_INCR);
     return res != 0 ? res : r;
 }
 
@@ -1592,6 +1594,15 @@ bgetc(void)
 	    (void) lseek(SHIN, fseekp, L_SET);
 	}
 	if (fseekp == feobp) {
+#ifdef WIDE_STRINGS
+	    off_t bytes;
+	    size_t i;
+
+	    bytes = fbobp;
+	    for (i = 0; i < (size_t)(feobp - fbobp); i++)
+		bytes += fclens[i];
+	    fseekp = feobp = bytes;
+#endif
 	    fbobp = feobp;
 	    c = wide_read(SHIN, fbuf[0], BUFSIZE, 1);
 #ifdef convex
@@ -1760,9 +1771,9 @@ btell(struct Ain *l)
 	return;
     case TCSH_F_SEEK:
 #ifdef WIDE_STRINGS
-	if (cantell && fseekp >= fbobp && fseekp < feobp) {
+	if (cantell && fseekp >= fbobp && fseekp <= feobp) {
 	    size_t i;
-	    
+
 	    l->f_seek = fbobp;
 	    for (i = 0; i < (size_t)(fseekp - fbobp); i++)
 		l->f_seek += fclens[i];

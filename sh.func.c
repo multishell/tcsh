@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.func.c,v 3.138 2006/02/16 01:26:09 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.func.c,v 3.141 2006/06/30 16:45:37 christos Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.func.c,v 3.138 2006/02/16 01:26:09 christos Exp $")
+RCSID("$tcsh: sh.func.c,v 3.141 2006/06/30 16:45:37 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -220,24 +220,15 @@ void
 dofiletest(Char **v, struct command *c)
 {
     Char **globbed, **fileptr, *ftest, *res;
-    int gflag;
 
     USE(c);
     if (*(ftest = *++v) != '-')
 	stderror(ERR_NAME | ERR_FILEINQ);
     ++v;
 
-    gflag = tglob(v);
-    if (gflag) {
-	v = globall(v, gflag);
-	if (v == 0)
-	    stderror(ERR_NAME | ERR_NOMATCH);
-    }
-    else
-	v = saveblk(v);
+    v = glob_all_or_error(v);
     globbed = v;
     cleanup_push(globbed, blk_cleanup);
-    trim(v);
 
     while (*(fileptr = v++) != '\0') {
 	res = filetest(ftest, &fileptr, 0);
@@ -1059,7 +1050,7 @@ static void
 xecho(int sep, Char **v)
 {
     Char *cp, **globbed = NULL;
-    int     nonl = 0, gflag;
+    int     nonl = 0;
     int	    echo_style = ECHO_STYLE;
     struct varent *vp;
 
@@ -1078,21 +1069,13 @@ xecho(int sep, Char **v)
     v++;
     if (*v == 0)
 	goto done;
-    gflag = tglob(v);
-    if (gflag) {
+    if (setintr) {
 	int old_pintr_disabled;
-
-	if (setintr)
-	    pintr_push_enable(&old_pintr_disabled);
-	v = globall(v, gflag);
-	if (setintr)
-	    cleanup_until(&old_pintr_disabled);
-	if (v == 0)
-	    stderror(ERR_NAME | ERR_NOMATCH);
-    }
-    else {
-	v = saveblk(v);
-	trim(v);
+	pintr_push_enable(&old_pintr_disabled);
+	v = glob_all_or_error(v);
+	cleanup_until(&old_pintr_disabled);
+    } else {
+	v = glob_all_or_error(v);
     }
     globbed = v;
     if (globbed != NULL)
@@ -1126,7 +1109,7 @@ xecho(int sep, Char **v)
 #if 0			/* Windows does not understand \e */
 		    c = '\e';
 #else
-		    c = '\033';
+		    c = CTL_ESC('\033');
 #endif
 		    break;
 		case 'f':
@@ -1320,7 +1303,7 @@ dosetenv(Char **v, struct command *c)
 	fix_strcoll_bug();
 # endif /* STRCOLLBUG */
 	tw_cmd_free();	/* since the collation sequence has changed */
-	for (k = 0200; k <= 0377 && !Isprint(k); k++)
+	for (k = 0200; k <= 0377 && !Isprint(CTL_ESC(k)); k++)
 	    continue;
 	AsciiOnly = MB_CUR_MAX == 1 && k > 0377;
 #else /* !NLS */
@@ -1523,7 +1506,7 @@ dounsetenv(Char **v, struct command *c)
 		    fix_strcoll_bug();
 # endif /* STRCOLLBUG */
 		    tw_cmd_free();/* since the collation sequence has changed */
-		    for (k = 0200; k <= 0377 && !Isprint(k); k++)
+		    for (k = 0200; k <= 0377 && !Isprint(CTL_ESC(k)); k++)
 			continue;
 		    AsciiOnly = MB_CUR_MAX == 1 && k > 0377;
 #else /* !NLS */

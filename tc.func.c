@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/tc.func.c,v 3.131 2006/03/02 18:46:45 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/tc.func.c,v 3.133 2006/03/11 15:32:00 mitr Exp $ */
 /*
  * tc.func.c: New tcsh builtins.
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: tc.func.c,v 3.131 2006/03/02 18:46:45 christos Exp $")
+RCSID("$tcsh: tc.func.c,v 3.133 2006/03/11 15:32:00 mitr Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -193,7 +193,7 @@ void
 dolist(Char **v, struct command *c)
 {
     Char **globbed;
-    int     i, k, gflag;
+    int     i, k;
     struct stat st;
 
     USE(c);
@@ -206,17 +206,9 @@ dolist(Char **v, struct command *c)
 	cleanup_until(&word);
 	return;
     }
-    gflag = tglob(v);
-    if (gflag) {
-	v = globall(v, gflag);
-	if (v == 0)
-	    stderror(ERR_NAME | ERR_NOMATCH);
-    }
-    else
-	v = saveblk(v);
+    v = glob_all_or_error(v);
     globbed = v;
     cleanup_push(globbed, blk_cleanup);
-    trim(v);
     for (k = 0; v[k] != NULL && v[k][0] != '-'; k++)
 	continue;
     if (v[k]) {
@@ -613,7 +605,8 @@ xgetpass(const char *prm)
 
     sigprocmask(SIG_UNBLOCK, NULL, &omask);
     sigaction(SIGINT, NULL, &sigint);
-    sigset(SIGINT, SIG_IGN);
+    signal(SIGINT, SIG_IGN);
+    sigrelse(SIGINT);
     cleanup_push(&sigint, sigint_cleanup);
     cleanup_push(&omask, sigprocmask_cleanup);
     (void) Rawmode();	/* Make sure, cause we want echo off */
@@ -2000,7 +1993,8 @@ remotehost(void)
     if (pid == 0) {
 	xclose(fds[0]);
 	/* Don't get stuck if the resolver does not work! */
-	sigset(SIGALRM, palarm);
+	signal(SIGALRM, palarm);
+	sigrelse(SIGALRM);
 	(void) alarm(2);
 	getremotehost(fds[1]);
 	/*NOTREACHED*/

@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/ed.chared.c,v 3.90 2006/02/14 14:07:36 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/ed.chared.c,v 3.92 2006/08/22 17:20:04 christos Exp $ */
 /*
  * ed.chared.c: Character editing functions.
  */
@@ -72,7 +72,7 @@
 
 #include "sh.h"
 
-RCSID("$tcsh: ed.chared.c,v 3.90 2006/02/14 14:07:36 christos Exp $")
+RCSID("$tcsh: ed.chared.c,v 3.92 2006/08/22 17:20:04 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -202,7 +202,11 @@ c_delafter(int num)
 	    for (cp = Cursor; cp + num <= LastChar; cp++)
 		*cp = cp[num];
 	LastChar -= num;
-	if (Mark && Mark > Cursor)
+	/* Mark was within the range of the deleted word? */
+	if (Mark && Mark > Cursor && Mark <= Cursor+num)
+		Mark = Cursor;
+	/* Mark after the deleted word? */
+	else if (Mark && Mark > Cursor)
 		Mark -= num;
     }
 #ifdef notdef
@@ -240,7 +244,11 @@ c_delbefore(int num)		/* delete before dot, with bounds checking */
 		*cp = cp[num];
 	LastChar -= num;
 	Cursor -= num;
-	if (Mark && Mark > Cursor)
+	/* Mark was within the range of the deleted word? */
+	if (Mark && Mark > Cursor && Mark <= Cursor+num)
+		Mark = Cursor;
+	/* Mark after the deleted word? */
+	else if (Mark && Mark > Cursor)
 		Mark -= num;
     }
 }
@@ -1065,6 +1073,12 @@ e_inc_search(int dir)
 	     *LastChar++ = *cp++)
 	    continue;
 	*LastChar = '\0';
+	if (adrof(STRhighlight) && pchar == ':') {
+	    /* if the no-glob-search patch is applied, remove the - 1 below */
+	    IncMatchLen = patbuf.len - 1;
+	    ClearLines();
+	    ClearDisp();
+	}
 	Refresh();
 
 	if (GetNextChar(&ch) != 1)
@@ -1103,7 +1117,7 @@ e_inc_search(int dir)
 	    break;
 
 	default:
-	    switch (ch) {
+	    switch (ASC(ch)) {
 	    case 0007:		/* ^G: Abort */
 		ret = CC_ERROR;
 		done++;
@@ -1335,7 +1349,7 @@ v_search(int dir)
 	return(CC_ERROR);
     }
     else {
-	if (ch == 0033) {
+	if (ASC(ch) == 0033) {
 	    Refresh();
 	    *LastChar++ = '\n';
 	    *LastChar = '\0';
@@ -1524,7 +1538,11 @@ e_digit(Char c)			/* gray magic here */
 CCRETVAL
 e_argdigit(Char c)		/* for ESC-n */
 {
+#ifdef IS_ASCII
     c &= ASCII;
+#else
+    c = CTL_ESC(ASC(c) & ASCII); /* stripping for EBCDIC done the ASCII way */
+#endif
 
     if (!Isdigit(c))
 	return(CC_ERROR);	/* no NULs in the input ever!! */
@@ -1566,6 +1584,14 @@ CCRETVAL
 e_newline(Char c)
 {				/* always ignore argument */
     USE(c);
+    if (adrof(STRhighlight) && MarkIsSet) {
+	MarkIsSet = 0;
+	ClearLines();
+	ClearDisp();
+	Refresh();
+    }
+    MarkIsSet = 0;
+
   /*  PastBottom();  NOW done in ed.inputl.c */
     *LastChar++ = '\n';		/* for the benefit of CSH */
     *LastChar = '\0';		/* just in case */
@@ -2222,6 +2248,11 @@ e_yank_kill(Char c)
 	Mark = cp;		/* else cursor at beginning, mark at end */
     }
 
+    if (adrof(STRhighlight) && MarkIsSet) {
+	ClearLines();
+	ClearDisp();
+    }
+    MarkIsSet = 0;
     return(CC_REFRESH);
 }
 
@@ -2281,6 +2312,11 @@ e_yank_pop(Char c)
 	Mark = cp;		/* else cursor at beginning, mark at end */
     }
 
+    if (adrof(STRhighlight) && MarkIsSet) {
+	ClearLines();
+	ClearDisp();
+    }
+    MarkIsSet = 0;
     return(CC_REFRESH);
 }
 
@@ -2540,7 +2576,10 @@ e_killend(Char c)
 {
     USE(c);
     c_push_kill(Cursor, LastChar); /* copy it */
-    Mark = LastChar = Cursor;		/* zap! -- delete to end */
+    LastChar = Cursor;		/* zap! -- delete to end */
+    if (Mark > Cursor)
+        Mark = Cursor;
+    MarkIsSet = 0;
     return(CC_REFRESH);
 }
 
@@ -2564,6 +2603,7 @@ e_killall(Char c)
     USE(c);
     c_push_kill(InputBuf, LastChar); /* copy it */
     Cursor = Mark = LastChar = InputBuf;	/* zap! -- delete all of it */
+    MarkIsSet = 0;
     return(CC_REFRESH);
 }
 
@@ -2584,6 +2624,11 @@ e_killregion(Char c)
 	c_push_kill(Mark, Cursor); /* copy it */
 	c_delbefore((int)(Cursor - Mark));
     }
+    if (adrof(STRhighlight) && MarkIsSet) {
+	ClearLines();
+	ClearDisp();
+    }
+    MarkIsSet = 0;
     return(CC_REFRESH);
 }
 
@@ -3019,7 +3064,13 @@ CCRETVAL
 e_set_mark(Char c)
 {
     USE(c);
+    if (adrof(STRhighlight) && MarkIsSet && Mark != Cursor) {
+	ClearLines();
+	ClearDisp();
+	Refresh();
+    }
     Mark = Cursor;
+    MarkIsSet = 1;
     return(CC_NORM);
 }
 
@@ -3414,9 +3465,20 @@ e_magic_space(Char c)
 CCRETVAL
 e_inc_fwd(Char c)
 {
+    CCRETVAL ret;
+
     USE(c);
     patbuf.len = 0;
-    return e_inc_search(F_DOWN_SEARCH_HIST);
+    MarkIsSet = 0;
+    ret = e_inc_search(F_DOWN_SEARCH_HIST);
+    if (adrof(STRhighlight) && IncMatchLen) {
+	IncMatchLen = 0;
+	ClearLines();
+	ClearDisp();
+	Refresh();
+    }
+    IncMatchLen = 0;
+    return ret;
 }
 
 
@@ -3424,9 +3486,20 @@ e_inc_fwd(Char c)
 CCRETVAL
 e_inc_back(Char c)
 {
+    CCRETVAL ret;
+
     USE(c);
     patbuf.len = 0;
-    return e_inc_search(F_UP_SEARCH_HIST);
+    MarkIsSet = 0;
+    ret = e_inc_search(F_UP_SEARCH_HIST);
+    if (adrof(STRhighlight) && IncMatchLen) {
+	IncMatchLen = 0;
+	ClearLines();
+	ClearDisp();
+	Refresh();
+    }
+    IncMatchLen = 0;
+    return ret;
 }
 
 /*ARGSUSED*/

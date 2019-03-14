@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.129 2006/03/02 18:46:44 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.132 2006/03/14 01:22:57 mitr Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -39,7 +39,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$tcsh: sh.c,v 3.129 2006/03/02 18:46:44 christos Exp $")
+RCSID("$tcsh: sh.c,v 3.132 2006/03/14 01:22:57 mitr Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -342,7 +342,7 @@ main(int argc, char **argv)
     {
 	int     k;
 
-	for (k = 0200; k <= 0377 && !Isprint(k); k++)
+	for (k = 0200; k <= 0377 && !Isprint(CTL_ESC(k)); k++)
 	    continue;
 	AsciiOnly = MB_CUR_MAX == 1 && k > 0377;
     }
@@ -688,6 +688,12 @@ main(int argc, char **argv)
 	if (sh_len == 0)
 	    setcopy(STRshell, STR_SHELLPATH, VAR_READWRITE);
     }
+
+#ifdef _OSD_POSIX  /* BS2000 needs this variable set to "SHELL" */
+    if ((tcp = getenv("PROGRAM_ENVIRONMENT")) == NULL)
+	tcp = "SHELL";
+    tsetenv(STRPROGRAM_ENVIRONMENT, quote(str2short(tcp)));
+#endif /* _OSD_POSIX */
 
 #ifdef COLOR_LS_F
     if ((tcp = getenv("LS_COLORS")) != NULL)
@@ -1651,10 +1657,14 @@ goodbye(Char **v, struct command *c)
     if (loginsh) {
 	size_t omark;
 
-	(void) sigset(SIGQUIT, SIG_IGN);
-	(void) sigset(SIGINT, SIG_IGN);
-	(void) sigset(SIGTERM, SIG_IGN);
-	(void) sigset(SIGHUP, SIG_IGN);
+	signal(SIGQUIT, SIG_IGN);
+	sigrelse(SIGQUIT);
+	signal(SIGINT, SIG_IGN);
+	sigrelse(SIGINT);
+	signal(SIGTERM, SIG_IGN);
+	sigrelse(SIGTERM);
+	signal(SIGHUP, SIG_IGN);
+	sigrelse(SIGHUP);
 	phup_disabled = 1;
 	setintr = 0;		/* No interrupts after "logout" */
 	/* Trap errors inside .logout */
@@ -2024,7 +2034,7 @@ void
 dosource(Char **t, struct command *c)
 {
     Char *f;
-    int    hflg = 0, gflag;
+    int    hflg = 0;
     char *file;
 
     USE(c);
@@ -2044,15 +2054,7 @@ dosource(Char **t, struct command *c)
     file = strsave(short2str(f));
     cleanup_push(file, xfree);
     xfree(f);
-    gflag = tglob(t);
-    if (gflag) {
-	t = globall(t, gflag);
-	if (t == 0)
-	    stderror(ERR_NAME | ERR_NOMATCH);
-    } else {
-	t = saveblk(t);
-	trim(t);
-    }
+    t = glob_all_or_error(t);
     if ((!srcfile(file, 0, hflg, t)) && (!hflg) && (!bequiet))
 	stderror(ERR_SYSTEM, file, strerror(errno));
     cleanup_until(file);

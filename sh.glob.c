@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.glob.c,v 3.69 2006/02/14 14:07:36 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.glob.c,v 3.72 2006/03/14 01:22:57 mitr Exp $ */
 /*
  * sh.glob.c: Regular expression expansion
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.glob.c,v 3.69 2006/02/14 14:07:36 christos Exp $")
+RCSID("$tcsh: sh.glob.c,v 3.72 2006/03/14 01:22:57 mitr Exp $")
 
 #include "tc.h"
 #include "tw.h"
@@ -496,8 +496,12 @@ globone(Char *str, int action)
 	vo = v;
 
     vl = libglob(vo);
-    if ((gflg & G_CSH) && vl != vo)
-	cleanup_until(vo);
+    if (gflg & G_CSH) {
+    	if (vl != vo)
+	    cleanup_until(vo);
+	else
+	    cleanup_ignore(vo);
+    }
     if (vl == NULL) {
 	setname(short2str(str));
 	stderror(ERR_NAME | ERR_NOMATCH);
@@ -546,6 +550,23 @@ globall(Char **v, int gflg)
 	trim(vl);
 
     return vl;
+}
+
+Char **
+glob_all_or_error(Char **v)
+{
+    int gflag;
+
+    gflag = tglob(v);
+    if (gflag) {
+	v = globall(v, gflag);
+	if (v == NULL)
+	    stderror(ERR_NAME | ERR_NOMATCH);
+    } else {
+	v = saveblk(v);
+	trim(v);
+    }
+    return v;
 }
 
 void
@@ -754,13 +775,13 @@ backeval(struct blk_buf *bb, struct Strbuf *word, Char *cp, int literal)
 	    if (seterr)
 		stderror(ERR_OLD);
 #ifdef SIGTSTP
-	    (void) sigignore(SIGTSTP);
+	    signal(SIGTSTP, SIG_IGN);
 #endif
 #ifdef SIGTTIN
-	    (void) sigignore(SIGTTIN);
+	    signal(SIGTTIN, SIG_IGN);
 #endif
 #ifdef SIGTTOU
-	    (void) sigignore(SIGTTOU);
+	    signal(SIGTTOU, SIG_IGN);
 #endif
 	    execute(t, -1, NULL, NULL, TRUE);
 

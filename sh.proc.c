@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.proc.c,v 3.97 2006/02/14 00:52:52 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.proc.c,v 3.101 2006/04/27 07:43:46 amold Exp $ */
 /*
  * sh.proc.c: Job manipulations
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.proc.c,v 3.97 2006/02/14 00:52:52 christos Exp $")
+RCSID("$tcsh: sh.proc.c,v 3.101 2006/04/27 07:43:46 amold Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -406,7 +406,7 @@ found:
 	    }
 	}
     }
-#if defined(BSDJOBS) || defined(HAVEwait3)
+#if defined(BSDJOBS) || defined(HAVEwait3) ||defined(WINNT_NATIVE)
     goto loop;
 #endif /* BSDJOBS || HAVEwait3 */
  end:
@@ -1032,10 +1032,10 @@ pprint(struct process *pp, int flag)
 			int free_ptr;
 
 			free_ptr = 0;
-			ptr = (char *)(intptr_t)mesg[pp->p_reason & ASCII].pname;
+			ptr = (char *)(intptr_t)mesg[pp->p_reason & 0177].pname;
 			if (ptr == NULL) {
 			    ptr = xasprintf("%s %d", CGETS(17, 5, "Signal"),
-					    pp->p_reason & ASCII);
+					    pp->p_reason & 0177);
 			    cleanup_push(ptr, xfree);
 			    free_ptr = 1;
 			}
@@ -1422,7 +1422,7 @@ static void
 pkill(Char **v, int signum)
 {
     struct process *pp, *np;
-    int jobflags = 0, err1 = 0, gflag;
+    int jobflags = 0, err1 = 0;
     pid_t     pid;
     Char *cp, **vp, **globbed;
 
@@ -1438,16 +1438,7 @@ pkill(Char **v, int signum)
 	if (**vp == '%')
 	    (void) quote(*vp);
 
-    gflag = tglob(v);
-    if (gflag) {
-	v = globall(v, gflag);
-	if (v == 0)
-	    stderror(ERR_NAME | ERR_NOMATCH);
-    }
-    else {
-	v = saveblk(v);
-	trim(v);
-    }
+    v = glob_all_or_error(v);
     globbed = v;
     cleanup_push(globbed, blk_cleanup);
 
@@ -1790,7 +1781,7 @@ pfork(struct command *t, int wanttty)
 	    (void) signal(SIGQUIT, SIG_IGN);
 	}
 #ifdef OREO
-	sigignore(SIGIO);	/* ignore SIGIO in child too */
+	signal(SIGIO, SIG_IGN);	/* ignore SIGIO in child too */
 #endif /* OREO */
 
 	pgetty(wanttty, pgrp);
@@ -1910,7 +1901,7 @@ setttypgrp(int pgrp)
 	 * the background according to POSIX... We ignore this here.
 	 */
 	sigaction(SIGTTOU, NULL, &old);
-	sigset(SIGTTOU, SIG_IGN);
+	signal(SIGTTOU, SIG_IGN);
 #endif
 	(void) tcsetpgrp(FSHTTY, pgrp);
 # ifdef POSIXJOBS
