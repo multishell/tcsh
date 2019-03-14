@@ -1,5 +1,5 @@
 #
-# $Id: complete.tcsh,v 1.28 1995/05/06 17:51:58 christos Exp $
+# $Id: complete.tcsh,v 1.27 1995/04/29 22:28:24 christos Exp christos $
 # example file using the new completion code
 #
 

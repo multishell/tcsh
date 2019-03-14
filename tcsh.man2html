@@ -1,5 +1,5 @@
 #!/usr/local/bin/perl
-# $Id: tcsh.man2html,v 1.7 1995/03/19 22:33:26 christos Exp $
+# $Id: tcsh.man2html,v 1.6 1995/03/12 04:49:26 christos Exp $
 
 # tcsh.man2html, Dave Schweisguth <dcs@proton.chem.yale.edu>
 #

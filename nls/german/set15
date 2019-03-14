@@ -1,4 +1,4 @@
-$ $Id: set15,v 1.2 1995/03/19 18:09:24 christos Exp $
+$ $Id$
 $ sh.func.c
 $set 15
 1 %s: %s: Kann Begrenzung nicht %s (%s)\n

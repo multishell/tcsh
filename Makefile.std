@@ -1,4 +1,4 @@
-# $Id: Makefile.std,v 1.79 1995/04/29 22:28:24 christos Exp $
+# $Id: Makefile.std,v 1.78 1995/04/16 19:15:53 christos Exp $
 #	Makefile.std	4.3	6/11/83
 #
 # C Shell with process control; VM/UNIX VAX Makefile

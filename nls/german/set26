@@ -1,4 +1,4 @@
-$ $Id: set26,v 1.2 1995/03/19 18:09:24 christos Exp $
+$ $Id$
 $ tc.who.c
 $set 26
 1 Kein Zugriff auf %s.  Bitte "unset watch" eingeben.\n
