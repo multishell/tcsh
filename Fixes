@@ -1,9 +1,16 @@
+ 30. V6.12.03 - 20040322
+ 34. turn on kanji and dspmbyte by default; add check for utf8 locales,
+     and turn parsing of that automatically based on $LANG.
+ 33. Fix compilation issue under Windows/NT and charset incorrect patch
+     (Yoshiyuki Sakakibara)
+ 32. completion additions (Tom Warzeka)
+ 31. compilation fix (Martin Kraemer)
  30. V6.12.02 - 20040221
  29. Glob completion listing addition (Tom Warzeka)
  28. BS2000 bs2cmd builtin. (Martin Kraemer)
  27. Fix interrupt resetting code when /etc startup scripts have syntax errors
      (Mark A. Grondona)
- 26. Clarification of kill-ring commands (Per Hederland)
+ 26. Clarification of kill-ring commands (Per Hedeland)
  25. Debian completion additions (Martin Godisch)
  24. Japanese character set fixes (Juehiro-san) from debian
  23. NLS charset fixes; disabled since they only work with gnu gencat
