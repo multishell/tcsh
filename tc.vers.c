@@ -1,4 +1,4 @@
-/* $Header: /u/christos/cvsroot/tcsh/tc.vers.c,v 3.45 1998/09/18 16:09:20 christos Exp $ */
+/* $Header: /src/pub/tcsh/tc.vers.c,v 3.47 2002/01/07 03:19:04 christos Exp $ */
 /*
  * tc.vers.c: Version dependent stuff
  */
@@ -14,11 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -37,7 +33,7 @@
 #include "sh.h"
 #include "tw.h"
 
-RCSID("$Id: tc.vers.c,v 3.45 1998/09/18 16:09:20 christos Exp $")
+RCSID("$Id: tc.vers.c,v 3.47 2002/01/07 03:19:04 christos Exp $")
 
 #include "patchlevel.h"
 
@@ -139,6 +135,11 @@ fix_version()
 #else
 # define CCATSTR ""
 #endif
+#ifdef FILEC
+# define FILECSTR ",filec"
+#else
+# define FILECSTR ""
+#endif
 /* if you want your local version to say something */
 #ifndef LOCALSTR
 # define LOCALSTR ""
@@ -157,11 +158,11 @@ fix_version()
 
 
     (void) xsnprintf(version, sizeof(version),
-"tcsh %d.%.2d.%.2d (%s) %s (%S-%S-%S) options %s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
+"tcsh %d.%.2d.%.2d (%s) %s (%S-%S-%S) options %s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
 	     REV, VERS, PATCHLEVEL, ORIGIN, DATE, machtype, vendor, ostype,
 	     SSSTR, NLSSTR, LFSTR, DLSTR, VISTR, DTRSTR, BYESTR,
 	     ALSTR, KANSTR, SMSTR, HBSTR, NGSTR, RHSTR, AFSSTR, NDSTR,
-	     COLORSTR, DSPMSTR, CCATSTR, LOCALSTR);
+	     COLORSTR, DSPMSTR, CCATSTR, FILECSTR, LOCALSTR);
     set(STRversion, SAVE(version), VAR_READWRITE);
     (void) xsnprintf(version, sizeof(version), "%d.%.2d.%.2d",
 		     REV, VERS, PATCHLEVEL);

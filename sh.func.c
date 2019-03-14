@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.func.c,v 3.92 2001/01/22 03:19:25 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.func.c,v 3.97 2002/03/05 23:21:14 christos Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -14,11 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.func.c,v 3.92 2001/01/22 03:19:25 christos Exp $")
+RCSID("$Id: sh.func.c,v 3.97 2002/03/05 23:21:14 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -446,7 +442,7 @@ reexecute(kp)
      * pgrp's as the jobs would then have no way to get the tty (we can't give
      * it to them, and our parent wouldn't know their pgrp, etc.
      */
-    execute(kp, (tpgrp > 0 ? tpgrp : -1), NULL, NULL);
+    execute(kp, (tpgrp > 0 ? tpgrp : -1), NULL, NULL, TRUE);
 }
 
 /*ARGSUSED*/
@@ -1382,6 +1378,11 @@ dosetenv(v, c)
 	return;
     }
 
+    if (eq(vp, STRNLSPATH)) {
+	(void) catclose(catd);
+	nlsinit();
+    }
+
     if (eq(vp, STRNOREBIND)) {
 	NoNLSRebind = 1;
 	MapsAreInited = 0;
@@ -1576,6 +1577,10 @@ dounsetenv(v, c)
 		else if (eq(name, STRLS_COLORS))
 		    parseLS_COLORS(n);
 #endif /* COLOR_LS_F */
+		else if (eq(name, STRNLSPATH)) {
+		    (void) catclose(catd);
+		    nlsinit();
+		}
 		/*
 		 * start again cause the environment changes
 		 */
@@ -1711,15 +1716,15 @@ doumask(v, c)
 #   define toset(a) ((a) + 1)
 #  endif /* aiws */
 # else /* BSDLIMIT */
-#  if defined(BSD4_4) && !defined(__386BSD__)
-    typedef quad_t RLIM_TYPE;
+#  if (defined(BSD4_4) || defined(__linux__)) && !defined(__386BSD__)
+    typedef rlim_t RLIM_TYPE;
 #  else
 #   if defined(SOLARIS2) || (defined(sgi) && SYSVREL > 3)
      typedef rlim_t RLIM_TYPE;
 #   else
 #    if defined(_SX)
       typedef long long RLIM_TYPE;
-#    else /* _SX */
+#    else /* !_SX */
       typedef unsigned long RLIM_TYPE;
 #    endif /* _SX */
 #   endif /* SOLARIS2 || (sgi && SYSVREL > 3) */
@@ -1825,9 +1830,9 @@ struct limits limits[] =
     { RLIMIT_NPROC,	"maxproc",	1,	""		},
 # endif /* RLIMIT_NPROC */
 
-# ifdef RLIMIT_OFILE
+# if defined(RLIMIT_OFILE) && !defined(RLIMIT_NOFILE)
     { RLIMIT_OFILE,	"openfiles",	1,	""		},
-# endif /* RLIMIT_OFILE */
+# endif /* RLIMIT_OFILE && !defined(RLIMIT_NOFILE) */
 
     { -1, 		NULL, 		0, 	NULL		}
 };
@@ -2143,6 +2148,9 @@ setlim(lp, hard, limit)
     else
 	rlim.rlim_cur = limit;
 
+    if (rlim.rlim_cur > rlim.rlim_max)
+	rlim.rlim_max = rlim.rlim_cur;
+
     if (setrlimit(lp->limconst, &rlim) < 0) {
 # else /* BSDLIMIT */
     if (limit != RLIM_INFINITY && lp->limconst == RLIMIT_FSIZE)
@@ -2153,10 +2161,10 @@ setlim(lp, hard, limit)
 # endif /* aiws */
     if (ulimit(toset(lp->limconst), limit) < 0) {
 # endif /* BSDLIMIT */
-	xprintf(CGETS(15, 1, "%s: %s: Can't %s%s limit\n"), bname, lp->limname,
-		limit == RLIM_INFINITY ? CGETS(15, 2, "remove") :
-		CGETS(15, 3, "set"),
-		hard ? CGETS(14, 4, " hard") : "");
+	xprintf(CGETS(15, 1, "%s: %s: Can't %s%s limit (%s)\n"), bname,
+	    lp->limname, limit == RLIM_INFINITY ? CGETS(15, 2, "remove") :
+	    CGETS(15, 3, "set"), hard ? CGETS(14, 4, " hard") : "",
+	    strerror(errno));
 	return (-1);
     }
     return (0);

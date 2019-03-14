@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tc.prompt.c,v 3.40 2000/07/20 16:00:04 christos Exp $ */
+/* $Header: /src/pub/tcsh/tc.prompt.c,v 3.42 2002/03/08 17:06:17 christos Exp $ */
 /*
  * tc.prompt.c: Prompt printing stuff
  */
@@ -14,11 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.prompt.c,v 3.40 2000/07/20 16:00:04 christos Exp $")
+RCSID("$Id: tc.prompt.c,v 3.42 2002/03/08 17:06:17 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -513,6 +509,20 @@ tprintf(what, buf, fmt, siz, str, tim, info)
 	    case 'L':
 		ClearToBottom();
 		break;
+
+	    case 'j':
+		{
+		    Char buf[128], *ebuf, *q;
+		    int njobs = -1;
+		    struct process *pp;
+		    for (pp = proclist.p_next; pp; pp = pp->p_next)
+			njobs++;
+		    /* make sure we have space */
+		    ebuf = Itoa(njobs, buf, 1, attributes);
+		    for (q = buf; q < ebuf; *p++ = *q++)
+			if (p >= ep) break;
+		    break;
+		}
 	    case '?':
 		if ((z = varval(STRstatus)) != STRNULL)
 		    for (; *z; *p++ = attributes | *z++)

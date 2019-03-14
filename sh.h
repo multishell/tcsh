@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.h,v 3.95 2001/02/21 18:11:19 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.h,v 3.101 2002/03/08 18:57:09 christos Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -14,11 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,6 +34,12 @@
 #define _h_sh
 
 #include "config.h"
+
+#ifndef HAVE_QUAD
+#ifdef __GNUC__
+#define HAVE_QUAD	1
+#endif
+#endif
 
 #ifndef EXTERN
 # define EXTERN extern
@@ -107,12 +109,12 @@ typedef int sigret_t;
 /*
  * Return true if the path is absolute
  */
-#ifndef WINNT_NATIVE
-# define ABSOLUTEP(p)	(*(p) == '/')
-#else /* WINNT_NATIVE */
+#if defined(WINNT_NATIVE) || defined(__CYGWIN__)
 # define ABSOLUTEP(p)	((p)[0] == '/' || \
-			 (Isalpha((p)[0]) && (p)[1] == ':' && (p)[2] == '/'))
-#endif /* WINNT_NATIVE */
+    (Isalpha((p)[0]) && (p)[1] == ':'))
+#else /* !WINNT_NATIVE && !__CYGWIN__ */
+# define ABSOLUTEP(p)	(*(p) == '/')
+#endif /* WINNT_NATIVE || __CYGWIN__ */
 
 /*
  * Fundamental definitions which may vary from system to system.
@@ -602,8 +604,12 @@ EXTERN int     onelflg IZERO;	/* 2 -> need line for -t, 1 -> exit on read */
 extern Char   *ffile;		/* Name of shell file for $0 */
 extern bool    dolzero;		/* if $?0 should return true... */
 
+#ifdef FILEC
+extern bool    filec;
+#endif /* FILEC */
+
 extern char *seterr;		/* Error message from scanner/parser */
-#ifndef BSD4_4
+#if !defined(BSD4_4) && !defined(__linux__)
 extern int errno;		/* Error from C library routines */
 #endif
 extern int exitset;

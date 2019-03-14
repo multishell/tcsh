@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.set.c,v 3.38 2001/02/19 23:30:45 kim Exp $ */
+/* $Header: /src/pub/tcsh/sh.set.c,v 3.40 2002/01/07 03:19:04 christos Exp $ */
 /*
  * sh.set.c: Setting and Clearing of variables
  */
@@ -14,11 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.set.c,v 3.38 2001/02/19 23:30:45 kim Exp $")
+RCSID("$Id: sh.set.c,v 3.40 2002/01/07 03:19:04 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -186,6 +182,10 @@ update_vars(vp)
 	(void) catclose(catd);
 	nlsinit();
     }
+#ifdef FILEC
+    else if (eq(vp, STRfilec))
+	filec = 1;
+#endif
 #endif /* NLS_CATALOGS */
 }
 
@@ -721,6 +721,12 @@ unset(v, c)
     did_roe = adrof(STRrecognize_only_executables) != NULL;
     did_edit = adrof(STRedit) != NULL;
     unset1(v, &shvhed);
+
+#ifdef FILEC
+    if (adrof(STRfilec) == 0)
+	filec = 0;
+#endif /* FILEC */
+
     if (adrof(STRhistchars) == 0) {
 	HIST = '!';
 	HISTSUB = '^';
@@ -1212,8 +1218,10 @@ autoset_dspmbyte(pcp)
     } dspmt[] = {
 	{ STRLANGEUCJP, STRKEUC },
 	{ STRLANGEUCKR, STRKEUC },
+	{ STRLANGEUCZH, STRKEUC },
 	{ STRLANGEUCJPB, STRKEUC },
 	{ STRLANGEUCKRB, STRKEUC },
+	{ STRLANGEUCZHB, STRKEUC },
 	{ STRLANGSJIS, STRKSJIS },
 	{ STRLANGSJISB, STRKSJIS },
 	{ STRLANGBIG5, STRKBIG5 },

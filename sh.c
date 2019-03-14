@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.c,v 3.94 2001/02/19 23:30:44 kim Exp $ */
+/* $Header: /src/pub/tcsh/sh.c,v 3.97 2002/03/08 17:07:37 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -14,11 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -43,7 +39,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$Id: sh.c,v 3.94 2001/02/19 23:30:44 kim Exp $")
+RCSID("$Id: sh.c,v 3.97 2002/03/08 17:07:37 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -2045,9 +2041,13 @@ process(catch)
 	 */
 	if ((lex(&paraml) && !seterr && intty && !tellwhat && !Expand && 
 	     !whyles) || adrof(STRverbose)) {
+	    int odidfds = didfds;
 	    haderr = 1;
+	    didfds = 0;
 	    prlex(&paraml);
+	    flush();
 	    haderr = 0;
+	    didfds = odidfds;
 	}
 	(void) alarm(0);	/* Autologout OFF */
 
@@ -2122,7 +2122,7 @@ process(catch)
 	 * Execute the parse tree From: Michael Schroeder
 	 * <mlschroe@immd4.informatik.uni-erlangen.de> was execute(t, tpgrp);
 	 */
-	execute(savet, (tpgrp > 0 ? tpgrp : -1), NULL, NULL);
+	execute(savet, (tpgrp > 0 ? tpgrp : -1), NULL, NULL, TRUE);
 
 	/*
 	 * Made it!

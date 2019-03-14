@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tc.func.c,v 3.96 2001/08/06 23:52:04 christos Exp $ */
+/* $Header: /src/pub/tcsh/tc.func.c,v 3.100 2002/01/26 23:23:03 christos Exp $ */
 /*
  * tc.func.c: New tcsh builtins.
  */
@@ -14,11 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.func.c,v 3.96 2001/08/06 23:52:04 christos Exp $")
+RCSID("$Id: tc.func.c,v 3.100 2002/01/26 23:23:03 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -341,7 +337,7 @@ dolist(v, c)
 	lastword = nextword;
 	for (cp = *v; cp; cp = *++v) {
 	    nextword = (struct wordent *) xcalloc(1, sizeof cmd);
-	    nextword->word = Strsave(cp);
+	    nextword->word = quote(Strsave(cp));
 	    lastword->next = nextword;
 	    nextword->prev = lastword;
 	    lastword = nextword;
@@ -356,7 +352,7 @@ dolist(v, c)
 	/* expand aliases like process() does */
 	/* alias(&cmd); */
 	/* execute the parse tree. */
-	execute(t, tpgrp > 0 ? tpgrp : -1, NULL, NULL);
+	execute(t, tpgrp > 0 ? tpgrp : -1, NULL, NULL, FALSE);
 	/* done. free the lex list and parse tree. */
 	freelex(&cmd), freesyn(t);
 	if (setintr)
@@ -1070,8 +1066,11 @@ job_cmd(args)
 	goto leave;
     }
     jobcmd_active = 1;
-    if (!whyles && adrof1(STRjobcmd, &aliases))
+    if (!whyles && adrof1(STRjobcmd, &aliases)) {
+	struct process *pp = pcurrjob; /* put things back after the hook */
 	aliasrun(2, STRjobcmd, args);
+	pcurrjob = pp;
+    }
 leave:
     jobcmd_active = 0;
 #ifdef BSDSIGS
@@ -1139,7 +1138,7 @@ aliasrun(cnt, s1, s2)
 	 * From: Michael Schroeder <mlschroe@immd4.informatik.uni-erlangen.de>
 	 * was execute(t, tpgrp);
 	 */
-	execute(t, tpgrp > 0 ? tpgrp : -1, NULL, NULL);	
+	execute(t, tpgrp > 0 ? tpgrp : -1, NULL, NULL, TRUE);
     /* done. free the lex list and parse tree. */
     freelex(&w), freesyn(t);
     if (haderr) {
@@ -1575,10 +1574,12 @@ gethomedir(us)
     fix_yp_bugs();
 #endif /* YPBUGS */
     if (pp != NULL) {
+#if 0
 	/* Don't return if root */
 	if (pp->pw_dir[0] == '/' && pp->pw_dir[1] == '\0')
 	    return NULL;
 	else
+#endif
 	    return Strsave(str2short(pp->pw_dir));
     }
 #ifdef HESIOD
@@ -1610,10 +1611,13 @@ gethomedir(us)
 	}
 	for (res1 = res; *res1; res1++)
 	    free(*res1);
+#if 0
+	/* Don't return if root */
 	if (rp != NULL && rp[0] == '/' && rp[1] == '\0') {
 	    xfree((ptr_t)rp);
 	    rp = NULL;
 	}
+#endif
 	return rp;
     }
 #endif /* HESIOD */
