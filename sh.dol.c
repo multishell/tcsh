@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.dol.c,v 3.39 2000/01/14 22:57:27 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.dol.c,v 3.43 2000/11/03 02:29:43 christos Exp $ */
 /*
  * sh.dol.c: Variable substitutions
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.dol.c,v 3.39 2000/01/14 22:57:27 christos Exp $")
+RCSID("$Id: sh.dol.c,v 3.43 2000/11/03 02:29:43 christos Exp $")
 
 /*
  * C shell
@@ -1017,7 +1017,7 @@ void
 heredoc(term)
     Char   *term;
 {
-    register int c;
+    int c;
     Char   *Dv[2];
     Char    obuf[BUFSIZE], lbuf[BUFSIZE], mbuf[BUFSIZE];
     int     ocnt, lcnt, mcnt;
@@ -1025,7 +1025,9 @@ heredoc(term)
     Char  **vp;
     bool    quoted;
     char   *tmp;
+    struct timeval tv;
 
+again:
     tmp = short2str(shtemp);
 #ifndef O_CREAT
 # define O_CREAT 0
@@ -1036,12 +1038,22 @@ heredoc(term)
 #ifndef O_TEMPORARY
 # define O_TEMPORARY 0
 #endif
-    if (open(tmp, O_RDWR|O_CREAT|O_TEMPORARY) < 0) {
-	int     oerrno = errno;
-
+#ifndef O_EXCL
+# define O_EXCL 0
+#endif
+    if (open(tmp, O_RDWR|O_CREAT|O_EXCL|O_TEMPORARY) == -1) {
+	int oerrno = errno;
+	if (errno == EEXIST) {
+	    if (unlink(tmp) == -1) {
+		(void) gettimeofday(&tv, NULL);
+		shtemp = Strspl(STRtmpsh, putn((((int)tv.tv_sec) ^ 
+		    ((int)tv.tv_usec) ^ ((int)getpid())) & 0x00ffffff));
+	    }
+	    goto again;
+	}
 	(void) unlink(tmp);
 	errno = oerrno;
-	stderror(ERR_SYSTEM, tmp, strerror(errno));
+ 	stderror(ERR_SYSTEM, tmp, strerror(errno));
     }
     (void) unlink(tmp);		/* 0 0 inode! */
     Dv[0] = term;
@@ -1053,9 +1065,9 @@ heredoc(term)
     ocnt = BUFSIZE;
     obp = obuf;
     inheredoc = 1;
-#ifdef WINNT
+#ifdef WINNT_NATIVE
     __dup_stdin = 1;
-#endif /* WINNT */
+#endif /* WINNT_NATIVE */
     for (;;) {
 	/*
 	 * Read up a line

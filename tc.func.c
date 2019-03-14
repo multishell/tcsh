@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tc.func.c,v 3.91 2000/07/04 19:44:11 christos Exp $ */
+/* $Header: /src/pub/tcsh/tc.func.c,v 3.93 2000/11/11 23:03:38 christos Exp $ */
 /*
  * tc.func.c: New tcsh builtins.
  */
@@ -36,15 +36,15 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.func.c,v 3.91 2000/07/04 19:44:11 christos Exp $")
+RCSID("$Id: tc.func.c,v 3.93 2000/11/11 23:03:38 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
 #include "tw.h"
 #include "tc.h"
-#ifdef WINNT
+#ifdef WINNT_NATIVE
 #include "nt.const.h"
-#endif /* WINNT */
+#endif /* WINNT_NATIVE */
 
 #ifdef AFS
 #define PASSMAX 16
@@ -81,9 +81,6 @@ struct tildecache;
 static	int	 tildecompare	__P((struct tildecache *, struct tildecache *));
 static  Char    *gethomedir	__P((Char *));
 #ifdef REMOTEHOST
-#ifdef INET6
-#include <utmp.h>
-#endif
 static	sigret_t palarm		__P((int));
 static	void	 getremotehost	__P((void));
 #endif /* REMOTEHOST */
@@ -402,9 +399,9 @@ dolist(v, c)
 		for (cp = tmp, dp = buf; *cp; *dp++ = (*cp++ | QUOTE))
 		    continue;
 		if (
-#ifdef WINNT
+#ifdef WINNT_NATIVE
 		    (dp[-1] != (Char) (':' | QUOTE)) &&
-#endif /* WINNT */
+#endif /* WINNT_NATIVE */
 		    (dp[-1] != (Char) ('/' | QUOTE)))
 		    *dp++ = '/';
 		else 
@@ -1950,10 +1947,10 @@ hashbang(fd, vp)
     char *sargv[HACKVECSZ];
     unsigned char *p, *ws;
     int sargc = 0;
-#ifdef WINNT
+#ifdef WINNT_NATIVE
     int fw = 0; 	/* found at least one word */
     int first_word = 0;
-#endif /* WINNT */
+#endif /* WINNT_NATIVE */
 
     if (read(fd, (char *) lbuf, HACKBUFSZ) <= 0)
 	return -1;
@@ -1964,16 +1961,16 @@ hashbang(fd, vp)
 	switch (*p) {
 	case ' ':
 	case '\t':
-#ifdef WINNT
+#ifdef WINNT_NATIVE
 	case '\r':
-#endif /* WINNT */
+#endif /* WINNT_NATIVE */
 	    if (ws) {	/* a blank after a word.. save it */
 		*p = '\0';
-#ifndef WINNT
+#ifndef WINNT_NATIVE
 		if (sargc < HACKVECSZ - 1)
 		    sargv[sargc++] = ws;
 		ws = NULL;
-#else /* WINNT */
+#else /* WINNT_NATIVE */
 		if (sargc < HACKVECSZ - 1) {
 		    sargv[sargc] = first_word ? NULL: hb_subst(ws);
 		    if (sargv[sargc] == NULL)
@@ -1983,7 +1980,7 @@ hashbang(fd, vp)
 		ws = NULL;
 	    	fw = 1;
 		first_word = 1;
-#endif /* WINNT */
+#endif /* WINNT_NATIVE */
 	    }
 	    p++;
 	    continue;
@@ -1993,22 +1990,22 @@ hashbang(fd, vp)
 
 	case '\n':	/* The end of the line. */
 	    if (
-#ifdef WINNT
+#ifdef WINNT_NATIVE
 		fw ||
-#endif /* WINNT */
+#endif /* WINNT_NATIVE */
 		ws) {	/* terminate the last word */
 		*p = '\0';
-#ifndef WINNT
+#ifndef WINNT_NATIVE
 		if (sargc < HACKVECSZ - 1)
 		    sargv[sargc++] = ws;
-#else /* WINNT */
+#else /* WINNT_NATIVE */
 		if (sargc < HACKVECSZ - 1) { /* deal with the 1-word case */
 		    sargv[sargc] = first_word? NULL : hb_subst(ws);
 		    if (sargv[sargc] == NULL)
 			sargv[sargc] = ws;
 		    sargc++;
 		}
-#endif /* !WINNT */
+#endif /* !WINNT_NATIVE */
 	    }
 	    sargv[sargc] = NULL;
 	    ws = NULL;
@@ -2125,7 +2122,12 @@ getremotehost()
 		    hints.ai_family = PF_UNSPEC;
 		    hints.ai_socktype = SOCK_STREAM;
 		    hints.ai_flags = AI_PASSIVE | AI_CANONNAME;
-		    if (strlen(name) < UT_HOSTSIZE) {
+#if defined(UTHOST) && !defined(HAVENOUTMP)
+		    if (strlen(name) < utmphostsize())
+#else
+		    if (name != NULL)
+#endif
+		    {
 			if (getaddrinfo(name, NULL, &hints, &res) != 0)
 			    res = NULL;
 		    } else if (gethostname(dbuf, sizeof(dbuf) - 1) == 0 &&

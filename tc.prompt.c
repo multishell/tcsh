@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tc.prompt.c,v 3.38 2000/04/18 19:40:46 christos Exp $ */
+/* $Header: /src/pub/tcsh/tc.prompt.c,v 3.40 2000/07/20 16:00:04 christos Exp $ */
 /*
  * tc.prompt.c: Prompt printing stuff
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.prompt.c,v 3.38 2000/04/18 19:40:46 christos Exp $")
+RCSID("$Id: tc.prompt.c,v 3.40 2000/07/20 16:00:04 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -357,7 +357,7 @@ tprintf(what, buf, fmt, siz, str, tim, info)
 			/* option to determine fixed # of dirs from path */
 		if (Scp == '.' || Scp == 'C') {
 		    int skip;
-#ifdef WINNT
+#ifdef WINNT_NATIVE
 		    if (z[1] == ':') {
 		    	*p++ = attributes | *z++;
 		    	*p++ = attributes | *z++;
@@ -369,7 +369,7 @@ tprintf(what, buf, fmt, siz, str, tim, info)
 					*p++ = attributes | *z++;
 				}while(*z != '/');
 			}
-#endif /* WINNT */
+#endif /* WINNT_NATIVE */
 		    q = z;
 		    while (*z)				/* calc # of /'s */
 			if (*z++ == '/')
@@ -520,7 +520,7 @@ tprintf(what, buf, fmt, siz, str, tim, info)
 		break;
 	    case '$':
 		sz = (int) (ep - p);
-		(void) expdollar(&p, &cp, &pdirs, attributes);
+		(void) expdollar(&p, &cp, &sz, attributes);
 		break;
 	    case '%':
 		*p++ = attributes | '%';
