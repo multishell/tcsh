@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/ed.screen.c,v 3.55 2004/08/04 17:17:40 christos Exp $ */
+/* $Header: /src/pub/tcsh/ed.screen.c,v 3.57 2004/11/23 01:48:34 christos Exp $ */
 /*
  * ed.screen.c: Editor/termcap-curses interface
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.screen.c,v 3.55 2004/08/04 17:17:40 christos Exp $")
+RCSID("$Id: ed.screen.c,v 3.57 2004/11/23 01:48:34 christos Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -349,7 +349,7 @@ terminit()
  * No Wrap         no      --              yes             yes
  */
 
-static bool me_all = 0;		/* does two or more of the attributes use me */
+static int me_all = 0;		/* does two or more of the attributes use me */
 
 static	void	ReBufferDisplay	__P((void));
 static	void	TCalloc		__P((struct termcapstr *, char *)); 
@@ -775,7 +775,7 @@ EchoTC(v)
     }
 }
 
-bool    GotTermCaps = 0;
+int    GotTermCaps = 0;
 
 static struct {
     Char   *name;
@@ -998,7 +998,7 @@ static Char cur_atr = 0;	/* current attributes */
 
 void
 SetAttributes(atr)
-    int     atr;
+    Char     atr;
 {
     atr &= ATTRIBUTES;
     if (atr != cur_atr) {

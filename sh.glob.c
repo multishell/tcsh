@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.glob.c,v 3.58 2004/11/20 17:40:36 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.glob.c,v 3.60 2004/11/23 01:48:34 christos Exp $ */
 /*
  * sh.glob.c: Regular expression expansion
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.glob.c,v 3.58 2004/11/20 17:40:36 christos Exp $")
+RCSID("$Id: sh.glob.c,v 3.60 2004/11/23 01:48:34 christos Exp $")
 
 #include "tc.h"
 #include "tw.h"
@@ -81,7 +81,7 @@ static	int	  globbrace	__P((Char *, Char *, Char ***));
 static  void	  expbrace	__P((Char ***, Char ***, int));
 static	void	  pword		__P((int));
 static	void	  psave		__P((Char));
-static	void	  backeval	__P((Char *, bool));
+static	void	  backeval	__P((Char *, int));
 
 static Char *
 globtilde(nv, s)
@@ -732,7 +732,7 @@ tglob(t)
 Char  **
 dobackp(cp, literal)
     Char   *cp;
-    bool    literal;
+    int    literal;
 {
     Char *lp, *rp;
     Char   *ep, word[LONGBSIZE];
@@ -786,12 +786,12 @@ dobackp(cp, literal)
 static void
 backeval(cp, literal)
     Char   *cp;
-    bool    literal;
+    int    literal;
 {
     int icnt;
     Char c, *ip;
     struct command faket;
-    bool    hadnl;
+    int    hadnl;
     int     pvec[2], quoted;
     Char   *fakecom[2], ibuf[BUFSIZE];
     char    tibuf[BUFSIZE];
@@ -927,7 +927,7 @@ backeval(cp, literal)
 		eof = 0;
 		if (icnt <= 0) {
 		    if (tmp == tibuf) {
-		        c = -1;
+		        c = 0;
 			break;
 		    }
 		    icnt = 0;
@@ -992,10 +992,10 @@ backeval(cp, literal)
 	 * If we didn't make empty words here when literal was set then we
 	 * would lose blank lines.
 	 */
-	if (c != -1 && (cnt || literal))
+	if (c != 0 && (cnt || literal))
 	    pword(BUFSIZE);
 	hadnl = 0;
-    } while (c >= 0);
+    } while (c > 0);
     (void) close(pvec[0]);
     pwait();
     prestjob();

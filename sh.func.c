@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.func.c,v 3.117 2004/08/08 06:42:28 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.func.c,v 3.120 2004/11/23 01:56:34 christos Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.func.c,v 3.117 2004/08/08 06:42:28 christos Exp $")
+RCSID("$Id: sh.func.c,v 3.120 2004/11/23 01:56:34 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -41,9 +41,11 @@ RCSID("$Id: sh.func.c,v 3.117 2004/08/08 06:42:28 christos Exp $")
 #include "nt.const.h"
 #endif /* WINNT_NATIVE */
 
+#ifdef NLS_CATALOGS
 #ifdef HAVE_ICONV
 #include <langinfo.h>
 static iconv_t catgets_iconv; /* Or (iconv_t)-1 */
+#endif
 #endif
 
 /*
@@ -52,9 +54,9 @@ static iconv_t catgets_iconv; /* Or (iconv_t)-1 */
 extern int just_signaled;
 extern char **environ;
 
-extern bool MapsAreInited;
-extern bool NLSMapsAreInited;
-extern bool GotTermCaps;
+extern int MapsAreInited;
+extern int NLSMapsAreInited;
+extern int GotTermCaps;
 
 static int zlast = -1;
 
@@ -66,7 +68,7 @@ static	void	search		__P((int, int, Char *));
 static	int	getword		__P((Char *));
 static	void	toend		__P((void));
 static	void	xecho		__P((int, Char **));
-static	bool	islocale_var	__P((Char *));
+static	int	islocale_var	__P((Char *));
 static	void	wpfree		__P((struct whyle *));
 
 struct biltins *
@@ -623,7 +625,7 @@ dowhile(v, c)
     struct command *c;
 {
     int status;
-    bool again = whyles != 0 && 
+    int again = whyles != 0 && 
 			  SEEKEQ(&whyles->w_start, &lineloc) &&
 			  whyles->w_fename == 0;
 
@@ -1269,7 +1271,7 @@ done:
 }
 
 /* check whether an environment variable should invoke 'set_locale()' */
-static bool
+static int
 islocale_var(var)
     Char *var;
 {
@@ -2066,7 +2068,7 @@ limtail(cp, str)
     const char *sp;
 
     sp = str;
-    while (*cp && *cp == *str)
+    while (*cp && *cp == (Char)*str)
 	cp++, str++;
     if (*cp)
 	stderror(ERR_BADSCALE, sp);
@@ -2432,6 +2434,7 @@ struct command *c;
     flush();
 }
 
+#ifdef NLS_CATALOGS
 #ifdef HAVE_ICONV
 char *
 iconv_catgets(ctd, set_id, msg_id, s)
@@ -2478,6 +2481,7 @@ const char *s;
     }
     return buf;
 }
+#endif
 #endif
 
 void

@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/ed.chared.c,v 3.76 2004/11/20 20:30:46 christos Exp $ */
+/* $Header: /src/pub/tcsh/ed.chared.c,v 3.78 2004/11/23 01:48:33 christos Exp $ */
 /*
  * ed.chared.c: Character editing functions.
  */
@@ -72,7 +72,7 @@
 
 #include "sh.h"
 
-RCSID("$Id: ed.chared.c,v 3.76 2004/11/20 20:30:46 christos Exp $")
+RCSID("$Id: ed.chared.c,v 3.78 2004/11/23 01:48:33 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -139,16 +139,16 @@ static  CCRETVAL c_search_line		__P((Char *, int));
 static  CCRETVAL v_repeat_srch		__P((int));
 static	CCRETVAL e_inc_search		__P((int));
 static	CCRETVAL v_search		__P((int));
-static	CCRETVAL v_csearch_fwd		__P((int, int, int));
+static	CCRETVAL v_csearch_fwd		__P((Char, int, int));
 static	CCRETVAL v_action		__P((int));
-static	CCRETVAL v_csearch_back		__P((int, int, int));
+static	CCRETVAL v_csearch_back		__P((Char, int, int));
 
 #if defined(DSPMBYTE)
 static	void 	 e_charfwd_mbyte	__P((int));
 static	void 	 e_charback_mbyte	__P((int));
 static  int	 extdel;
 static  int	 extins = 0;
-extern  bool	 dspmbyte_utf8;
+extern  int	 dspmbyte_utf8;
 #endif
 
 static void
@@ -530,8 +530,8 @@ c_expand(p)
     struct Hist *h = Histlist.Hnext;
     struct wordent *l;
     int     i, from, to, dval;
-    bool    all_dig;
-    bool    been_once = 0;
+    int    all_dig;
+    int    been_once = 0;
     Char   *op = p;
     Char    buf[INBUFSIZE];
     Char   *bend = buf;
@@ -861,7 +861,7 @@ c_endword(p, high, n, delim)
     Char *p, *high, *delim;
     int n;
 {
-    int inquote = 0;
+    Char inquote = 0;
     p++;
 
     while (n--) {
@@ -2057,7 +2057,7 @@ e_up_search_hist(c)
 {
     struct Hist *hp;
     int h;
-    bool    found = 0;
+    int    found = 0;
 
     USE(c);
     ActionFlag = TCSHOP_NOP;
@@ -2126,7 +2126,7 @@ e_down_search_hist(c)
 {
     struct Hist *hp;
     int h;
-    bool    found = 0;
+    int    found = 0;
 
     USE(c);
     ActionFlag = TCSHOP_NOP;
@@ -2367,7 +2367,7 @@ e_dabbrev_expand(c)
     Char *cp, *ncp, *bp;
     struct Hist *hp;
     int arg = 0, len = 0, i; /* len = 0 to shut up gcc -Wall */
-    bool found = 0;
+    int found = 0;
     Char hbuf[INBUFSIZE];
     static int oldevent, hist, word;
     static Char *start, *oldcursor;
@@ -3189,7 +3189,8 @@ v_repeat_srch(c)
 
 static CCRETVAL
 v_csearch_back(ch, count, tflag)
-    int ch, count, tflag;
+    Char ch;
+    int count, tflag;
 {
     Char *cp;
 
@@ -3221,7 +3222,8 @@ v_csearch_back(ch, count, tflag)
 
 static CCRETVAL
 v_csearch_fwd(ch, count, tflag)
-    int ch, count, tflag;
+    Char ch;
+    int count, tflag;
 {
     Char *cp;
 
