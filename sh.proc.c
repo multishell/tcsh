@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.proc.c,v 3.106 2007/07/12 14:12:46 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.proc.c,v 3.108 2009/06/25 14:20:35 christos Exp $ */
 /*
  * sh.proc.c: Job manipulations
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.proc.c,v 3.106 2007/07/12 14:12:46 christos Exp $")
+RCSID("$tcsh: sh.proc.c,v 3.108 2009/06/25 14:20:35 christos Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -486,7 +486,7 @@ pjwait(struct process *pp)
 
     do {
 	if ((fp->p_flags & (PFOREGND | PRUNNING)) == PRUNNING)
-	  xprintf(CGETS(17, 1, "BUG: waiting for background job!\n"));
+	  xprintf("%s", CGETS(17, 1, "BUG: waiting for background job!\n"));
     } while ((fp = fp->p_friends) != pp);
     /*
      * Now keep pausing as long as we are not interrupted (SIGINT), and the
@@ -627,7 +627,7 @@ pflush(struct process *pp)
     int idx;
 
     if (pp->p_procid == 0) {
-	xprintf(CGETS(17, 3, "BUG: process flushed twice"));
+	xprintf("%s", CGETS(17, 3, "BUG: process flushed twice"));
 	return;
     }
     while (pp->p_procid != pp->p_jobid)
@@ -675,6 +675,8 @@ static Char *cmdstr;
 static size_t cmdmax;
 static size_t cmdlen;
 static Char *cmdp;
+#define CMD_INIT 1024
+#define CMD_INCR 64
 
 static void
 morecommand(size_t s)
@@ -683,7 +685,7 @@ morecommand(size_t s)
     ptrdiff_t d;
 
     cmdmax += s;
-    ncmdstr = xrealloc(cmdstr, cmdmax);
+    ncmdstr = xrealloc(cmdstr, cmdmax * sizeof(*cmdstr));
     d = ncmdstr - cmdstr;
     cmdstr = ncmdstr;
     cmdp += d;
@@ -696,7 +698,7 @@ Char *
 unparse(struct command *t)
 {
     if (cmdmax == 0)
-	morecommand(1024);
+	morecommand(CMD_INIT);
     cmdp = cmdstr;
     cmdlen = 0;
     padd(t);
@@ -725,7 +727,7 @@ palloc(pid_t pid, struct command *t)
     if (t->t_dflg & F_HUP)
 	pp->p_flags |= PHUP;
     if (cmdmax == 0)
-	morecommand(1024);
+	morecommand(CMD_INIT);
     cmdp = cmdstr;
     cmdlen = 0;
     padd(t);
@@ -869,7 +871,7 @@ pads(Char *cp)
 
     i = Strlen(cp);
 
-    len = cmdlen + i + 100;
+    len = cmdlen + i + CMD_INCR;
     if (len >= cmdmax)
 	morecommand(len);
     (void) Strcpy(cmdp, cp);
@@ -1088,13 +1090,13 @@ prcomd:
 		xprintf("&");
 	}
 	if (flag & (REASON | AREASON) && pp->p_flags & PDUMPED)
-	    xprintf(CGETS(17, 9, " (core dumped)"));
+	    xprintf("%s", CGETS(17, 9, " (core dumped)"));
 	if (tp == pp->p_friends) {
 	    if (flag & AMPERSAND)
 		xprintf(" &");
 	    if (flag & JOBDIR &&
 		!eq(tp->p_cwd->di_name, dcwd->di_name)) {
-		xprintf(CGETS(17, 10, " (wd: "));
+		xprintf("%s", CGETS(17, 10, " (wd: "));
 		dtildepr(tp->p_cwd->di_name);
 		xprintf(")");
 	    }
@@ -1125,7 +1127,7 @@ prcomd:
 	    if (linp != linbuf)
 		xputchar('\n');
 	    if (flag & SHELLDIR && !eq(tp->p_cwd->di_name, dcwd->di_name)) {
-		xprintf(CGETS(17, 11, "(wd now: "));
+		xprintf("%s", CGETS(17, 11, "(wd now: "));
 		dtildepr(dcwd->di_name);
 		xprintf(")\n");
 	    }
