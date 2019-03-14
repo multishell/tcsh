@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tc.os.h,v 3.101 2006/02/14 00:52:52 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/tc.os.h,v 3.103 2011/01/20 19:40:25 christos Exp $ */
 /*
  * tc.os.h: Shell os dependent defines
  */
@@ -361,6 +361,18 @@ struct ucred {
 #ifndef O_RDWR
 # define O_RDWR		2
 #endif /* O_RDWR */
+#ifndef O_TEMPORARY
+# define O_TEMPORARY	0
+#endif /* O_TEMPORARY */
+#ifndef O_EXCL
+# define O_EXCL		0
+#endif /* O_EXCL */
+#ifndef O_LARGEFILE
+# define O_LARGEFILE	0
+#endif /* O_LARGEFILE */
+#ifndef O_CREAT
+# define O_CREAT	0
+#endif /* O_CREAT */
 
 /*
  * Lseek()
@@ -600,5 +612,9 @@ extern int killpg (pid_t, int);
 #  define va_copy(DEST, SRC) memcpy(&(DEST), &(SRC), sizeof(va_list))
 # endif
 #endif
+
+#if defined(__CYGWIN__) && !defined(NO_CRYPT)
+extern char *cygwin_xcrypt(struct passwd *, const char *, const char *);
+#endif /* __CYGWIN__ && !NO_CRYPT */
 
 #endif /* _h_tc_os */

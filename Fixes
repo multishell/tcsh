@@ -1,3 +1,23 @@
+ 69. V6.17.05 - 20110201
+ 68. Use mkstemp() if there for here docs (Werner Fink)
+ 67. Fix handling of errors and exit values in builtins (Werner Fink)
+ 66. Better pty name detection (Werner Fink)
+ 65. Enable NLS catalogs on Cygwin (Corinna Vinschen)
+ 64. NLSPATH handling fixes (Corinna Vinschen)
+ 63. Avoid infrequent exit when tcsh cd's into a non-existent directory
+     https://bugzilla.novell.com/show_bug.cgi?id=293395 (Werner Fink)
+ 62. Don't try to spell check full path binaries that are correct because
+     they can cause hangs when other nfs partitions are hung. (Werner Fink)
+ 61. Avoid nested interrupts when exiting causing history writing to fail
+     https://bugzilla.novell.com/show_bug.cgi?id=331627 (Werner Fink)
+ 60. Instead of giving an error or ignoring lines with missing eol at eof,
+     process them.
+ 59. Avoid leaking fd's in mail check (Werner Fink)
+ 58. Add cygwin_xcrypt() (Corinna Vinschen)
+ 57. Recognize i686 (Corinna Vinschen)
+ 56. Rename cygwin32 to cygwin and bring it up-to-date with modern cygwin
+     settings (Corinna Vinschen)
+ 55. Avoid double slashes in cdpath (Corinna Vinschen)
  54. V6.17.04 - 20110118
  53. Revert PR/110, breaks the test suite.
  52. V6.17.03 - 20110117

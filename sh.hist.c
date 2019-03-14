@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.hist.c,v 3.49 2010/05/27 04:00:23 amold Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.hist.c,v 3.52 2011/01/21 02:31:17 christos Exp $ */
 /*
  * sh.hist.c: Shell history expansions and substitutions
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.hist.c,v 3.49 2010/05/27 04:00:23 amold Exp $")
+RCSID("$tcsh: sh.hist.c,v 3.52 2011/01/21 02:31:17 christos Exp $")
 
 #include <assert.h>
 #include "tc.h"
@@ -64,7 +64,7 @@ static	void	hfree	(struct Hist *);
 #define PG_STATIC static
 #endif
 
-//#define DEBUG_HIST 1
+/* #define DEBUG_HIST 1 */
 
 static const int fastMergeErase = 1;
 static unsigned histCount = 0;		/* number elements on history list */
@@ -165,7 +165,7 @@ savehist(
 }
 
 #define USE_JENKINS_HASH 1
-//#define USE_ONE_AT_A_TIME 1
+/* #define USE_ONE_AT_A_TIME 1 */
 #undef PRIME_LENGTH			/* no need for good HTL */
 
 #ifdef USE_JENKINS_HASH
@@ -204,8 +204,8 @@ struct hashValue		  /* State used to hash a wordend word list. */
 };
 
 /* Set up the internal state */
-static inline
-void initializeHash(struct hashValue *h)
+static void
+initializeHash(struct hashValue *h)
 {
     h->a = h->b = h->c = 0xdeadbeef;
 }
@@ -271,8 +271,8 @@ addCharToHash(struct hashValue *h, Char ch)
     mix(h->a, h->b, h->c);
 }
 
-static inline
-uint32_t finalizeHash(struct hashValue *h)
+static uint32_t
+finalizeHash(struct hashValue *h)
 {
     uint32_t a = h->a, b = h->b, c = h->c;
     final(a, b, c);
@@ -304,14 +304,14 @@ one_at_a_time(char *key, ub4 len)
 #endif
 
 struct hashValue { uint32_t h; };
-static inline
-void initializeHash(struct hashValue *h)
+static void
+initializeHash(struct hashValue *h)
 {
     h->h = 0;
 }
 
-static inline
-void addWordToHash(struct hashValue *h, const Char *word)
+static void
+addWordToHash(struct hashValue *h, const Char *word)
 {
     unsigned k;
     uint32_t hash = h->h;
@@ -320,14 +320,14 @@ void addWordToHash(struct hashValue *h, const Char *word)
     h->h = hash;
 }
 
-static inline void
+static void
 addCharToHash(struct hashValue *h, Char c)
 {
     Char b[2] = { c, 0 };
     addWordToHash(h, b);
 }
 
-static inline uint32_t
+static uint32_t
 finalizeHash(struct hashValue *h)
 {
     unsigned hash = h->h;
@@ -342,13 +342,13 @@ finalizeHash(struct hashValue *h)
 /* Simple multipy and add hash. */
 #define PRIME_LENGTH 1			/* need "good" HTL */
 struct hashValue { uint32_t h; };
-static inline void
+static void
 initializeHash(struct hashValue *h)
 {
     h->h = 0xe13e2345;
 }
 
-static inline void
+static void
 addWordToHash(struct hashValue *h, const Char *word)
 {
     unsigned k;
@@ -358,13 +358,13 @@ addWordToHash(struct hashValue *h, const Char *word)
     h->h = hash;
 }
 
-static inline void
+static void
 addCharToHash(struct hashValue *h, Char c)
 {
     h->h = h->h * 0x9e4167b9 + (uChar)c;
 }
 
-static inline uint32_t
+static uint32_t
 finalizeHash(struct hashValue *h)
 {
     return h->h;
@@ -710,8 +710,8 @@ discardHistHashTable(void)
 }
 
 /* Computes a new hash table size, when the current one is too small. */
-static inline
-unsigned getHashTableSize(int histlen)
+static unsigned
+getHashTableSize(int histlen)
 {
     unsigned target = histlen * 2;
     unsigned e = 5;
@@ -792,12 +792,16 @@ insertHistHashTable(struct Hist *np, unsigned hashval)
              * will roughly double the size we give it.  Create initializes the
              * new table with everything on the Histlist, so we are done when
              * it returns.  */
-	    //	    xprintf("Growing history hash table from %d ...",
-	    //		    histHashTableLength); flush();
+#ifdef DEBUG_HIST
+	    xprintf("Growing history hash table from %d ...",
+		histHashTableLength);
+	    flush();
+#endif
             discardHistHashTable();
             createHistHashTable(histHashTableLength);
-	    //	    xprintf("to %d.\n",
-	    //		    histHashTableLength);
+#ifdef DEBUG_HIST
+	    xprintf("to %d.\n", histHashTableLength);
+#endif
             return;
         }
     }
@@ -1272,9 +1276,9 @@ rechist(Char *fname, int ref)
 	    loadhist(fname, 1);
 
     fp = xcreat(short2str(fname), 0600);
+    cleanup_until(fname);
     if (fp == -1) {
 	didfds = oldidfds;
-	cleanup_until(fname);
 	return;
     }
     ftmp = SHOUT;
@@ -1284,7 +1288,6 @@ rechist(Char *fname, int ref)
     xclose(fp);
     SHOUT = ftmp;
     didfds = oldidfds;
-    cleanup_until(fname);
 }
 
 

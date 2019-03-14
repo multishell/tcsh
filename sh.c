@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.162 2011/01/10 14:08:14 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.168 2011/01/25 19:32:02 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -39,7 +39,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$tcsh: sh.c,v 3.162 2011/01/10 14:08:14 christos Exp $")
+RCSID("$tcsh: sh.c,v 3.168 2011/01/25 19:32:02 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -78,7 +78,7 @@ extern int NLSMapsAreInited;
  * ported to Apple Unix (TM) (OREO)  26 -- 29 Jun 1987
  */
 
-jmp_buf_t reslab INIT_ZERO_STRUCT;
+jmp_buf_t reslab;
 
 static const char tcshstr[] = "tcsh";
 
@@ -168,28 +168,54 @@ static	void		  st_restore	(void *);
 static void
 add_localedir_to_nlspath(const char *path)
 {
-    static const char msgs[] = "/%L/LC_MESSAGES/%N.cat";
+    static const char msgs_LOC[] = "/%L/LC_MESSAGES/%N.cat";
+    static const char msgs_lang[] = "/%l/LC_MESSAGES/%N.cat";
     char *old = getenv("NLSPATH");
-    char *new;
+    char *new, *new_p;
     size_t len = 0;
+    int add_LOC = 1;
+    int add_lang = 1;
 
     if (path == NULL)
         return;
 
     if (old != NULL)
-        len += strlen(old);
+        len += strlen(old) + 1;	/* don't forget the colon. */
 
-    len += strlen(path) + sizeof(msgs);
+    len += 2 * strlen(path) +
+	   sizeof(msgs_LOC) + sizeof(msgs_lang); /* includes the extra colon */
 
-    new = xcalloc(len, 1);
+    new = new_p = xcalloc(len, 1);
 
     if (old != NULL) {
-        (void)strncat(new, old, len);
-        (void)strncat(new, ":", len);
+	size_t pathlen = strlen(path);
+	char *old_p;
+
+	(void) xsnprintf(new_p, len, "%s", old);
+	new_p += strlen(new_p);
+	len -= new_p - new;
+
+	/* Check if the paths we try to add are already present in NLSPATH.
+	   If so, note it by setting the appropriate flag to 0. */
+	for (old_p = old; old_p; old_p = strchr(old_p, ':'),
+				 old_p = old_p ? old_p + 1 : NULL) {
+	    if (strncmp(old_p, path, pathlen) != 0)
+	    	continue;
+	    if (strncmp(old_p + pathlen, msgs_LOC, sizeof(msgs_LOC) - 1) == 0)
+		add_LOC = 0;
+	    else if (strncmp(old_p + pathlen, msgs_lang,
+			      sizeof(msgs_lang) - 1) == 0)
+		add_lang = 0;
+	}
     }
 
-    (void)strncat(new, path, len);
-    (void)strncat(new, msgs, len);
+    /* Add the message catalog paths not already present to NLSPATH. */
+    if (add_LOC || add_lang)
+	(void) xsnprintf(new_p, len, "%s%s%s%s%s%s",
+			 old ? ":" : "",
+			 add_LOC ? path : "", add_LOC ? msgs_LOC : "",
+			 add_LOC && add_lang ? ":" : "",
+			 add_lang ? path : "", add_lang ? msgs_lang : "");
 
     tsetenv(STRNLSPATH, str2short(new));
     free(new);
@@ -215,6 +241,7 @@ main(int argc, char **argv)
     int osetintr;
     struct sigaction oparintr;
 
+    (void)memset(&reslab, 0, sizeof(reslab));
 #ifdef WINNT_NATIVE
     nt_init();
 #endif /* WINNT_NATIVE */
@@ -499,7 +526,8 @@ main(int argc, char **argv)
     if (loginsh || (uid == 0)) {
 	if (*cp) {
 	    /* only for login shells or root and we must have a tty */
-	    if ((cp2 = Strrchr(cp, (Char) '/')) != NULL) {
+	    if (((cp2 = Strrchr(cp, (Char) '/')) != NULL) &&
+		(Strncmp(cp, STRptssl, 3) != 0)) {
 		cp2 = cp2 + 1;
 	    }
 	    else
@@ -777,7 +805,16 @@ main(int argc, char **argv)
 	xfree(tmp2);
     }
 #else /* !WINNT_NATIVE */
+#ifdef HAVE_MKSTEMP
+    {
+	char *tmpdir = getenv ("TMPDIR");
+	if (!tmpdir)
+	    tmpdir = "/tmp";
+	shtemp = Strspl(SAVE(tmpdir), SAVE("/sh" TMP_TEMPLATE)); /* For << */
+    }
+#else /* !HAVE_MKSTEMP */
     shtemp = Strspl(STRtmpsh, doldol);	/* For << */
+#endif /* HAVE_MKSTEMP */
 #endif /* WINNT_NATIVE */
 
     /*
@@ -2087,7 +2124,10 @@ process(int catch)
 #endif /* SIG_WINDOW */
 	setcopy(STR_, InputBuf, VAR_READWRITE | VAR_NOGLOB);
     cmd_done:
-	cleanup_until(&paraml);
+	if (cleanup_reset())
+	    cleanup_until(&paraml);
+	else
+	    haderr = 1;
     }
     cleanup_pop_mark(omark);
     resexit(osetexit);
@@ -2216,9 +2256,9 @@ mailchk(void)
 	    while (readdir(mailbox))
 		mailcount++;
 
+	    (void)closedir(mailbox);
 	    if (mailcount == 0)
 		continue;
-	    (void)closedir(mailbox);
 
 	    if (cnt == 1)
 		xprintf(CGETS(11, 3, "You have %d mail messages.\n"),

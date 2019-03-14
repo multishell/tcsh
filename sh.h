@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.h,v 3.158 2010/05/15 13:32:09 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.h,v 3.161 2011/01/24 18:17:07 christos Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -89,6 +89,8 @@ typedef unsigned long intptr_t;
 #if defined(POSIXJOBS) && !defined(BSDJOBS)
 # define BSDJOBS
 #endif 
+
+#define TMP_TEMPLATE ".XXXXXX"
 
 #ifdef SHORT_STRINGS
 # ifdef WIDE_STRINGS
@@ -361,9 +363,6 @@ typedef long tcsh_number_t;
 #if !defined(O_RDONLY) || !defined(O_NDELAY)
 # include <fcntl.h>
 #endif 
-#ifndef O_LARGEFILE
-# define O_LARGEFILE 0
-#endif
 
 #include <errno.h>
 
@@ -569,6 +568,7 @@ EXTERN int    neednote IZERO;	/* Need to pnotify() */
 EXTERN int    noexec IZERO;	/* Don't execute, just syntax check */
 EXTERN int    pjobs IZERO;	/* want to print jobs if interrupted */
 EXTERN int    setintr IZERO;	/* Set interrupts on/off -> Wait intr... */
+EXTERN int    handle_intr IZERO;/* Are we currently handling an interrupt? */
 EXTERN int    havhash IZERO;	/* path hashing is available */
 EXTERN int    editing IZERO;	/* doing filename expansion and line editing */
 EXTERN int    noediting IZERO;	/* initial $term defaulted to noedit */
@@ -662,7 +662,7 @@ EXTERN int   SHDIAG IZERO;	/* Diagnostic output... shell errs go here */
 EXTERN int   OLDSTD IZERO;	/* Old standard input (def for cmds) */
 
 
-#if SYSVREL == 4 && defined(_UTS)
+#if (SYSVREL == 4 && defined(_UTS)) || defined(__linux__)
 /* 
  * From: fadden@uts.amdahl.com (Andy McFadden)
  * we need sigsetjmp for UTS4, but not UTS2.1
@@ -680,7 +680,7 @@ EXTERN int   OLDSTD IZERO;	/* Old standard input (def for cmds) */
 
 #ifdef SIGSETJMP
    typedef struct { sigjmp_buf j; } jmp_buf_t;
-# define setexit()  sigsetjmp(reslab.j)
+# define setexit()  sigsetjmp(reslab.j, 1)
 # define _reset()    siglongjmp(reslab.j, 1)
 #else
    typedef struct { jmp_buf j; } jmp_buf_t;
