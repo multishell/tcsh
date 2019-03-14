@@ -1654,7 +1654,7 @@ doumask(v, c)
 #   if defined(SOLARIS2)
 #    define RLIM_TYPE rlim_t
 #   else
-     typedef unsigned long RLIM_TYPE
+     typedef unsigned long RLIM_TYPE;
 #   endif /* SOLARIS2 */
 #  endif /* BSD4_4 && !__386BSD__  */
 # endif /* BSDLIMIT */
