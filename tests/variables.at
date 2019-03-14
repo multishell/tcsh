@@ -39,6 +39,28 @@ VAR_UNSET([afsuser])
 VAR_UNSET([ampm])
 
 
+AT_SETUP([$ anyerror])
+
+AT_DATA([exit_status.csh],
+[[echo $?anyerror $anyerror
+false | true ; echo $?
+unset anyerror ; echo $?anyerror
+false | true ; echo $?
+set anyerror
+false | true ; echo $?
+]])
+
+AT_CHECK([tcsh -f exit_status.csh],,
+[1
+1
+0
+0
+1
+])
+
+AT_CLEANUP
+
+
 AT_SETUP([$ argv])
 
 AT_CHECK([tcsh -f -c 'echo $argv; echo $2' foo bar baz], ,
@@ -680,6 +702,15 @@ AT_CHECK([tcsh -f mail.csh], ,
 AT_CLEANUP
 
 
+AT_SETUP([$ cdtohome])
+AT_CHECK([tcsh -f -c 'cd'], 0)
+AT_CLEANUP
+AT_SETUP([$ noimplicithome])
+AT_CHECK([tcsh -f -c 'unset cdtohome; cd'], 1, , [cd: Too few arguments.
+])
+AT_CLEANUP
+
+
 VAR_UNSET([matchbeep])
 VAR_UNSET([nobeep])
 VAR_UNSET([noclobber]) # Functionality tested with "Command execution"
@@ -887,7 +918,7 @@ if ( $status > 128 ) echo OK
 true
 echo $status
 ]])
-AT_CHECK([tcsh -f status.csh | sed 's/Abort (core dumped)/Abort/'], ,
+AT_CHECK([tcsh -f status.csh 2>&1 | sed 's/Abort (core dumped)/Abort/'], ,
 [0
 Abort
 OK

@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.set.c,v 3.83 2012/01/15 17:15:28 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.set.c,v 3.85 2014/10/28 16:51:30 christos Exp $ */
 /*
  * sh.set.c: Setting and Clearing of variables
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.set.c,v 3.83 2012/01/15 17:15:28 christos Exp $")
+RCSID("$tcsh: sh.set.c,v 3.85 2014/10/28 16:51:30 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -205,6 +205,9 @@ update_vars(Char *vp)
 #endif /* HAVENOUTMP */
     else if (eq(vp, STRimplicitcd)) {
 	implicit_cd = ((eq(varval(vp), STRverbose)) ? 2 : 1);
+    }
+    else if (eq(vp, STRcdtohome)) {
+	cdtohome = 1;
     }
 #ifdef COLOR_LS_F
     else if (eq(vp, STRcolor)) {
@@ -783,6 +786,8 @@ unset(Char **v, struct command *c)
 	symlinks = 0;
     if (adrof(STRimplicitcd) == 0)
 	implicit_cd = 0;
+    if (adrof(STRcdtohome) == 0)
+	cdtohome = 0;
     if (adrof(STRkillring) == 0)
 	SetKillRing(0);
     if (did_edit && noediting && adrof(STRedit) == 0)

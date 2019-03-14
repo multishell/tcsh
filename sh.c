@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.177 2013/03/28 15:06:31 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.181 2014/09/08 19:18:55 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -39,7 +39,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$tcsh: sh.c,v 3.177 2013/03/28 15:06:31 christos Exp $")
+RCSID("$tcsh: sh.c,v 3.181 2014/09/08 19:18:55 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -78,7 +78,8 @@ extern int NLSMapsAreInited;
  * ported to Apple Unix (TM) (OREO)  26 -- 29 Jun 1987
  */
 
-jmp_buf_t reslab;
+jmp_buf_t reslab IZERO_STRUCT;
+struct wordent paraml IZERO_STRUCT;
 
 static const char tcshstr[] = "tcsh";
 
@@ -250,10 +251,11 @@ main(int argc, char **argv)
     int osetintr;
     struct sigaction oparintr;
 
-    (void)memset(&reslab, 0, sizeof(reslab));
 #ifdef WINNT_NATIVE
     nt_init();
 #endif /* WINNT_NATIVE */
+
+    (void)memset(&reslab, 0, sizeof(reslab));
 #if defined(NLS_CATALOGS) && defined(LC_MESSAGES)
     (void) setlocale(LC_MESSAGES, "");
 #endif /* NLS_CATALOGS && LC_MESSAGES */
@@ -478,6 +480,9 @@ main(int argc, char **argv)
      */
     initdesc();
 
+    cdtohome = 1;
+    setv(STRcdtohome, SAVE(""), VAR_READWRITE);
+
     /*
      * Get and set the tty now
      */
@@ -494,6 +499,7 @@ main(int argc, char **argv)
     }
     else
 	setv(STRtty, cp = SAVE(""), VAR_READWRITE);
+
     /*
      * Initialize the shell variables. ARGV and PROMPT are initialized later.
      * STATUS is also munged in several places. CHILD is munged when
@@ -2181,6 +2187,7 @@ dosource(Char **t, struct command *c)
     cleanup_push(file, xfree);
     xfree(f);
     t = glob_all_or_error(t);
+    cleanup_push(t, blk_cleanup);
     if ((!srcfile(file, 0, hflg, t)) && (!hflg) && (!bequiet))
 	stderror(ERR_SYSTEM, file, strerror(errno));
     cleanup_until(file);

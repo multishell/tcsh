@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.glob.c,v 3.84 2012/12/17 15:52:54 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.glob.c,v 3.86 2015/02/03 16:02:05 christos Exp $ */
 /*
  * sh.glob.c: Regular expression expansion
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.glob.c,v 3.84 2012/12/17 15:52:54 christos Exp $")
+RCSID("$tcsh: sh.glob.c,v 3.86 2015/02/03 16:02:05 christos Exp $")
 
 #include "tc.h"
 #include "tw.h"
@@ -595,7 +595,10 @@ trim(Char **t)
 
     while ((p = *t++) != '\0')
 	while (*p)
-	    *p++ &= TRIM;
+	    if (*p < INVALID_BYTE)
+		*p++ &= TRIM;
+	    else
+		*p++;
 }
 
 int
@@ -879,7 +882,7 @@ backeval(struct blk_buf *bb, struct Strbuf *word, Char *cp, int literal)
 	if (c != 0 && (cnt || literal))
 	    pword(bb, word);
 	hadnl = 0;
-    } while (c > 0);
+    } while (c >= 0);
  eof:
     cleanup_until(&pvec[0]);
     pwait();

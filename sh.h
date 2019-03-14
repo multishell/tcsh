@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.h,v 3.166 2012/06/21 18:49:11 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.h,v 3.171 2014/10/28 18:40:46 christos Exp $ */
 /*
  * sh.h: Catch it all globals and includes file!
  */
@@ -126,6 +126,11 @@ typedef int eChar;
 
 #if !defined(__inline) && !defined(__GNUC__) && !defined(_MSC_VER)
 #define __inline
+#endif
+#ifdef _MSC_VER
+#define TCSH_PTRDIFF_T_FMT "I"
+#else
+#define TCSH_PTRDIFF_T_FMT "t"
 #endif
 /* Elide unused argument warnings */
 #define USE(a)	(void) (a)
@@ -569,7 +574,8 @@ EXTERN int    isdiagatty IZERO;/* is SHDIAG a tty */
 EXTERN int    is1atty IZERO;	/* is file descriptor 1 a tty (didfds mode) */
 EXTERN int    is2atty IZERO;	/* is file descriptor 2 a tty (didfds mode) */
 EXTERN int    arun IZERO;	/* Currently running multi-line-aliases */
-EXTERN int     implicit_cd IZERO;/* implicit cd enabled?(1=enabled,2=verbose) */
+EXTERN int    implicit_cd IZERO;/* implicit cd enabled?(1=enabled,2=verbose) */
+EXTERN int    cdtohome IZERO;	/* cd without args goes home */
 EXTERN int    inheredoc IZERO;	/* Currently parsing a heredoc */
 /* We received a window change event */
 EXTERN volatile sig_atomic_t windowchg IZERO;
@@ -701,14 +707,14 @@ extern struct sigaction parterm;	/* Parents terminate catch */
 #define		ASCII		0177
 #ifdef WIDE_STRINGS		/* Implies SHORT_STRINGS */
 /* 31st char bit used for 'ing (not 32nd, we want all values nonnegative) */
-# define	QUOTE		0x40000000
-# define	TRIM		0x3FFFFFFF /* Mask to strip quote bit */
+# define	QUOTE		0x80000000U
+# define	TRIM		0x7FFFFFFFU /* Mask to strip quote bit */
 # define	UNDER		0x08000000 /* Underline flag */
 # define	BOLD		0x04000000 /* Bold flag */
 # define	STANDOUT	0x02000000 /* Standout flag */
 # define	LITERAL		0x01000000 /* Literal character flag */
 # define	ATTRIBUTES	0x0F000000 /* The bits used for attributes */
-# define	INVALID_BYTE	0x00800000 /* Invalid character on input */
+# define	INVALID_BYTE	0x90000000U /* Invalid character on input */
 # ifdef SOLARIS2
 #  define	CHAR		0x30FFFFFF /* Mask to mask out the character */
 # else
@@ -736,6 +742,8 @@ extern struct sigaction parterm;	/* Parents terminate catch */
 # define	CHAR		0000177	/* Mask to mask out the character */
 #endif
 #define		CHAR_DBWIDTH	(LITERAL|(LITERAL-1))
+
+# define 	MAX_UTF32	0x7FFFFFFFU	/* max UTF32 is U+7FFFFFFF */
 
 EXTERN int     AsciiOnly;	/* If set only 7 bits expected in characters */
 
@@ -1045,7 +1053,7 @@ EXTERN struct Hist {
     unsigned Hhash;                     /* hash value of command line */
 }       Histlist IZERO_STRUCT;
 
-EXTERN struct wordent paraml;	/* Current lexical word list */
+extern struct wordent paraml;	/* Current lexical word list */
 EXTERN int     eventno;		/* Next events number */
 EXTERN int     lastev;		/* Last event reference (default) */
 
