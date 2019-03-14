@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tc.nls.c,v 3.3 2005/01/18 20:01:10 christos Exp $ */
+/* $Header: /src/pub/tcsh/tc.nls.c,v 3.5 2005/01/20 05:16:10 christos Exp $ */
 /*
  * tc.nls.c: NLS handling
  */
@@ -31,10 +31,8 @@
  * SUCH DAMAGE.
  */
 #include "sh.h"
-#include <stdlib.h>
-#include <wchar.h>
 
-RCSID("$Id: tc.nls.c,v 3.3 2005/01/18 20:01:10 christos Exp $")
+RCSID("$Id: tc.nls.c,v 3.5 2005/01/20 05:16:10 christos Exp $")
 
 #ifdef SHORT_STRINGS
 int
@@ -99,18 +97,18 @@ NLSStringWidth(Char *s)
 #elif defined (SHORT_STRINGS)
 
 int
-NLSFrom(const Char *p, int l, NLSChar *cp)
+NLSFrom(const Char *p, size_t l, NLSChar *cp)
 {
     size_t i;
     int len;
     wchar_t c;
     char b[MB_LEN_MAX];
 
-    if (l == -1) {
+    if (l == NLSZEROT) {
         for (i = 0; i < MB_CUR_MAX && *p; i++)
 	    b[i] = p[i] & CHAR;
     } else {
-        for (i = 0; i < MB_CUR_MAX && i < (size_t)l; i++)
+        for (i = 0; i < MB_CUR_MAX && i < l; i++)
 	    b[i] = p[i] & CHAR;
     }
     mbtowc(0, 0, 0);
@@ -161,7 +159,7 @@ NLSStringWidth(Char *s)
     int w = 0;
     NLSChar c;
     while (*s) {
-        s += NLSFrom(s, -1, &c);
+        s += NLSFrom(s, NLSZEROT, &c);
 	w += NLSWidth(c);
     }
     return w;
@@ -252,7 +250,7 @@ NLSChangeCase(Char *p, int mode)
     int l, l2;
 
     while (*p) {
-       l = NLSFrom(p, -1, &c);
+       l = NLSFrom(p, NLSZEROT, &c);
        if (mode == 0 && iswlower((wint_t)c)) {
 	   c2 = (int)towupper((wint_t)c);
 	   break;

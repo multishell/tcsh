@@ -72,7 +72,7 @@
 .\"   used here if you can. In particular, please don't use nroff commands
 .\"   which aren't already used herein.
 .\" 
-.TH TCSH 1 "18 January 2005" "Astron 6.13.07"
+.TH TCSH 1 "3 March 2005" "Astron 6.13.08"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
@@ -4987,11 +4987,10 @@ Command substitution supports multiple commands and conditions, but not
 cycles or backward \fIgoto\fRs.
 .PP
 Report bugs to tcsh-bugs@mx.gw.com, preferably with fixes.  If you want to
-help maintain and test tcsh, send mail to listserv@mx.gw.com with the text
-`subscribe tcsh <your name>' on a line by itself in the body.  You can
-also `subscribe tcsh-bugs <your name>' to get all bug reports, or
-`subscribe tcsh-diffs <your name>' to get the development list plus
-diffs for each patchlevel.
+help maintain and test tcsh, send mail to tcsh-request@mx.gw.com with the
+text `subscribe tcsh' on a line by itself in the body.  You can also send
+mail to tcsh-bugs-request@mx.gw.com with the text `subscribe tcsh-bugs' to
+receive all bug reports.
 .SH THE T IN TCSH
 In 1964, DEC produced the PDP-6.  The PDP-10 was a later re-implementation.  It
 was re-christened the DECsystem-10 in 1970 or so when DEC brought out the
@@ -5038,7 +5037,7 @@ pipe(2), setrlimit(2), sigvec(2), stat(2), umask(2), vfork(2), wait(2),
 malloc(3), setlocale(3), tty(4), a.out(5), termcap(5), environ(7),
 termio(7), Introduction to the C Shell
 .SH VERSION
-This manual documents tcsh 6.13.07 (Astron) 2005-01-18.
+This manual documents tcsh 6.13.08 (Astron) 2005-03-03.
 .SH AUTHORS
 .PD 0
 .TP 2
