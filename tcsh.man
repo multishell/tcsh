@@ -72,7 +72,7 @@
 .\"   used here if you can. In particular, please don't use nroff commands
 .\"   which aren't already used herein.
 .\" 
-.TH TCSH 1 "21 March 2005" "Astron 6.13.10"
+.TH TCSH 1 "25 March 2005" "Astron 6.14.00"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
@@ -175,6 +175,13 @@ Sets the \fBverbose\fR shell variable even before executing \fI~/.tcshrc\fR.
 .TP 4
 .B \-X
 Is to \fB\-x\fR as \fB\-V\fR is to \fB\-v\fR.
+.TP 4
+.B \-\-help
+Print a help message on the standard output and exit. (+)
+.TP 4
+.B \-\-version
+Print the version/platform/compilation options on the standard output and exit.
+This information is also contained in the \fBversion\fR shell variable. (+)
 .PP
 After processing of flag arguments, if arguments remain but none of the
 \fB\-c\fR, \fB\-i\fR, \fB\-s\fR, or \fB\-t\fR options were given, the first
@@ -4995,11 +5002,9 @@ interrupted.
 Command substitution supports multiple commands and conditions, but not
 cycles or backward \fIgoto\fRs.
 .PP
-Report bugs to tcsh-bugs@mx.gw.com, preferably with fixes.  If you want to
+Report bugs at http://bugs.gw.com/, preferably with fixes.  If you want to
 help maintain and test tcsh, send mail to tcsh-request@mx.gw.com with the
-text `subscribe tcsh' on a line by itself in the body.  You can also send
-mail to tcsh-bugs-request@mx.gw.com with the text `subscribe tcsh-bugs' to
-receive all bug reports.
+text `subscribe tcsh' on a line by itself in the body.
 .SH THE T IN TCSH
 In 1964, DEC produced the PDP-6.  The PDP-10 was a later re-implementation.  It
 was re-christened the DECsystem-10 in 1970 or so when DEC brought out the
@@ -5046,7 +5051,7 @@ pipe(2), setrlimit(2), sigvec(2), stat(2), umask(2), vfork(2), wait(2),
 malloc(3), setlocale(3), tty(4), a.out(5), termcap(5), environ(7),
 termio(7), Introduction to the C Shell
 .SH VERSION
-This manual documents tcsh 6.13.10 (Astron) 2005-03-21.
+This manual documents tcsh 6.14.00 (Astron) 2005-03-25.
 .SH AUTHORS
 .PD 0
 .TP 2
