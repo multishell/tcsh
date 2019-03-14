@@ -1,3 +1,15 @@
+ 89. V6.17.07 - 20111227
+ 88. Fix debian bug #645238: tcsh segfaults when prompt includes %j and
+     there are more than 10 jobs.
+ 87. PR/155: Default $anyerror to set for backward compatibility
+ 86. PR/149: Don't print -1 in %j (Vojtech Vitek)
+ 85. handle -- on chdir commands as the end of options processing so that
+     they can process a directory like -x without resorting to ./-x
+     (Andrew Stevenson)
+ 84. Handle write(2) returning ENOENT from SoFS, thanks ++HAL (Robert Byrnes)
+ 83. PR/38: Null check for jobs (Kurt Miller)
+ 82. Fix spelling correction correcting ./foo -> ../foo2 (jean-luc leger)
+ 81. PR/120: string0 in filetest does not have enough space.
  80. V6.17.06 - 20110415
  79. PR/110: Add $anyerror to select behavior. Default to the new one.
  78. Don't try to spell commands that are correct (Rouben Rostamian)

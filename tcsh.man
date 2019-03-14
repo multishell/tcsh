@@ -72,7 +72,7 @@
 .\"   used here if you can. In particular, please don't use nroff commands
 .\"   which aren't already used herein.
 .\" 
-.TH TCSH 1 "15 April 2011" "Astron 6.17.06"
+.TH TCSH 1 "27 December 2011" "Astron 6.17.07"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
@@ -2291,7 +2291,7 @@ see the \fBversion\fR shell variable.
 .B case \fIlabel\fB:
 A label in a \fIswitch\fR statement as discussed below.
 .TP 8
-.B cd \fR[\fB\-p\fR] [\fB\-l\fR] [\fB\-n\fR|\fB\-v\fR] [\fIname\fR]
+.B cd \fR[\fB\-p\fR] [\fB\-l\fR] [\fB\-n\fR|\fB\-v\fR] [\I--\fR] [\fIname\fR]
 If a directory \fIname\fR is given, changes the shell's working directory
 to \fIname\fR.  If not, changes to \fBhome\fR.
 If \fIname\fR is `\-' it is interpreted as the previous working directory
@@ -2306,6 +2306,8 @@ begins with `/', then this is tried to see if it is a directory.
 With \fB\-p\fR, prints the final directory stack, just like \fIdirs\fR.
 The \fB\-l\fR, \fB\-n\fR and \fB\-v\fR flags have the same effect on \fIcd\fR
 as on \fIdirs\fR, and they imply \fB\-p\fR.  (+)
+Using \fB\-\-\fR forces a break from option processing so the next word
+is taken as the directory \fIname\fR even if it begins with '\-'. (+)
 .PP
 See also the \fBimplicitcd\fR shell variable.
 .RE
@@ -2841,7 +2843,7 @@ With \fIcommand\fR, runs \fIcommand\fR such that it will exit on a hangup
 signal and arranges for the shell to send it a hangup signal when the shell
 exits.
 Note that commands may set their own response to hangups, overriding \fIhup\fR.
-Without an argument (allowed in only a shell script), causes the shell to
+Without an argument, causes the non-interactive shell only to
 exit on a hangup for the remainder of the script.
 See also \fBSignal handling\fR and the \fInohup\fR builtin command.
 .TP 8
@@ -3097,7 +3099,7 @@ itself can cause unexpected behavior, because the shell
 does not like to lose its tty.  (TCF only)
 .PD
 .TP 8
-.B newgrp \fR[\fB\-\fR] \fIgroup\fR (+)
+.B newgrp \fR[\fB\-\fR] \fI[group]\fR (+)
 Equivalent to `exec newgrp'; see \fInewgrp\fR(1).
 Available only if the shell was so compiled;
 see the \fBversion\fR shell variable.
@@ -3115,7 +3117,7 @@ commands in simple \fIif\fR statements apply.
 .B nohup \fR[\fIcommand\fR]
 With \fIcommand\fR, runs \fIcommand\fR such that it will ignore hangup signals.
 Note that commands may set their own response to hangups, overriding \fInohup\fR.
-Without an argument (allowed in only a shell script), causes the shell to
+Without an argument, causes the non-interactive shell only to
 ignore hangups for the remainder of the script.
 See also \fBSignal handling\fR and the \fIhup\fR builtin command.
 .TP 8
@@ -4021,13 +4023,12 @@ signal (see \fBSignal handling\fR).  See also the \fBautologout\fR
 shell variable.
 .TP 8
 .B mail
-The names of the files or directories to check for incoming mail,
-separated by whitespace, and optionally preceded by a numeric word.
-Before each prompt, if 10 minutes have passed since the last check, the
-shell checks each file and says `You have new mail.' (or, if \fBmail\fR
-contains multiple files, `You have new mail in \fIname\fR.') if the
-filesize is greater than zero in size and has a modification time
-greater than its access time.
+A list of files and directories to check for incoming mail, optionally
+preceded by a numeric word.  Before each prompt, if 10 minutes have
+passed since the last check, the shell checks each file and says `You
+have new mail.' (or, if \fBmail\fR contains multiple files, `You have
+new mail in \fIname\fR.') if the filesize is greater than zero in size
+and has a modification time greater than its access time.
 .PP
 .RS +8
 .PD
@@ -4355,9 +4356,11 @@ See also \fBloginsh\fR.
 The status returned by the last command, unless the variable
 .B anyerror
 is set, and any error in a pipeline or a backquote expansion will be
-propagated (this was the default
+propagated (this is the default
 .B csh
-behavior). If it terminated
+behavior, and the current
+.B tcsh
+default). If it terminated
 abnormally, then 0200 is added to the status.  Builtin commands
 which fail return exit status `1', all other builtin commands
 return status `0'.
@@ -5198,7 +5201,7 @@ pipe(2), setrlimit(2), sigvec(2), stat(2), umask(2), vfork(2), wait(2),
 malloc(3), setlocale(3), tty(4), a.out(5), termcap(5), environ(7),
 termio(7), Introduction to the C Shell
 .SH VERSION
-This manual documents tcsh 6.17.06 (Astron) 2011-04-15.
+This manual documents tcsh 6.17.07 (Astron) 2011-12-27.
 .SH AUTHORS
 .PD 0
 .TP 2
