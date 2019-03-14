@@ -694,7 +694,7 @@ auto_lock()
 #endif /* PW_SHADOW && !XCRYPT */
 
 #ifndef XCRYPT
-    extern const char *crypt();
+    //extern const char *crypt();
 
 #define XCRYPT(a, b) crypt(a, b)
 
