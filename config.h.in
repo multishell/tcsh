@@ -42,6 +42,9 @@
 /* Define to 1 if the system has the type `long long'. */
 #undef HAVE_LONG_LONG
 
+/* Define to 1 if you have the `mbrtowc' function. */
+#undef HAVE_MBRTOWC
+
 /* Define to 1 if you have the `memmove' function. */
 #undef HAVE_MEMMOVE
 
@@ -143,6 +146,9 @@
 /* Define to 1 if you have the `wcwidth' function. */
 #undef HAVE_WCWIDTH
 
+/* Define to 1 if the system has the type `wint_t'. */
+#undef HAVE_WINT_T
+
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT
 
@@ -193,6 +199,9 @@
 
 /* Define to `int' if neither <sys/types.h> nor <sys/socket.h> define. */
 #undef socklen_t
+
+/* Define to `int' not defined in <sys/types.h>. */
+#undef ssize_t
 
 /* Define to `int' if <sys/types.h> doesn't define. */
 #undef uid_t

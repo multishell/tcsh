@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/ed.term.c,v 1.31 2004/11/23 02:10:48 christos Exp $ */
+/* $Header: /src/pub/tcsh/ed.term.c,v 1.34 2006/01/12 18:15:24 christos Exp $ */
 /*
  * ed.term.c: Low level terminal interface
  */
@@ -33,7 +33,7 @@
 #include "sh.h"
 #ifndef WINNT_NATIVE
 
-RCSID("$Id: ed.term.c,v 1.31 2004/11/23 02:10:48 christos Exp $")
+RCSID("$Id: ed.term.c,v 1.34 2006/01/12 18:15:24 christos Exp $")
 
 #include "ed.h"
 
@@ -84,7 +84,7 @@ ttyperm_t ttylist = {
     }
 };
 
-static struct tcshmodes {
+static const struct tcshmodes {
     const char *m_name;
 #ifdef SOLARIS2
     unsigned long m_value;
@@ -568,31 +568,35 @@ static struct tcshmodes {
 #endif
 
 /* Retry a system call */
-static int count;
-#define RETRY(x) \
-   for (count = 0;; count++) \
-	if ((x) == -1) { \
-	    if (OKERROR(errno) || KLUDGE) \
-		continue; \
-	    else \
-		return -1; \
-	} \
-	else \
-	   break \
+#define RETRY(x)				\
+do {						\
+    int count;					\
+						\
+    for (count = 0;; count++)			\
+	if ((x) == -1) {			\
+	    if (OKERROR(errno) || KLUDGE)	\
+		continue;			\
+	    else				\
+		return -1;			\
+	}					\
+	else					\
+	    break;				\
+} while (0)
 
 /*ARGSUSED*/
 void
 dosetty(Char **v, struct command *t)
 {
-    struct tcshmodes *m;
-    char x, *d;
+    const struct tcshmodes *m;
+    char x, *d, *cmdname;
     int aflag = 0;
     Char *s;
     int z = EX_IO;
-    char cmdname[BUFSIZE];
 
     USE(t);
-    setname(strcpy(cmdname, short2str(*v++)));
+    cmdname = strsave(short2str(*v++));
+    cleanup_push(cmdname, xfree);
+    setname(cmdname);
 
     while (v && *v && v[0][0] == '-' && v[0][2] == '\0') 
 	switch (v[0][1]) {
@@ -613,7 +617,7 @@ dosetty(Char **v, struct command *t)
 	    z = QU_IO;
 	    break;
 	default:
-	    stderror(ERR_NAME | ERR_SYSTEM, short2str(v[0]), 
+	    stderror(ERR_NAME | ERR_SYSTEM, short2str(v[0]),
 		     CGETS(8, 1, "Unknown switch"));
 	    break;
 	}
@@ -624,7 +628,7 @@ dosetty(Char **v, struct command *t)
 	int len = 0, st = 0, cu;
 	for (m = modelist; m->m_name; m++) {
 	    if (m->m_type != i) {
-		xprintf("%s%s", i != -1 ? "\n" : "", 
+		xprintf("%s%s", i != -1 ? "\n" : "",
 			ttylist[z][m->m_type].t_name);
 		i = m->m_type;
 		st = len = strlen(ttylist[z][m->m_type].t_name);
@@ -635,7 +639,7 @@ dosetty(Char **v, struct command *t)
 
 	    if (x != '\0' || aflag) {
 		cu = strlen(m->m_name) + (x != '\0') + 1;
-		if (len + cu >= T_Cols) {
+		if (len + cu >= TermH) {
 		    xprintf("\n%*s", st, "");
 		    len = st + cu;
 		}
@@ -648,6 +652,7 @@ dosetty(Char **v, struct command *t)
 	    }
 	}
 	xputchar('\n');
+	cleanup_until(cmdname);
 	return;
     }
     while (v && (s = *v++)) {
@@ -682,6 +687,7 @@ dosetty(Char **v, struct command *t)
 	    break;
 	}
     }
+    cleanup_until(cmdname);
 } /* end dosetty */
 
 int
@@ -719,7 +725,7 @@ int
 tty_setty(int fd, ttydata_t *td)
 {
 #ifdef POSIX
-    RETRY(tcsetattr(fd, TCSADRAIN, &td->d_t)); 
+    RETRY(xtcsetattr(fd, TCSADRAIN, &td->d_t)); 
 #else
 # ifdef TERMIO
     RETRY(ioctl(fd, TCSETAW,    (ioctl_t) &td->d_t));

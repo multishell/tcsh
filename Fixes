@@ -1,3 +1,31 @@
+ 34. V6.14.03 - 20060212
+ 33. Signal related changes (Miloslav Trmac)
+ 32. Misc cast cleanups and code clarification (Miloslav Trmac)
+ 31. Use dynamically allocated buffers everywhere (Miloslav Trmac)
+ 30. Fix reading of invalid byte sequences (Miloslav Trmac)
+ 29. read should only increment count when it succeeds (Miloslav Trmac)
+ 28. testsuiteadditions (Miloslav Trmac)
+ 27. -n fixes (Miloslav Trmac)
+ 26. signness warnings (Miloslav Trmac)
+ 25. Prevent infinite recursion in catclose (Gerhard Niklasch)
+ 24. Add Dragonfly (Joerg Sonnenberger)
+ 23. Check for wcwidth returning a negative number (TOMITA Yoshinori)
+ 22. recognize "li" and "co" in echotc (Martin Kraemer) [PR/7]
+ 21. Don't use T_Cols for wrapping purposes; use TermH consistently
+     (Martin Kraemer) [PR/8]
+ 20. Don't display duplicate utmp records (Miloslav Trmac) [PR/17]
+ 19. Clarify hashing and -f sections of man page (Volker Quetschke) [PR/20]
+ 18. Dave Yearke: configure did not recognize solaris 10 [PR/18]
+ 17. CYGWIN: Don't lowercase commands and allow foo.exe on command line.
+     (Corinna Vinschen) [PR/19]
+ 16. CYGWIN: cd /foo && cd .. ends up erroneously in // for systems that
+     HAVE_SLASHSLASH [PR/21]
+ 15. %j was broken (Peter Kruse)
+ 14. Extend // handling in pathnames from being apollo specific to also
+     cygwin (Corinna Vinschen)
+ 13. Fix uppercase/lowercase transformations (Jean-Luc Leger)
+ 12. Fix symlink expansion (revert from 6.10.00) (Jean-Luc Leger and Christos)
+ 11. Fix literal sequence in prompt (Miloslav Trmac)
  10. V6.14.02 - 20050412
   9. Prototype fixes (Miloslav Trmac and Jean-Luc Leger)
   8. V6.14.01 - 20050411

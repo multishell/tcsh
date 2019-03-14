@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tc.printf.c,v 3.27 2005/01/05 16:06:15 christos Exp $ */
+/* $Header: /src/pub/tcsh/tc.printf.c,v 3.32 2006/01/13 19:28:44 christos Exp $ */
 /*
  * tc.printf.c: A public-domain, minimal printf/sprintf routine that prints
  *	       through the putchar() routine.  Feel free to use for
@@ -34,16 +34,15 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.printf.c,v 3.27 2005/01/05 16:06:15 christos Exp $")
+RCSID("$Id: tc.printf.c,v 3.32 2006/01/13 19:28:44 christos Exp $")
 
 #ifdef lint
 #undef va_arg
 #define va_arg(a, b) (a ? (b) 0 : (b) 0)
 #endif
 
-#define INF	32766		/* should be bigger than any field to print */
+#define INF	INT_MAX		/* should be bigger than any field to print */
 
-static char buf[128];
 static char snil[] = "(nil)";
 
 static	void	xaddchar	(int);
@@ -55,7 +54,7 @@ doprnt(void (*addchar) (int), const char *sfmt, va_list ap)
     char *bp;
     const char *f;
 #ifdef SHORT_STRINGS
-    Char *Bp;
+    const Char *Bp;
 #endif /* SHORT_STRINGS */
 #ifdef HAVE_LONG_LONG
     long long l;
@@ -64,10 +63,12 @@ doprnt(void (*addchar) (int), const char *sfmt, va_list ap)
     long l;
     unsigned long u;
 #endif
+    char buf[(CHAR_BIT * sizeof (l) + 2) / 3 + 1]; /* Octal: 3 bits per char */
     int i;
     int fmt;
     unsigned char pad = ' ';
-    int     flush_left = 0, f_width = 0, prec = INF, hash = 0, do_long = 0;
+    int     flush_left = 0, f_width = 0, prec = INF, hash = 0;
+    int	    do_long = 0, do_size_t = 0;
     int     sign = 0;
     int     attributes = 0;
 
@@ -75,7 +76,7 @@ doprnt(void (*addchar) (int), const char *sfmt, va_list ap)
     f = sfmt;
     for (; *f; f++) {
 	if (*f != '%') {	/* then just out the char */
-	    (*addchar) ((int) (((unsigned char)*f) | attributes));
+	    (*addchar) (((unsigned char)*f) | attributes);
 	}
 	else {
 	    f++;		/* skip the % */
@@ -126,6 +127,10 @@ doprnt(void (*addchar) (int), const char *sfmt, va_list ap)
 		    f++;
 		}
 	    }
+	    if (*f == 'z') {	/* size_t format */
+		do_size_t++;
+		f++;
+	    }
 
 	    fmt = (unsigned char) *f;
 	    if (fmt != 'S' && fmt != 'Q' && isupper(fmt)) {
@@ -137,7 +142,10 @@ doprnt(void (*addchar) (int), const char *sfmt, va_list ap)
 	    case 'd':
 		switch (do_long) {
 		case 0:
-		    l = (long) (va_arg(ap, int));
+		    if (do_size_t)
+			l = (long) (va_arg(ap, size_t));
+		    else
+			l = (long) (va_arg(ap, int));
 		    break;
 		case 1:
 #ifndef HAVE_LONG_LONG
@@ -164,12 +172,12 @@ doprnt(void (*addchar) (int), const char *sfmt, va_list ap)
 		f_width = f_width - (int) (bp - buf);
 		if (!flush_left)
 		    while (f_width-- > 0) 
-			(*addchar) ((int) (pad | attributes));
+			(*addchar) (pad | attributes);
 		for (bp--; bp >= buf; bp--) 
-		    (*addchar) ((int) (((unsigned char) *bp) | attributes));
+		    (*addchar) (((unsigned char) *bp) | attributes);
 		if (flush_left)
 		    while (f_width-- > 0)
-			(*addchar) ((int) (' ' | attributes));
+			(*addchar) (' ' | attributes);
 		break;
 
 	    case 'p':
@@ -182,7 +190,10 @@ doprnt(void (*addchar) (int), const char *sfmt, va_list ap)
 	    case 'u':
 		switch (do_long) {
 		case 0:
-		    u = (unsigned long) (va_arg(ap, unsigned int));
+		    if (do_size_t)
+			u = va_arg(ap, size_t);
+		    else
+			u = va_arg(ap, unsigned int);
 		    break;
 		case 1:
 #ifndef HAVE_LONG_LONG
@@ -224,18 +235,18 @@ doprnt(void (*addchar) (int), const char *sfmt, va_list ap)
 		i = f_width - (int) (bp - buf);
 		if (!flush_left)
 		    while (i-- > 0)
-			(*addchar) ((int) (pad | attributes));
+			(*addchar) (pad | attributes);
 		for (bp--; bp >= buf; bp--)
-		    (*addchar) ((int) (((unsigned char) *bp) | attributes));
+		    (*addchar) (((unsigned char) *bp) | attributes);
 		if (flush_left)
 		    while (i-- > 0)
-			(*addchar) ((int) (' ' | attributes));
+			(*addchar) (' ' | attributes);
 		break;
 
 
 	    case 'c':
 		i = va_arg(ap, int);
-		(*addchar) ((int) (i | attributes));
+		(*addchar) (i | attributes);
 		break;
 
 	    case 'S':
@@ -255,16 +266,16 @@ doprnt(void (*addchar) (int), const char *sfmt, va_list ap)
 		    size_t pos, len;
 
 		    if (fmt == 'Q' && *Bp & QUOTE)
-			(*addchar) ((int) ('\\' | attributes));
+			(*addchar) ('\\' | attributes);
 		    len = one_wctomb(cbuf, *Bp & CHAR);
 		    for (pos = 0; pos < len; pos++)
-			(*addchar) ((int) ((unsigned char)cbuf[pos]
-					   | attributes | (*Bp & ATTRIBUTES)));
+			(*addchar) ((unsigned char)cbuf[pos] | attributes
+				    | (*Bp & ATTRIBUTES));
 		    Bp++;
 		}
 		if (flush_left)
 		    while (f_width-- > 0)
-			(*addchar) ((int) (' ' | attributes));
+			(*addchar) (' ' | attributes);
 		break;
 #endif /* SHORT_STRINGS */
 
@@ -274,20 +285,19 @@ doprnt(void (*addchar) (int), const char *sfmt, va_list ap)
 lcase_s:
 		if (!bp)
 		    bp = snil;
-		f_width = f_width - strlen((char *) bp);
+		f_width = f_width - strlen(bp);
 		if (!flush_left)
 		    while (f_width-- > 0)
-			(*addchar) ((int) (pad | attributes));
+			(*addchar) (pad | attributes);
 		for (i = 0; *bp && i < prec; i++) {
 		    if (fmt == 'q' && *bp & QUOTE)
-			(*addchar) ((int) ('\\' | attributes));
-		    (*addchar) ((int) (((unsigned char) *bp & TRIM) |
-				   	attributes));
+			(*addchar) ('\\' | attributes);
+		    (*addchar) (((unsigned char) *bp & TRIM) | attributes);
 		    bp++;
 		}
 		if (flush_left)
 		    while (f_width-- > 0)
-			(*addchar) ((int) (' ' | attributes));
+			(*addchar) (' ' | attributes);
 		break;
 
 	    case 'a':
@@ -295,13 +305,14 @@ lcase_s:
 		break;
 
 	    case '%':
-		(*addchar) ((int) ('%' | attributes));
+		(*addchar) ('%' | attributes);
 		break;
 
 	    default:
 		break;
 	    }
-	    flush_left = 0, f_width = 0, prec = INF, hash = 0, do_long = 0;
+	    flush_left = 0, f_width = 0, prec = INF, hash = 0;
+	    do_size_t = 0, do_long = 0;
 	    sign = 0;
 	    pad = ' ';
 	}
@@ -372,6 +383,42 @@ xvsnprintf(char *str, size_t size, const char *fmt, va_list va)
 #endif
 }
 
+char *
+xvasprintf(const char *fmt, va_list va)
+{
+    size_t size;
+    char *buf;
+
+    buf = NULL;
+    size = 2048; /* Arbitrary */
+    for (;;) {
+	buf = xrealloc(buf, size);
+	xstring = buf;
+	xestring = buf + size - 1;
+	/*
+	 * XXX: this breaks on some platforms where va_list gets modified.
+	 * is the solution va_copy? At least x86_64 seems to suffer from it.
+	 */
+	doprnt(xaddchar, fmt, va);
+	if (xstring < xestring)
+	    break;
+	size *= 2;
+    }
+    *xstring++ = '\0';
+    return xrealloc(buf, xstring - buf);
+}
+
+char *
+xasprintf(const char *fmt, ...)
+{
+    va_list va;
+    char *ret;
+
+    va_start (va, fmt);
+    ret = xvasprintf(fmt, va);
+    va_end(va);
+    return ret;
+}
 
 
 #ifdef PURIFY

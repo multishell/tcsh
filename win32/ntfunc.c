@@ -1,4 +1,4 @@
-/*$Header: /src/pub/tcsh/win32/ntfunc.c,v 1.10 2004/11/23 02:10:50 christos Exp $*/
+/*$Header: /src/pub/tcsh/win32/ntfunc.c,v 1.13 2006/01/12 18:15:25 christos Exp $*/
 /*-
  * Copyright (c) 1980, 1991 The Regents of the University of California.
  * All rights reserved.
@@ -56,7 +56,7 @@ BOOL is_url(const char *cmd);
 void error(char * ) ;
 void make_err_str(unsigned int ,char *,int) ;
 
-#define	INF	0x7fffffff
+#define	INF INT_MAX
 struct	biltins nt_bfunc[] = {
     { "cls",		docls,		0,	0	},
 #ifdef NTDBG
@@ -151,7 +151,7 @@ BOOL is_directory(const char *cmd) {
 void dostart(Char ** vc, struct command *c) {
 
 	char *cmdstr,*cmdend,*ptr;
-	char argv0[256];
+	char argv0[256];/*FIXBUF*/
 	DWORD cmdsize;
 	char *currdir=NULL;
 	char *savepath;
@@ -159,7 +159,7 @@ void dostart(Char ** vc, struct command *c) {
 	STARTUPINFO si;
 	PROCESS_INFORMATION pi;
 	DWORD dwCreationFlags=CREATE_NEW_CONSOLE;
-	int k,cmdlen,j,jj,ret;
+	int k,cmdlen,j,jj,ret,gflag;
 
 
 	USE(c);*vc++;
@@ -172,17 +172,17 @@ void dostart(Char ** vc, struct command *c) {
 	memset(&si,0,sizeof(si));
 	si.cb = sizeof(si);
 
-	gflag = 0;
-	tglob(vc);
+	gflag = tglob(vc);
 	if (gflag) {
-		vc = globall(vc);
+		vc = globall(vc, gflag);
 		if (vc == 0)
 			stderror(ERR_NAME | ERR_NOMATCH);
 	}
 	else
-		vc = gargv = saveblk(vc);
+		vc = saveblk(vc);
 	trim(vc);
 	v = short2blk(vc);
+	blkfree(vc);
 	for (k = 0; v[k] != NULL ; k++){
 
 		if ( v[k][0] == '-' ) {
@@ -209,7 +209,7 @@ void dostart(Char ** vc, struct command *c) {
 				dwCreationFlags |= REALTIME_PRIORITY_CLASS;
 			else{
 				blkfree((Char **)v);
-				stderror(ERR_SYSTEM,start_usage,"See CMD.EXE for more info");
+				stderror(ERR_SYSTEM,start_usage,"See CMD.EXE for more info");/*FIXRESET*/
 			}
 		}
 		else{ // non-option arg
@@ -225,11 +225,12 @@ void dostart(Char ** vc, struct command *c) {
 			j=(lstrlen(v[jj]) + 2);
 			if (j + cmdlen > cmdsize) {
 				ptr = cmdstr;
+				/* FIXME: buffer overflow */
 				cmdstr = heap_realloc(cmdstr, cmdsize << 1);
 				if(!cmdstr)
 				{
 					heap_free(ptr);
-					stderror(ERR_NOMEM,"start");
+					stderror(ERR_NOMEM,"start");/*FIXRESET*/
 				}
 				cmdend =  cmdstr + (cmdend - ptr);
 				cmdsize <<= 1;
@@ -244,7 +245,7 @@ void dostart(Char ** vc, struct command *c) {
 	}
 	if (jj == k) {
 		blkfree((Char **)v);
-		stderror(ERR_SYSTEM,start_usage,"See CMD.EXE for more info");
+		stderror(ERR_SYSTEM,start_usage,"See CMD.EXE for more info");/*FIXRESET*/
 	}
 	*cmdend = 0;
 	lstrcpyn(argv0,v[k],255);
@@ -286,7 +287,7 @@ void dostart(Char ** vc, struct command *c) {
 			heap_free(cmdstr); /* free !! */
 
 			if (errno) {
-				stderror(ERR_ARCH,argv0,strerror(errno));
+				stderror(ERR_ARCH,argv0,strerror(errno));/*FIXRESET*/
 			}
 		}
 		else if (ret == ERROR_INVALID_PARAMETER) {
@@ -295,7 +296,7 @@ void dostart(Char ** vc, struct command *c) {
 
 			heap_free(cmdstr); /* free !! */
 
-			stderror(ERR_TOOLARGE,argv0);
+			stderror(ERR_TOOLARGE,argv0);/*FIXRESET*/
 
 		}
 		else {
@@ -309,7 +310,7 @@ void dostart(Char ** vc, struct command *c) {
 
 			heap_free(cmdstr); /* free !! */
 			if (errno) {
-				stderror(ERR_NOTFOUND,argv0);
+				stderror(ERR_NOTFOUND,argv0);/*FIXRESET*/
 			}
 		}
 	}
@@ -348,7 +349,7 @@ void make_err_str(unsigned int error,char *buf,int size) {
 char dummy;
 char *nameBuf=&dummy, *valBuf=&dummy;
 
-void nt_set_env(Char *name, Char *val) {
+void nt_set_env(const Char *name, const Char *val) {
 	char *cname, *cval;
 	int len;
 
@@ -381,48 +382,48 @@ void nt_set_env(Char *name, Char *val) {
 }
 void dotitle(Char **vc, struct command * c) {
 
-	int k;
-	char titlebuf[512];
-	char errbuf[128],err2[128];
+	int k, gflag;
+	char titlebuf[512];/*FIXBUF*/
+	char errbuf[128],err2[128];/*FIXBUF*/
 	char **v;
 
 	USE(c);*vc++;
-	gflag = 0;
-	tglob(vc);
+	gflag = tglob(vc);
 	if (gflag) {
-		vc = globall(vc);
+		vc = globall(vc, gflag);
 		if (vc == 0)
 			stderror(ERR_NAME | ERR_NOMATCH);
 	}
 	else
-		vc = gargv = saveblk(vc);
+		vc = saveblk(vc);
 	trim(vc);
+	cleanup_push(vc, blk_cleanup);
 
 	if (k=GetConsoleTitle(titlebuf,512) ) {
 		titlebuf[k]=0;
-		set(STRoldtitle,SAVE(titlebuf),VAR_READWRITE);
+		setcopy(STRoldtitle,str2short(titlebuf),VAR_READWRITE);
 	}
 
 	memset(titlebuf,0,512);
 	v = short2blk(vc);
+	cleanup_until(vc);
+	cleanup_push((Char **)v, blk_cleanup);
 	for (k = 0; v[k] != NULL ; k++){
 		__try {
 			 lstrcat(titlebuf,v[k]);
 			 lstrcat(titlebuf," ");
 		}
 		__except(1) {
-			blkfree((Char **)v);
 			stderror(ERR_TOOMANY);
 		}
 	}
-	blkfree((Char **)v);
 
 	if (!SetConsoleTitle(titlebuf) ) {
 			make_err_str(GetLastError(),errbuf,128);
 			wsprintf(err2,"%s",v[k]);
-			blkfree((Char **)v);
 			stderror(ERR_SYSTEM,err2,errbuf);
 	}
+	cleanup_until((Char **)v);
 	return;
 }
 void docls(Char **vc, struct command *c) {
@@ -432,7 +433,7 @@ void docls(Char **vc, struct command *c) {
 int nt_feed_to_cmd(char *file,char **argv) {
 
 	char *ptr;
-	char cmdbuf[128];
+	char cmdbuf[128];/*FIXBUF*/
 	HANDLE htemp;
 	STARTUPINFO si;
 	PROCESS_INFORMATION pi;
@@ -474,7 +475,7 @@ int nt_feed_to_cmd(char *file,char **argv) {
 			*ptr = '\\';
 		ptr++;
 	}
-	if (gdwPlatform == VER_PLATFORM_WIN32_WINDOWS){
+	if (gdwPlatform == VER_PLATFORM_WIN32_WINDOWS){/*FIXME:bufer overflows*/
 		wsprintf(cmdbuf,"command.com /c %s",file);
 	}
 	else
@@ -516,7 +517,7 @@ static char *hb_subst_array[20] ;
 void init_hb_subst(void) {
 	int i= 0;
 	size_t len;
-	char envbuf[1024];
+	char envbuf[1024];/*FIXBUF*/
 	char *ptr;
 	char *p2;
 
@@ -575,8 +576,8 @@ static HMODULE hShellDll;
 static shell_ex_func pShellExecuteEx;
 int __nt_only_start_exes;
 
-static char no_assoc[256]; //the environment string
-static char *no_assoc_array[20]; // the list of extensions to NOT try 
+static char no_assoc[256]; //the environment string/*FIXBUF*/
+static char *no_assoc_array[20]; // the list of extensions to NOT try /*FIXBUF*/
 								 // explorer associations for
 
 void init_shell_dll(void) {
@@ -650,14 +651,14 @@ int find_no_assoc(char *str) {
 	}
 	return 0;
 }
-void try_shell_ex(char **argv,int exitsuccess, BOOL throw_ok) {
+void try_shell_ex(char **argv,int exitsuccess, BOOL throw_ok) {/*FIXRESET*/
 
 	char *prog;
 	char *cmdstr, *p2, *cmdend;
 	char *originalPtr = NULL;
 	unsigned int cmdsize,cmdlen;
 	int hasdot = 0;
-	char err2[256];
+	char err2[256];/*FIXBUF*/
 	char *ptr;
 	short quotespace=0;
 	SHELLEXECUTEINFO shinfo;
@@ -751,7 +752,7 @@ void try_shell_ex(char **argv,int exitsuccess, BOOL throw_ok) {
 
 		make_err_str(GetLastError(),cmdstr,512);//don't need the full size
 		wsprintf(err2,"%s",prog);
-		stderror(ERR_SYSTEM,err2,cmdstr);
+		stderror(ERR_SYSTEM,err2,cmdstr);/*FIXRESET*/
 	}
 
 	heap_free(originalPtr);
@@ -776,7 +777,7 @@ int nt_try_fast_exec(struct command *t) {
 	register struct varent *v;
 	register int hashval,i;
 	register int slash;
-	int rc;
+	int rc, gflag;
 	Char *vp;
 	Char   *blk[2];
 
@@ -792,13 +793,12 @@ int nt_try_fast_exec(struct command *t) {
         return 1;
 
 
-	gflag = 0, tglob(blk);
+	gflag = tglob(blk);
 	if (gflag) {
-		pv = globall(blk);
+		pv = globall(blk, gflag);
 		if (pv == 0) {
 			return 1;
 		}
-		gargv = 0;
 	}
 	else
 		pv = saveblk(blk);
@@ -815,16 +815,14 @@ int nt_try_fast_exec(struct command *t) {
 	/*
 	 * Glob the argument list, if necessary. Otherwise trim off the quote bits.
 	 */
-	gflag = 0;
 	av = &t->t_dcom[1];
-	tglob(av);
+	gflag = tglob(av);
 	if (gflag) {
-		av = globall(av);
+		av = globall(av, gflag);/*FIXRESET*/
 		if (av == 0) {
 			blkfree(pv);
 			return 1;
 		}
-		gargv = 0;
 	}
 	else
 		av = saveblk(av);
@@ -839,7 +837,7 @@ int nt_try_fast_exec(struct command *t) {
 	if (*av == NULL || **av == '\0')
 		return 1;
 
-	xechoit(av);		/* Echo command if -x */
+	xechoit(av);/*FIXRESET*/		/* Echo command if -x */
 	if (v == 0 || v->vec[0] == 0 || slash)
 		pv = abspath;
 	else
@@ -1054,7 +1052,7 @@ re_cp:
 		if(!gui_app) {
 			WaitForSingleObject(pi.hProcess,INFINITE);
 			(void)GetExitCodeProcess(pi.hProcess,&exitcode);
-			set(STRstatus, putn(exitcode), VAR_READWRITE);
+			set(STRstatus, putn(exitcode), VAR_READWRITE);/*FIXRESET*/
 		}
 		retval = 0;
 		CloseHandle(pi.hProcess);
@@ -1109,22 +1107,23 @@ BOOL is_url(const char *cmd) {
   return TRUE;
 }
 void dostacksize(Char ** vc, struct command *c) {
-	int k;
+	int k, gflag;
 	char **v;
 	USE(c);
 	*vc++;
-	gflag = 0;
-	tglob(vc);
+	gflag = tglob(vc);
 	if (gflag) {
-		vc = globall(vc);
+		vc = globall(vc, gflag);
 		if (vc == 0)
 			stderror(ERR_NAME | ERR_NOMATCH);
 	}
 	else
-		vc = gargv = saveblk(vc);
+		vc = saveblk(vc);
 	trim(vc);
 
 	v = short2blk(vc);
+	blkfree(vc);
+	cleanup_push((Char **)v, blk_cleanup);
 	if (v[0] == NULL) {
 		xprintf("Stack limit for shell threads is %d bytes\n",gdwStackSize);
 	}
@@ -1133,7 +1132,7 @@ void dostacksize(Char ** vc, struct command *c) {
 			gdwStackSize = (unsigned)atol(v[k]);
 		}
 	}
-	blkfree((Char **)v);
+	cleanup_until((Char **)v);
 }
 /*
  * patch based on work by Chun-Pong Yu (bol.pacific.net.sg)
@@ -1149,12 +1148,12 @@ BOOL is_nt_executable(char *path,char *extension) {
 	return FALSE;
 }
 int
-executable(Char *dir, Char *name, int dir_ok)
+executable(const Char *dir, const Char *name, int dir_ok)
 {
 	struct stat stbuf;
-	Char    path[MAXPATHLEN + 1];
+	Char    path[MAXPATHLEN + 1];/*FIXBUF*/
 	char   *strname;
-	char extension[MAXPATHLEN]; //bugfix by Avner Lottem.avner.lottem@intel.com
+	char extension[MAXPATHLEN]; //bugfix by Avner Lottem.avner.lottem@intel.com/*FIXBUF*/
 	char *ptr, *p2 ;
 	int has_ext = 0;
 	extern void copyn(Char *, Char *, int);
@@ -1163,8 +1162,8 @@ executable(Char *dir, Char *name, int dir_ok)
 	(void) memset(path, 0, sizeof(path));
 
 	if (dir && *dir) {
-		copyn(path, dir, MAXPATHLEN);
-		catn(path, name, MAXPATHLEN);
+		copyn(path, dir, MAXPATHLEN);/*FIXBUF*/
+		catn(path, name, MAXPATHLEN);/*FIXBUF*/
 
 		p2 = ptr = short2str(path);
 
@@ -1177,13 +1176,13 @@ executable(Char *dir, Char *name, int dir_ok)
 				break;
 			if (*ptr == '.') {
 				has_ext = 1;
-				lstrcpyn(extension,ptr+1,MAXPATHLEN);
+				lstrcpyn(extension,ptr+1,MAXPATHLEN);/*FIXBUF*/
 				break;
 			}
 			ptr--;
 		}
 		if (!has_ext && (nt_stat(p2, &stbuf) == -1))
-			catn(path, STRdotEXE, MAXPATHLEN);
+			catn(path, STRdotEXE, MAXPATHLEN);/*FIXBUF*/
 		strname = short2str(path);
 	}
 	else
@@ -1248,8 +1247,8 @@ void dosourceresource(Char ** vc, struct command *c) {
 }
 void doprintresource(Char ** vc, struct command *c) {
 
-	static char oembuf[256];
-	WCHAR buffer[256];
+	static char oembuf[256];/*FIXBUF*/
+	WCHAR buffer[256];/*FIXBUF*/
 	int rc;
 	HANDLE hMod = GetModuleHandle(NULL);
 	int i = 666;

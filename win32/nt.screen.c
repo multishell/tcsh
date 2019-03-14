@@ -1,4 +1,4 @@
-/*$Header: /src/pub/tcsh/win32/nt.screen.c,v 1.6 2005/03/25 18:46:42 kim Exp $*/
+/*$Header: /src/pub/tcsh/win32/nt.screen.c,v 1.10 2006/01/12 18:15:25 christos Exp $*/
 /*
  * ed.screen.c: Editor/termcap-curses interface
  */
@@ -37,9 +37,6 @@
 #include "tc.h"
 #include "ed.defns.h"
 
-# define PUTPURE putpure
-# define PUTRAW putraw
-
 
 /* #define DEBUG_LITERAL */
 
@@ -59,6 +56,8 @@ extern void NT_ClearScreen(void) ;
 extern void NT_VisibleBell(void);
 extern void NT_WrapHorizontal(void);
 
+static int GetSize(int *lins, int *cols);
+
 int DisplayWindowHSize;
 	void
 terminit(void)
@@ -75,10 +74,9 @@ static	void	ReBufferDisplay	(void);
 
 /*ARGSUSED*/
 	void
-TellTC(char *what)
+TellTC(void)
 {
 
-	USE(what);
 	xprintf(CGETS(7, 1, "\n\tYou're using a Windows console.\n"));
 }
 
@@ -109,7 +107,7 @@ ReBufferDisplay(void)
 	}
 	TermH = cols;
 
-	TermV = (INBUFSIZE * 4) / TermH + 1;
+	TermV = (INBUFSIZE * 4) / TermH + 1;/*FIXBUF*/
 	b = (Char **) xmalloc((size_t) (sizeof(*b) * (TermV + 1)));
 	for (i = 0; i < TermV; i++)
 		b[i] = (Char *) xmalloc((size_t) (sizeof(*b[i]) * (TermH + 1)));
@@ -148,59 +146,66 @@ SetTC(char *what, char *how)
 	void
 EchoTC(Char **v)
 {
+    Char **globbed;
+    char    cv[BUFSIZE];/*FIXBUF*/
+    int     verbose = 0, silent = 0, gflag;
+    static char *fmts = "%s\n", *fmtd = "%d\n";
+    int li,co;
 
-	char    cv[BUFSIZE];
-	int     verbose = 0, silent = 0;
-	static char *fmts = "%s\n", *fmtd = "%d\n";
 
+    setname("echotc");
 
-	setname("echotc");
+    gflag = tglob(v);
+    if (gflag) {
+        v = globall(v, gflag);
+        if (v == 0)
+            stderror(ERR_NAME | ERR_NOMATCH);
+    }
+    else
+        v = saveblk(v);
+    globbed = v;
+    cleanup_push(globbed, blk_cleanup);
+    trim(v);
 
-	tglob(v);
-	if (gflag) {
-		v = globall(v);
-		if (v == 0)
-			stderror(ERR_NAME | ERR_NOMATCH);
-	}
-	else
-		v = gargv = saveblk(v);
-	trim(v);
+    if (!*v || *v[0] == '\0')
+        goto end;
+    if (v[0][0] == '-') {
+        switch (v[0][1]) {
+            case 'v':
+                verbose = 1;
+                break;
+            case 's':
+                silent = 1;
+                break;
+            default:
+                stderror(ERR_NAME | ERR_TCUSAGE);
+                break;
+        }
+        v++;
+    }
+    if (!*v || *v[0] == '\0')
+        goto end;
+    (void) strcpy(cv, short2str(*v));
 
-	if (!*v || *v[0] == '\0')
-		return;
-	if (v[0][0] == '-') {
-		switch (v[0][1]) {
-			case 'v':
-				verbose = 1;
-				break;
-			case 's':
-				silent = 1;
-				break;
-			default:
-				stderror(ERR_NAME | ERR_TCUSAGE);
-				break;
-		}
-		v++;
-	}
-	if (!*v || *v[0] == '\0')
-		return;
-	(void) strcpy(cv, short2str(*v));
+    GetSize(&li,&co);
 
-	if(!lstrcmp(cv,"rows") || !lstrcmp(cv,"lines") ) {
-		xprintf(fmtd,T_Lines);
-		return;
-	}
-	else if(!lstrcmp(cv,"cols") ) {
-		xprintf(fmtd,T_ActualWindowSize);
-		return;
-	}
-	else if(!lstrcmp(cv,"buffer") ) {
-		xprintf(fmtd,T_Cols);
-		return;
-	}
-	else
-		stderror(ERR_SYSTEM, "EchoTC","Sorry, this function is not supported");
+    if(!lstrcmp(cv,"rows") || !lstrcmp(cv,"lines") ) {
+        xprintf(fmtd,T_Lines);
+        goto end;
+    }
+    else if(!lstrcmp(cv,"cols") ) {
+        xprintf(fmtd,T_ActualWindowSize);
+        goto end;
+    }
+    else if(!lstrcmp(cv,"buffer") ) {
+        xprintf(fmtd,T_Cols);
+        goto end;
+    }
+    else
+        stderror(ERR_SYSTEM, "EchoTC","Sorry, this function is not supported");
 
+ end:
+    cleanup_until(globbed);
 }
 
 int    GotTermCaps = 0;
@@ -247,11 +252,10 @@ BindArrowKeys(void)
 {
 	return;
 }
-static Char cur_atr = 0;	/* current attributes */
 
 #define GoodStr(ignore)  1
 	void
-SetAttributes(int atr)
+SetAttributes(Char atr)
 {
 	atr &= ATTRIBUTES;
 }
@@ -463,7 +467,6 @@ GetTermCaps(void)
 
 	return;
 }
-#ifdef SIG_WINDOW
 /* GetSize():
  *	Return the new window size in lines and cols, and
  *	true if the size was changed.
@@ -472,31 +475,35 @@ GetTermCaps(void)
 GetSize(int *lins, int *cols)
 {
 
-	*lins = T_Lines;
+    int ret = 0;
 
-	*cols = T_Cols;
+    *lins = T_Lines;
 
-	nt_getsize(lins,cols,&DisplayWindowHSize);
+    *cols = T_Cols;
 
-	// compare the actual visible window size,but return the console buffer size
-	// this is seriously demented.
-	return  (T_Lines != *lins || T_ActualWindowSize != DisplayWindowHSize);
+    nt_getsize(lins,cols,&DisplayWindowHSize);
 
+    // compare the actual visible window size,but return the console buffer size
+    // this is seriously demented.
+    ret =   (T_Lines != *lins || T_ActualWindowSize != DisplayWindowHSize);
 
+    T_Lines = *lins;
+    T_Cols = *cols;
+    T_ActualWindowSize = DisplayWindowHSize;
+
+    return ret;
 }
-
-#endif /* SIGWINDOW */
-
-	void
+void
 ChangeSize(int lins, int cols)
 {
 
+    int rc = 0;
 	// here we're setting the window size, not the buffer size.
 	// 
 	nt_set_size(lins,cols);
 
-	T_Lines = lins;
-	T_ActualWindowSize = cols;
+	rc = GetSize(&lins,&cols);
+
 
 	ReBufferDisplay();		/* re-make display buffers */
 	ClearDisp();

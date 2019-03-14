@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.err.c,v 3.39 2005/01/18 20:43:30 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.err.c,v 3.45 2006/01/13 00:29:53 christos Exp $ */
 /*
  * sh.err.c: Error printing routines. 
  */
@@ -32,8 +32,9 @@
  */
 #define _h_sh_err		/* Don't redefine the errors	 */
 #include "sh.h"
+#include <assert.h>
 
-RCSID("$Id: sh.err.c,v 3.39 2005/01/18 20:43:30 christos Exp $")
+RCSID("$Id: sh.err.c,v 3.45 2006/01/13 00:29:53 christos Exp $")
 
 /*
  * C Shell
@@ -197,10 +198,10 @@ void
 errinit(void)
 {
 #ifdef NLS_CATALOGS
-    int i;
+    size_t i;
 
     for (i = 0; i < NO_ERRORS; i++)
-	xfree((ptr_t) elst[i]);
+	xfree(elst[i]);
 #  if defined(__FreeBSD__) || defined(hpux)
 #  define NLS_MAXSET 30
     for (i = 1; i <= NLS_MAXSET; i++)
@@ -364,6 +365,170 @@ errinit(void)
     elst[ERR_BADJOB] = CSAVS(1, 136, "No such job (badjob)");
     elst[ERR_BADCOLORVAR] = CSAVS(1, 137, "Unknown colorls variable `%c%c'");
 }
+
+/* Cleanup data. */
+struct cleanup_entry
+{
+    void *var;
+    void (*fn) (void *);
+#ifdef CLEANUP_DEBUG
+    const char *file;
+    size_t line;
+#endif
+};
+
+static struct cleanup_entry *cleanup_stack; /* = NULL; */
+static size_t cleanup_sp; /* = 0; Next free entry */
+static size_t cleanup_mark; /* = 0; Last entry to handle before unwinding */
+static size_t cleanup_stack_size; /* = 0 */
+
+/* fn() will be run with all signals blocked, so it should not do anything
+   risky. */
+void
+cleanup_push_internal(void *var, void (*fn) (void *)
+#ifdef CLEANUP_DEBUG
+    , const char *file, size_t line
+#endif
+)
+{
+    struct cleanup_entry *ce;
+
+    if (cleanup_sp == cleanup_stack_size) {
+	if (cleanup_stack_size == 0)
+	    cleanup_stack_size = 64; /* Arbitrary */
+	else
+	    cleanup_stack_size *= 2;
+	cleanup_stack = xrealloc(cleanup_stack,
+				 cleanup_stack_size * sizeof (*cleanup_stack));
+    }
+    ce = cleanup_stack + cleanup_sp;
+    ce->var = var;
+    ce->fn = fn;
+#ifdef CLEANUP_DEBUG
+    ce->file = file;
+    ce->line = line;
+#endif
+    cleanup_sp++;
+}
+
+static void
+cleanup_ignore_fn(void *dummy)
+{
+    USE(dummy);
+}
+
+void
+cleanup_ignore(void *var)
+{
+    struct cleanup_entry *ce;
+
+    ce = cleanup_stack + cleanup_sp;
+    while (ce != cleanup_stack) {
+        ce--;
+	if (ce->var == var) {
+	    ce->fn = cleanup_ignore_fn;
+	    return;
+	}
+    }
+    abort();
+}
+
+void
+cleanup_until(void *last_var)
+{
+    while (cleanup_sp != 0) {
+	struct cleanup_entry ce;
+
+	cleanup_sp--;
+	ce = cleanup_stack[cleanup_sp];
+	ce.fn(ce.var);
+	if (ce.var == last_var)
+	    return;
+    }
+    abort();
+}
+
+void
+cleanup_until_mark(void)
+{
+    while (cleanup_sp > cleanup_mark) {
+	struct cleanup_entry ce;
+
+	cleanup_sp--;
+	ce = cleanup_stack[cleanup_sp];
+	ce.fn(ce.var);
+    }
+}
+
+size_t
+cleanup_push_mark(void)
+{
+    size_t old_mark;
+
+    old_mark = cleanup_mark;
+    cleanup_mark = cleanup_sp;
+    return old_mark;
+}
+
+void
+cleanup_pop_mark(size_t mark)
+{
+    assert (mark <= cleanup_sp);
+    cleanup_mark = mark;
+}
+
+void
+sigint_cleanup(void *xsa)
+{
+    const struct sigaction *sa;
+
+    sa = xsa;
+    sigaction(SIGINT, sa, NULL);
+}
+
+void
+sigprocmask_cleanup(void *xmask)
+{
+    sigset_t *mask;
+
+    mask = xmask;
+    sigprocmask(SIG_SETMASK, mask, NULL);
+}
+
+void
+open_cleanup(void *xptr)
+{
+    int *ptr;
+
+    ptr = xptr;
+    xclose(*ptr);
+}
+
+void
+opendir_cleanup(void *xdir)
+{
+    DIR *dir;
+
+    dir = xdir;
+    xclosedir(dir);
+}
+
+void
+xfree_indirect(void *xptr)
+{
+    void **ptr; /* This is actually type punning :( */
+
+    ptr = xptr;
+    xfree(*ptr);
+}
+
+void
+reset(void)
+{
+    cleanup_until_mark();
+    _reset();
+}
+
 /*
  * The parser and scanner set up errors for later by calling seterr,
  * which sets the variable err as a side effect; later to be tested,
@@ -373,18 +538,14 @@ void
 /*VARARGS1*/
 seterror(unsigned int id, ...)
 {
-
     if (seterr == 0) {
 	va_list va;
-	char    berr[BUFSIZE];
-	va_start(va, id);
 
+	va_start(va, id);
 	if (id >= sizeof(elst) / sizeof(elst[0]))
 	    id = ERR_INVALID;
-	xvsnprintf(berr, sizeof(berr), elst[id], va);
+	seterr = xvasprintf(elst[id], va);
 	va_end(va);
-
-	seterr = strsave(berr);
     }
 }
 
@@ -411,7 +572,6 @@ void
 stderror(unsigned int id, ...)
 {
     va_list va;
-    Char **v;
     int flags;
     int vareturn;
 
@@ -439,21 +599,19 @@ stderror(unsigned int id, ...)
 	 * form of) diagnostic output. If didfds then output will go to 1/2
 	 * else to FSHOUT/FSHDIAG. See flush in sh.print.c.
 	 */
-	flush();
+	flush();/*FIXRESET*/
 	haderr = 1;			/* Now to diagnostic output */
-	timflg = 0;			/* This isn't otherwise reset */
-
 
 	if (!(flags & ERR_SILENT)) {
 	    if (flags & ERR_NAME)
-		xprintf("%s: ", bname);
+		xprintf("%s: ", bname);/*FIXRESET*/
 	    if ((flags & ERR_OLD)) {
 		/* Old error. */
-		xprintf("%s.\n", seterr);
-		} else {
-		   xvprintf(elst[id], va);
-		    xprintf(".\n");
-		}
+		xprintf("%s.\n", seterr);/*FIXRESET*/
+	    } else {
+		xvprintf(elst[id], va);/*FIXRESET*/
+		xprintf(".\n");/*FIXRESET*/
+	    }
 	}
     } else {
 	vareturn = 1;	/* Return immediately after va_end */
@@ -463,16 +621,10 @@ stderror(unsigned int id, ...)
 	return;
 
     if (seterr) {
-	xfree((ptr_t) seterr);
+	xfree(seterr);
 	seterr = NULL;
     }
 
-    if ((v = pargv) != 0)
-	pargv = 0, blkfree(v);
-    if ((v = gargv) != 0)
-	gargv = 0, blkfree(v);
-
-    inheredoc = 0; 		/* Not anymore in a heredoc */
     didfds = 0;			/* Forget about 0,1,2 */
     /*
      * Go away if -e or we are a child shell
@@ -486,7 +638,7 @@ stderror(unsigned int id, ...)
      */
     btoeof();
 
-    set(STRstatus, Strsave(STR1), VAR_READWRITE);
+    setcopy(STRstatus, STR1, VAR_READWRITE);/*FIXRESET*/
 #ifdef BSDJOBS
     if (tpgrp > 0)
 	(void) tcsetpgrp(FSHTTY, tpgrp);

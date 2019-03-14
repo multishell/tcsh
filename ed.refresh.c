@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/ed.refresh.c,v 3.39 2005/02/15 21:09:02 christos Exp $ */
+/* $Header: /src/pub/tcsh/ed.refresh.c,v 3.42 2006/01/12 19:43:00 christos Exp $ */
 /*
  * ed.refresh.c: Lower level screen refreshing functions
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: ed.refresh.c,v 3.39 2005/02/15 21:09:02 christos Exp $")
+RCSID("$Id: ed.refresh.c,v 3.42 2006/01/12 19:43:00 christos Exp $")
 
 #include "ed.h"
 /* #define DEBUG_UPDATE */
@@ -96,7 +96,7 @@ dprintf(char *fmt, ...)
 	va_start(va, fmt);
 
 	if (fd == -1)
-	    fd = open(dtty, O_RDWR);
+	    fd = xopen(dtty, O_RDWR);
 	o = SHOUT;
 	flush();
 	SHOUT = fd;
@@ -136,10 +136,7 @@ static int MakeLiteral(Char *str, int len, Char addlit)
 	int add = 256;
 	while (len + addlitlen + 1 + (LIT_FACTOR - 1) > add)
 	    add *= 2;
-	if (litptr)
-	    newlitptr = (Char *)xrealloc(litptr, (litalloc + add) * sizeof(Char));
-	else
-	    newlitptr = (Char *)xmalloc((litalloc + add) * sizeof(Char));
+	newlitptr = xrealloc(litptr, (litalloc + add) * sizeof(Char));
 	if (!newlitptr)
 	    return '?';
 	litptr = newlitptr;
@@ -264,7 +261,7 @@ Vdraw(Char c, int width)	/* draw char c onto V lines */
        that "span line breaks". */
     while (vcursor_h + width > TermH)
 	Vdraw(' ', 1);
-    Vdisplay[vcursor_v][vcursor_h] = (Char) c;
+    Vdisplay[vcursor_v][vcursor_h] = c;
     if (width)
 	vcursor_h++;		/* advance to next place */
     while (--width > 0)
@@ -294,6 +291,8 @@ RefreshPromptpart(Char *buf)
     NLSChar c;
     int l, w;
 
+    if (buf == NULL)
+	return;
     for (cp = buf; *cp; ) {
 	if (*cp & LITERAL) {
 	    Char *litstart = cp;
@@ -340,7 +339,7 @@ Refresh(void)
     Char    oldgetting;
 
 #ifdef DEBUG_REFRESH
-    dprintf("PromptBuf = :%s:\r\n", short2str(PromptBuf));
+    dprintf("Prompt = :%s:\r\n", short2str(Prompt));
     dprintf("InputBuf = :%s:\r\n", short2str(InputBuf));
 #endif /* DEBUG_REFRESH */
     oldgetting = GettingInput;
@@ -349,14 +348,14 @@ Refresh(void)
     /* reset the Vdraw cursor, temporarily draw rprompt to calculate its size */
     vcursor_h = 0;
     vcursor_v = 0;
-    RefreshPromptpart(RPromptBuf);
+    RefreshPromptpart(RPrompt);
     rprompt_h = vcursor_h;
     rprompt_v = vcursor_v;
 
     /* reset the Vdraw cursor, draw prompt */
     vcursor_h = 0;
     vcursor_v = 0;
-    RefreshPromptpart(PromptBuf);
+    RefreshPromptpart(Prompt);
     cur_h = -1;			/* set flag in case I'm not set */
 
     /* draw the current input buffer */
@@ -383,7 +382,7 @@ Refresh(void)
 			 */
 	while (--rhdiff > 0)		/* pad out with spaces */
 	    Vdraw(' ', 1);
-	RefreshPromptpart(RPromptBuf);
+	RefreshPromptpart(RPrompt);
     }
     else {
 	rprompt_h = 0;			/* flag "not using rprompt" */
@@ -586,8 +585,8 @@ update_line(Char *old, Char *new, int cur_line)
     /*
      * Find the end of both old and new
      */
-    while (*o)
-	o++;
+    o = Strend(o);
+
     /* 
      * Remove any trailing blanks off of the end, being careful not to
      * back up past the beginning.
@@ -599,9 +598,8 @@ update_line(Char *old, Char *new, int cur_line)
     }
     oe = o;
     *oe = (Char) 0;
-  
-    while (*n)
-	n++;
+
+    n = Strend(n);
 
     /* remove blanks from end of new */
     while (nfd < n) {
@@ -1131,13 +1129,13 @@ RefCursor(void)
     v = 0;
     th = TermH;			/* optimize for speed */
 
-    for (cp = PromptBuf; *cp; ) {	/* do prompt */
+    for (cp = Prompt; cp != NULL && *cp; ) {	/* do prompt */
 	if (*cp & LITERAL) {
 	    cp++;
 	    continue;
 	}
 	l = NLSFrom(cp, NLSZEROT, &c);
-	w = NLSClassify(c, cp == PromptBuf);
+	w = NLSClassify(c, cp == Prompt);
 	cp += l;
 	switch(w) {
 	    case NLSCLASS_NL:

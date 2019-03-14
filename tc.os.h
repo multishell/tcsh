@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tc.os.h,v 3.97 2005/03/03 22:32:01 kim Exp $ */
+/* $Header: /src/pub/tcsh/tc.os.h,v 3.99 2006/01/12 18:15:25 christos Exp $ */
 /*
  * tc.os.h: Shell os dependent defines
  */
@@ -87,22 +87,6 @@
 #  include <termios.h>
 # endif /* POSIX */
 #endif /* OREO */
-
-#ifndef NCARGS
-# ifdef _SC_ARG_MAX
-#  define NCARGS sysconf(_SC_ARG_MAX)
-# else /* !_SC_ARG_MAX */
-#  ifdef ARG_MAX
-#   define NCARGS ARG_MAX
-#  else /* !ARG_MAX */
-#   ifdef _MINIX
-#    define NCARGS 80
-#   else /* !_MINIX */
-#    define NCARGS 1024
-#   endif /* _MINIX */
-#  endif /* ARG_MAX */
-# endif /* _SC_ARG_MAX */
-#endif /* NCARGS */
 
 #ifdef convex
 # include <sys/dmon.h>
@@ -491,19 +475,6 @@ extern void qsort();
 #ifndef _CX_UX
 extern void perror();
 #endif
-
-# ifdef BSDSIGS
-#  if !defined(_AIX370) && !defined(MACH) && !defined(NeXT) && !defined(_AIXPS2) && !defined(ardent) && !defined(SUNOS4) && !defined(HPBSD) && !defined(__MACHTEN__)
-#   if (!defined(apollo) || !defined(__STDC__)) && !defined(__DGUX__) && !defined(fps500)
-extern RETSIGTYPE sigvec();
-#ifndef _CX_UX
-extern void sigpause();
-#endif /* _CX_UX */
-#   endif /* (!apollo || !__STDC__) && !__DGUX__ && !fps500 */
-#  endif /* _AIX370 || MACH || NeXT || _AIXPS2 || ardent || SUNOS4 || HPBSD */
-extern sigmask_t sigblock();
-extern sigmask_t sigsetmask();
-# endif	/* BSDSIGS */
 
 # ifdef BSD
 extern uid_t getuid(), geteuid();

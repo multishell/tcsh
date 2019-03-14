@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.func.c,v 3.127 2005/04/11 22:10:57 kim Exp $ */
+/* $Header: /src/pub/tcsh/sh.func.c,v 3.135 2006/01/13 16:18:13 christos Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.func.c,v 3.127 2005/04/11 22:10:57 kim Exp $")
+RCSID("$Id: sh.func.c,v 3.135 2006/01/13 16:18:13 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -49,8 +49,6 @@ static iconv_t catgets_iconv; /* Or (iconv_t)-1 */
 /*
  * C shell
  */
-extern int just_signaled;
-extern char **environ;
 
 extern int MapsAreInited;
 extern int NLSMapsAreInited;
@@ -63,17 +61,17 @@ static	void	preread		(void);
 static	void	doagain		(void);
 static  const char *isrchx	(int);
 static	void	search		(int, int, Char *);
-static	int	getword		(Char *);
+static	int	getword		(struct Strbuf *);
 static	void	toend		(void);
 static	void	xecho		(int, Char **);
 static	int	islocale_var	(Char *);
 static	void	wpfree		(struct whyle *);
 
-struct biltins *
+const struct biltins *
 isbfunc(struct command *t)
 {
     Char *cp = t->t_dcom[0];
-    struct biltins *bp, *bp1, *bp2;
+    const struct biltins *bp, *bp1, *bp2;
     static struct biltins label = {"", dozip, 0, 0};
     static struct biltins foregnd = {"%job", dofg1, 0, 0};
     static struct biltins backgnd = {"%job &", dobg1, 0, 0};
@@ -133,7 +131,7 @@ isbfunc(struct command *t)
 }
 
 void
-func(struct command *t, struct biltins *bp)
+func(struct command *t, const struct biltins *bp)
 {
     int     i;
 
@@ -155,46 +153,27 @@ doonintr(Char **v, struct command *c)
     Char *vv = v[1];
 
     USE(c);
-    if (parintr == SIG_IGN)
+    if (parintr.sa_handler == SIG_IGN)
 	return;
     if (setintr && intty)
 	stderror(ERR_NAME | ERR_TERMINAL);
     cp = gointr;
     gointr = 0;
-    xfree((ptr_t) cp);
+    xfree(cp);
     if (vv == 0) {
-#ifdef BSDSIGS
-	if (setintr) {
-	    (void) sigblock(sigmask(SIGINT));
-	    (void) signal(SIGINT, pintr);
-	}
-	else 
-	    (void) signal(SIGINT, SIG_DFL);
-#else /* !BSDSIGS */
-	if (setintr) {
-	    (void) sighold(SIGINT);
-	    (void) sigset(SIGINT, pintr);
-	}
+	if (setintr)
+	    sigset_interrupting(SIGINT, queue_pintr);
 	else
-	    (void) sigset(SIGINT, SIG_DFL);
-#endif /* BSDSIGS */
+	    (void) signal(SIGINT, SIG_DFL);
 	gointr = 0;
     }
     else if (eq((vv = strip(vv)), STRminus)) {
-#ifdef BSDSIGS
 	(void) signal(SIGINT, SIG_IGN);
-#else /* !BSDSIGS */
-	(void) sigset(SIGINT, SIG_IGN);
-#endif /* BSDSIGS */
 	gointr = Strsave(STRminus);
     }
     else {
 	gointr = Strsave(vv);
-#ifdef BSDSIGS
-	(void) signal(SIGINT, pintr);
-#else /* !BSDSIGS */
-	(void) sigset(SIGINT, pintr);
-#endif /* BSDSIGS */
+	sigset_interrupting(SIGINT, queue_pintr);
     }
 }
 
@@ -208,6 +187,7 @@ donohup(Char **v, struct command *c)
 	stderror(ERR_NAME | ERR_TERMINAL);
     if (setintr == 0) {
 	(void) signal(SIGHUP, SIG_IGN);
+	phup_disabled = 1;
 #ifdef CC
 	submit(getpid());
 #endif /* CC */
@@ -239,36 +219,37 @@ dozip(Char **v, struct command *c)
 void
 dofiletest(Char **v, struct command *c)
 {
-    Char **fileptr, *ftest, *res;
+    Char **globbed, **fileptr, *ftest, *res;
+    int gflag;
 
     USE(c);
     if (*(ftest = *++v) != '-')
 	stderror(ERR_NAME | ERR_FILEINQ);
     ++v;
 
-    gflag = 0;
-    tglob(v);
+    gflag = tglob(v);
     if (gflag) {
-	v = globall(v);
+	v = globall(v, gflag);
 	if (v == 0)
 	    stderror(ERR_NAME | ERR_NOMATCH);
     }
     else
-	v = gargv = saveblk(v);
+	v = saveblk(v);
+    globbed = v;
+    cleanup_push(globbed, blk_cleanup);
     trim(v);
 
     while (*(fileptr = v++) != '\0') {
-	xprintf("%S", res = filetest(ftest, &fileptr, 0));
-	xfree((ptr_t) res);
+	res = filetest(ftest, &fileptr, 0);
+	cleanup_push(res, xfree);
+	xprintf("%S", res);
+	cleanup_until(res);
 	if (*v)
 	    xprintf(" ");
     }
     xprintf("\n");
 
-    if (gargv) {
-	blkfree(gargv);
-	gargv = 0;
-    }
+    cleanup_until(globbed);
 }
 
 void
@@ -332,13 +313,15 @@ dologin(Char **v, struct command *c)
     USE(v);
 #else /* !WINNT_NATIVE */
     char **p = short2blk(v);
+
     USE(c);
+    cleanup_push((Char **)p, blk_cleanup);
     islogin();
     rechist(NULL, adrof(STRsavehist) != NULL);
-    (void) signal(SIGTERM, parterm);
+    sigaction(SIGTERM, &parterm, NULL);
     (void) execv(_PATH_BIN_LOGIN, p);
     (void) execv(_PATH_USRBIN_LOGIN, p);
-    blkfree((Char **) p);
+    cleanup_until((Char **)p);
     untty();
     xexit(1);
 #endif /* !WINNT_NATIVE */
@@ -349,13 +332,11 @@ dologin(Char **v, struct command *c)
 /*ARGSUSED*/
 void
 donewgrp(Char **v, struct command *c)
-    Char  **v;
-    struct command *c;
 {
     char **p;
     if (chkstop == 0 && setintr)
 	panystop(0);
-    (void) signal(SIGTERM, parterm);
+    sigaction(SIGTERM, &parterm, NULL);
     p = short2blk(v);
     /*
      * From Beto Appleton (beto@aixwiz.austin.ibm.com)
@@ -386,7 +367,7 @@ doif(Char **v, struct command *kp)
     Char **vv;
 
     v++;
-    i = expr(&v);
+    i = noexec ? 1 : expr(&v);
     vv = v;
     if (*vv == NULL)
 	stderror(ERR_NAME | ERR_EMPTYIF);
@@ -436,7 +417,8 @@ doelse (Char **v, struct command *c)
 {
     USE(c);
     USE(v);
-    search(TC_ELSE, 0, NULL);
+    if (!noexec)
+	search(TC_ELSE, 0, NULL);
 }
 
 /*ARGSUSED*/
@@ -446,8 +428,11 @@ dogoto(Char **v, struct command *c)
     Char   *lp;
 
     USE(c);
-    gotolab(lp = globone(v[1], G_ERROR));
-    xfree((ptr_t) lp);
+    lp = globone(v[1], G_ERROR);
+    cleanup_push(lp, xfree);
+    if (!noexec)
+	gotolab(lp);
+    cleanup_until(lp);
 }
 
 void
@@ -489,8 +474,11 @@ doswitch(Char **v, struct command *c)
 	v--;
     if (*v)
 	stderror(ERR_SYNTAX);
-    search(TC_SWITCH, 0, lp = globone(cp, G_ERROR));
-    xfree((ptr_t) lp);
+    lp = globone(cp, G_ERROR);
+    cleanup_push(lp, xfree);
+    if (!noexec)
+	search(TC_SWITCH, 0, lp);
+    cleanup_until(lp);
 }
 
 /*ARGSUSED*/
@@ -499,10 +487,10 @@ dobreak(Char **v, struct command *c)
 {
     USE(v);
     USE(c);
-    if (whyles)
-	toend();
-    else
+    if (whyles == NULL)
 	stderror(ERR_NAME | ERR_NOTWHILE);
+    if (!noexec)
+	toend();
 }
 
 /*ARGSUSED*/
@@ -527,7 +515,7 @@ doexit(Char **v, struct command *c)
     if (intty)
 #endif
     /* Always close, why only on ttys? */
-	(void) close(SHIN);
+	xclose(SHIN);
 }
 
 /*ARGSUSED*/
@@ -536,6 +524,7 @@ doforeach(Char **v, struct command *c)
 {
     Char *cp, *sp;
     struct whyle *nwp;
+    int gflag;
 
     USE(c);
     v++;
@@ -546,25 +535,22 @@ doforeach(Char **v, struct command *c)
 	cp++;
     if (*cp)
 	stderror(ERR_NAME | ERR_VARALNUM);
-    if ((cp - sp) > MAXVARLEN)
-	stderror(ERR_NAME | ERR_VARTOOLONG);
     cp = *v++;
     if (v[0][0] != '(' || v[blklen(v) - 1][0] != ')')
 	stderror(ERR_NAME | ERR_NOPAREN);
     v++;
-    gflag = 0, tglob(v);
+    gflag = tglob(v);
     if (gflag) {
-	v = globall(v);
-	if (v == 0)
+	v = globall(v, gflag);
+	if (v == 0 && !noexec)
 	    stderror(ERR_NAME | ERR_NOMATCH);
     }
     else {
-	v = gargv = saveblk(v);
+	v = saveblk(v);
 	trim(v);
     }
-    nwp = (struct whyle *) xcalloc(1, sizeof *nwp);
+    nwp = xcalloc(1, sizeof *nwp);
     nwp->w_fe = nwp->w_fe0 = v;
-    gargv = 0;
     btell(&nwp->w_start);
     nwp->w_fename = Strsave(cp);
     nwp->w_next = whyles;
@@ -576,7 +562,8 @@ doforeach(Char **v, struct command *c)
     zlast = TC_FOREACH;
     if (intty)
 	preread();
-    doagain();
+    if (!noexec)
+	doagain();
 }
 
 /*ARGSUSED*/
@@ -594,15 +581,16 @@ dowhile(Char **v, struct command *c)
      * Implement prereading here also, taking care not to evaluate the
      * expression before the loop has been read up from a terminal.
      */
-    if (intty && !again)
+    if (noexec)
+	status = 0;
+    else if (intty && !again)
 	status = !exp0(&v, 1);
     else
 	status = !expr(&v);
-    if (*v)
+    if (*v && !noexec)
 	stderror(ERR_NAME | ERR_EXPRESSION);
     if (!again) {
-	struct whyle *nwp =
-	(struct whyle *) xcalloc(1, sizeof(*nwp));
+	struct whyle *nwp = xcalloc(1, sizeof(*nwp));
 
 	nwp->w_start = lineloc;
 	nwp->w_end.type = TCSH_F_SEEK;
@@ -627,20 +615,14 @@ dowhile(Char **v, struct command *c)
 static void
 preread(void)
 {
+    int old_pintr_disabled;
+
     whyles->w_end.type = TCSH_I_SEEK;
     if (setintr)
-#ifdef BSDSIGS
-	(void) sigsetmask(sigblock((sigmask_t) 0) & ~sigmask(SIGINT));
-#else /* !BSDSIGS */
-	(void) sigrelse (SIGINT);
-#endif /* BSDSIGS */
+	pintr_push_enable(&old_pintr_disabled);
     search(TC_BREAK, 0, NULL);		/* read the expression in */
     if (setintr)
-#ifdef BSDSIGS
-	(void) sigblock(sigmask(SIGINT));
-#else /* !BSDSIGS */
-	(void) sighold(SIGINT);
-#endif /* BSDSIGS */
+	cleanup_until(&old_pintr_disabled);
     btell(&whyles->w_end);
 }
 
@@ -653,7 +635,8 @@ doend(Char **v, struct command *c)
     if (!whyles)
 	stderror(ERR_NAME | ERR_NOTWHILE);
     btell(&whyles->w_end);
-    doagain();
+    if (!noexec)
+	doagain();
 }
 
 /*ARGSUSED*/
@@ -664,7 +647,8 @@ docontin(Char **v, struct command *c)
     USE(c);
     if (!whyles)
 	stderror(ERR_NAME | ERR_NOTWHILE);
-    doagain();
+    if (!noexec)
+	doagain();
 }
 
 static void
@@ -693,38 +677,28 @@ dorepeat(Char **v, struct command *kp)
 {
     int i = 1;
 
-#ifdef BSDSIGS
-    sigmask_t omask = 0;
-#endif /* BSDSIGS */
-
     do {
 	i *= getn(v[1]);
 	lshift(v, 2);
     } while (v[0] != NULL && Strcmp(v[0], STRrepeat) == 0);
+    if (noexec)
+	i = 1;
 
-    if (setintr)
-#ifdef BSDSIGS
-	omask = sigblock(sigmask(SIGINT)) & ~sigmask(SIGINT);
-#else /* !BSDSIGS */
-	(void) sighold(SIGINT);
-#endif /* BSDSIGS */
+    if (setintr) {
+	pintr_disabled++;
+	cleanup_push(&pintr_disabled, disabled_cleanup);
+    }
     while (i > 0) {
-	if (setintr)
-#ifdef BSDSIGS
-	    (void) sigsetmask(omask);
-#else /* !BSDSIGS */
-	    (void) sigrelse (SIGINT);
-#endif /* BSDSIGS */
+	if (setintr && pintr_disabled == 1) {
+	    cleanup_until(&pintr_disabled);
+	    pintr_disabled++;
+	    cleanup_push(&pintr_disabled, disabled_cleanup);
+	}
 	reexecute(kp);
 	--i;
     }
+    cleanup_until(&pintr_disabled);
     donefds();
-    if (setintr)
-#ifdef BSDSIGS
-	(void) sigsetmask(omask);
-#else /* !BSDSIGS */
-	(void) sigrelse (SIGINT);
-#endif /* BSDSIGS */
 }
 
 /*ARGSUSED*/
@@ -733,7 +707,8 @@ doswbrk(Char **v, struct command *c)
 {
     USE(v);
     USE(c);
-    search(TC_BRKSW, 0, NULL);
+    if (!noexec)
+	search(TC_BRKSW, 0, NULL);
 }
 
 int
@@ -777,19 +752,18 @@ isrchx(int n)
 }
 
 
-static Char Stype;
+static int Stype;
 static Char *Sgoal;
 
 static void
 search(int type, int level, Char *goal)
 {
-    Char    wordbuf[BUFSIZE];
-    Char *aword = wordbuf;
+    struct Strbuf word = Strbuf_INIT;
     Char *cp;
     struct whyle *wp;
     int wlevel = 0;
 
-    Stype = (Char) type;
+    Stype = type;
     Sgoal = goal;
     if (type == TC_GOTO) {
 	struct Ain a;
@@ -797,24 +771,25 @@ search(int type, int level, Char *goal)
 	a.f_seek = 0;
 	bseek(&a);
     }
+    cleanup_push(&word, Strbuf_cleanup);
     do {
 	if (intty && fseekp == feobp && aret == TCSH_F_SEEK)
 	    printprompt(1, isrchx(type == TC_BREAK ? zlast : type));
 	/* xprintf("? "), flush(); */
-	aword[0] = 0;
-	(void) getword(aword);
-	switch (srchx(aword)) {
+	(void) getword(&word);
+	Strbuf_terminate(&word);
+	switch (srchx(word.s)) {
 
 	case TC_ELSE:
 	    if (level == 0 && type == TC_IF)
-		return;
+		goto end;
 	    break;
 
 	case TC_IF:
-	    while (getword(aword))
+	    while (getword(&word))
 		continue;
 	    if ((type == TC_IF || type == TC_ELSE) &&
-		eq(aword, STRthen))
+		eq(word.s, STRthen))
 		level++;
 	    break;
 
@@ -856,31 +831,32 @@ search(int type, int level, Char *goal)
 	    break;
 
 	case TC_LABEL:
-	    if (type == TC_GOTO && getword(aword) && eq(aword, goal))
+	    if (type == TC_GOTO && getword(&word) && eq(word.s, goal))
 		level = -1;
 	    break;
 
 	default:
 	    if (type != TC_GOTO && (type != TC_SWITCH || level != 0))
 		break;
-	    if (lastchr(aword) != ':')
+	    if (word.len == 0 || word.s[word.len - 1] != ':')
 		break;
-	    aword[Strlen(aword) - 1] = 0;
-	    if ((type == TC_GOTO && eq(aword, goal)) ||
-		(type == TC_SWITCH && eq(aword, STRdefault)))
+	    word.s[--word.len] = 0;
+	    if ((type == TC_GOTO && eq(word.s, goal)) ||
+		(type == TC_SWITCH && eq(word.s, STRdefault)))
 		level = -1;
 	    break;
 
 	case TC_CASE:
 	    if (type != TC_SWITCH || level != 0)
 		break;
-	    (void) getword(aword);
-	    if (lastchr(aword) == ':')
-		aword[Strlen(aword) - 1] = 0;
-	    cp = strip(Dfix1(aword));
+	    (void) getword(&word);
+	    if (word.len != 0 && word.s[word.len - 1] == ':')
+		word.s[--word.len] = 0;
+	    cp = strip(Dfix1(word.s));
+	    cleanup_push(cp, xfree);
 	    if (Gmatch(goal, cp))
 		level = -1;
-	    xfree((ptr_t) cp);
+	    cleanup_until(cp);
 	    break;
 
 	case TC_DEFAULT:
@@ -890,14 +866,18 @@ search(int type, int level, Char *goal)
 	}
 	(void) getword(NULL);
     } while (level >= 0);
+ end:
+    cleanup_until(&word);
 }
 
 static int
-getword(Char *wp)
+getword(struct Strbuf *wp)
 {
     int found = 0, first;
     eChar c, d;
 
+    if (wp)
+	wp->len = 0;
     c = readc(1);
     d = 0;
     do {
@@ -929,16 +909,11 @@ getword(Char *wp)
 	    }
 	    if (c == CHAR_ERR)
 		goto past;
-	    if (wp) {
-		*wp++ = (Char) c;
-		*wp = '\0';
-	    }
+	    if (wp)
+		Strbuf_append1(wp, (Char) c);
 	    if (!first && !d && c == '(') {
-		if (wp) {
-		    unreadc(c);
-		    *--wp = '\0';
-		    return found;
-		}
+		if (wp)
+		    goto past_word_end;
 		else 
 		    break;
 	    }
@@ -946,9 +921,12 @@ getword(Char *wp)
 	} while ((d || (c != ' ' && c != '\t')) && c != '\n');
     } while (wp == 0);
 
+ past_word_end:
     unreadc(c);
-    if (found)
-	*--wp = '\0';
+    if (found) {
+	wp->len--;
+	Strbuf_terminate(wp);
+    }
 
     return (found);
 
@@ -1003,9 +981,8 @@ wpfree(struct whyle *wp)
 {
 	if (wp->w_fe0)
 	    blkfree(wp->w_fe0);
-	if (wp->w_fename)
-	    xfree((ptr_t) wp->w_fename);
-	xfree((ptr_t) wp);
+	xfree(wp->w_fename);
+	xfree(wp);
 }
 
 void
@@ -1018,13 +995,13 @@ wfree(void)
 #endif
 
 #ifdef FDEBUG
-    static char foo[] = "IAFE";
+    static const char foo[] = "IAFE";
 #endif /* FDEBUG */
 
     btell(&o);
 
 #ifdef FDEBUG
-    xprintf("o->type %c o->a_seek %d o->f_seek %d\n", 
+    xprintf("o->type %c o->a_seek %d o->f_seek %d\n",
 	    foo[o.type + 1], o.a_seek, o.f_seek);
 #endif /* FDEBUG */
 
@@ -1033,10 +1010,10 @@ wfree(void)
 	nwp = wp->w_next;
 
 #ifdef FDEBUG
-	xprintf("start->type %c start->a_seek %d start->f_seek %d\n", 
+	xprintf("start->type %c start->a_seek %d start->f_seek %d\n",
 		foo[wp->w_start.type+1], 
 		wp->w_start.a_seek, wp->w_start.f_seek);
-	xprintf("end->type %c end->a_seek %d end->f_seek %d\n", 
+	xprintf("end->type %c end->a_seek %d end->f_seek %d\n",
 		foo[wp->w_end.type + 1], wp->w_end.a_seek, wp->w_end.f_seek);
 #endif /* FDEBUG */
 
@@ -1081,17 +1058,9 @@ doglob(Char **v, struct command *c)
 static void
 xecho(int sep, Char **v)
 {
-    Char *cp;
-    int     nonl = 0;
-#ifdef ECHO_STYLE
+    Char *cp, **globbed = NULL;
+    int     nonl = 0, gflag;
     int	    echo_style = ECHO_STYLE;
-#else /* !ECHO_STYLE */
-# if SYSVREL > 0
-    int	    echo_style = SYSV_ECHO;
-# else /* SYSVREL == 0 */
-    int	    echo_style = BSD_ECHO;
-# endif /* SYSVREL */
-#endif /* ECHO_STYLE */
     struct varent *vp;
 
     if ((vp = adrof(STRecho_style)) != NULL && vp->vec != NULL &&
@@ -1106,25 +1075,28 @@ xecho(int sep, Char **v)
 	    echo_style = NONE_ECHO;
     }
 
-    if (setintr)
-#ifdef BSDSIGS
-	(void) sigsetmask(sigblock((sigmask_t) 0) & ~sigmask(SIGINT));
-#else /* !BSDSIGS */
-	(void) sigrelse (SIGINT);
-#endif /* BSDSIGS */
     v++;
     if (*v == 0)
 	goto done;
-    gflag = 0, tglob(v);
+    gflag = tglob(v);
     if (gflag) {
-	v = globall(v);
+	int old_pintr_disabled;
+
+	if (setintr)
+	    pintr_push_enable(&old_pintr_disabled);
+	v = globall(v, gflag);
+	if (setintr)
+	    cleanup_until(&old_pintr_disabled);
 	if (v == 0)
 	    stderror(ERR_NAME | ERR_NOMATCH);
     }
     else {
-	v = gargv = saveblk(v);
+	v = saveblk(v);
 	trim(v);
     }
+    globbed = v;
+    if (globbed != NULL)
+	cleanup_push(globbed, blk_cleanup);
 
     if ((echo_style & BSD_ECHO) != 0 && sep == ' ' && *v && eq(*v, STRmn))
 	nonl++, v++;
@@ -1132,6 +1104,12 @@ xecho(int sep, Char **v)
     while ((cp = *v++) != 0) {
 	Char c;
 
+	if (setintr) {
+	    int old_pintr_disabled;
+
+	    pintr_push_enable(&old_pintr_disabled);
+	    cleanup_until(&old_pintr_disabled);
+	}
 	while ((c = *cp++) != 0) {
 	    if ((echo_style & SYSV_ECHO) != 0 && c == '\\') {
 		switch (c = *cp++) {
@@ -1198,14 +1176,8 @@ done:
 	xputchar('\n');
     else
 	flush();
-    if (setintr)
-#ifdef BSDSIGS
-	(void) sigblock(sigmask(SIGINT));
-#else /* !BSDSIGS */
-	(void) sighold(SIGINT);
-#endif /* BSDSIGS */
-    if (gargv)
-	blkfree(gargv), gargv = 0;
+    if (globbed != NULL)
+	cleanup_until(globbed);
 }
 
 /* check whether an environment variable should invoke 'set_locale()' */
@@ -1224,36 +1196,48 @@ islocale_var(Char *var)
     return 0;
 }
 
+static void
+xlate_cr_cleanup(void *dummy)
+{
+    USE(dummy);
+    xlate_cr = 0;
+}
+
 /*ARGSUSED*/
 void
-doprintenv(Char **v, struct command *c)
+doprintenv(Char **v, struct command *c) 
 {
     Char   *e;
 
     USE(c);
-    if (setintr)
-#ifdef BSDSIGS
-	(void) sigsetmask(sigblock((sigmask_t) 0) & ~sigmask(SIGINT));
-#else /* !BSDSIGS */
-	(void) sigrelse (SIGINT);
-#endif /* BSDSIGS */
-
     v++;
     if (*v == 0) {
 	Char **ep;
 
 	xlate_cr = 1;
-	for (ep = STR_environ; *ep; ep++)
+	cleanup_push(&xlate_cr, xlate_cr_cleanup);
+	for (ep = STR_environ; *ep; ep++) {
+	    if (setintr) {
+		int old_pintr_disabled;
+
+		pintr_push_enable(&old_pintr_disabled);
+		cleanup_until(&old_pintr_disabled);
+	    }
 	    xprintf("%S\n", *ep);
-	xlate_cr = 0;
+	}
+	cleanup_until(&xlate_cr);
     }
     else if ((e = tgetenv(*v)) != NULL) {
+	int old_output_raw;
+
+	old_output_raw = output_raw;
 	output_raw = 1;
+	cleanup_push(&old_output_raw, output_raw_restore);
 	xprintf("%S\n", e);
-	output_raw = 0;
+	cleanup_until(&old_output_raw);
     }
     else
-	set(STRstatus, Strsave(STR1), VAR_READWRITE);
+	setcopy(STRstatus, STR1, VAR_READWRITE);
 }
 
 /* from "Karl Berry." <karl%mote.umb.edu@relay.cs.net> -- for NeXT things
@@ -1282,18 +1266,20 @@ dosetenv(Char **v, struct command *c)
     if ((lp = *v++) == 0)
 	lp = STRNULL;
 
-    tsetenv(vp, lp = globone(lp, G_APPEND));
+    lp = globone(lp, G_APPEND);
+    cleanup_push(lp, xfree);
+    tsetenv(vp, lp);
     if (eq(vp, STRKPATH)) {
-	importpath(lp);
+        importpath(lp);
 	dohash(NULL, NULL);
-	xfree((ptr_t) lp);
+	cleanup_until(lp);
 	return;
     }
 
 #ifdef apollo
     if (eq(vp, STRSYSTYPE)) {
 	dohash(NULL, NULL);
-	xfree((ptr_t) lp);
+	cleanup_until(lp);
 	return;
     }
 #endif /* apollo */
@@ -1344,7 +1330,7 @@ dosetenv(Char **v, struct command *c)
 	ed_Init();
 	if (MapsAreInited && !NLSMapsAreInited)
 	    ed_InitNLSMaps();
-	xfree((ptr_t) lp);
+	cleanup_until(lp);
 	return;
     }
 
@@ -1360,24 +1346,27 @@ dosetenv(Char **v, struct command *c)
 	MapsAreInited = 0;
 	NLSMapsAreInited = 0;
 	ed_InitMaps();
-	xfree((ptr_t) lp);
+	cleanup_until(lp);
 	return;
     }
 #ifdef WINNT_NATIVE
     if (eq(vp, STRtcshlang)) {
 	nlsinit();
-	xfree((ptr_t) lp);
+	cleanup_until(lp);
 	return;
     }
 #endif /* WINNT_NATIVE */
     if (eq(vp, STRKTERM)) {
 	char *t;
+
 	set(STRterm, quote(lp), VAR_READWRITE);	/* lp memory used here */
+	cleanup_ignore(lp);
+	cleanup_until(lp);
 	t = short2str(lp);
 	if (noediting && strcmp(t, "unknown") != 0 && strcmp(t,"dumb") != 0) {
 	    editing = 1;
 	    noediting = 0;
-	    set(STRedit, Strsave(STRNULL), VAR_READWRITE);
+	    setNS(STRedit);
 	}
 	GotTermCaps = 0;
 	ed_Init();
@@ -1385,11 +1374,17 @@ dosetenv(Char **v, struct command *c)
     }
 
     if (eq(vp, STRKHOME)) {
+	Char *canon;
 	/*
 	 * convert to canonical pathname (possibly resolving symlinks)
 	 */
-	lp = dcanon(lp, lp);
-	set(STRhome, quote(lp), VAR_READWRITE);	/* cp memory used here */
+	canon = dcanon(lp, lp);
+	cleanup_ignore(lp);
+	cleanup_until(lp);
+	cleanup_push(canon, xfree);
+	set(STRhome, quote(canon), VAR_READWRITE); /* lp memory used here */
+	cleanup_ignore(canon);
+	cleanup_until(canon);
 
 	/* fix directory stack for new tilde home */
 	dtilde();
@@ -1397,24 +1392,30 @@ dosetenv(Char **v, struct command *c)
     }
 
     if (eq(vp, STRKSHLVL)) {
-	/* lp memory used here */
-	set(STRshlvl, quote(lp), VAR_READWRITE);
+	set(STRshlvl, quote(lp), VAR_READWRITE); /* lp memory used here */
+	cleanup_ignore(lp);
+	cleanup_until(lp);
 	return;
     }
 
     if (eq(vp, STRKUSER)) {
 	set(STRuser, quote(lp), VAR_READWRITE);	/* lp memory used here */
+	cleanup_ignore(lp);
+	cleanup_until(lp);
 	return;
     }
 
     if (eq(vp, STRKGROUP)) {
-	set(STRgroup, quote(lp), VAR_READWRITE);	/* lp memory used here */
+	set(STRgroup, quote(lp), VAR_READWRITE); /* lp memory used here */
+	cleanup_ignore(lp);
+	cleanup_until(lp);
 	return;
     }
 
 #ifdef COLOR_LS_F
     if (eq(vp, STRLS_COLORS)) {
         parseLS_COLORS(lp);
+	cleanup_until(lp);
 	return;
     }
 #endif /* COLOR_LS_F */
@@ -1425,7 +1426,7 @@ dosetenv(Char **v, struct command *c)
      */
     if ((eq(lp, STRNULL) && (eq(vp, STRLINES) || eq(vp, STRCOLUMNS))) ||
 	eq(vp, STRTERMCAP)) {
-	xfree((ptr_t) lp);
+	cleanup_until(lp);
 	check_window_size(1);
 	return;
     }
@@ -1437,25 +1438,22 @@ dosetenv(Char **v, struct command *c)
 #if 0
 	GotTermCaps = 0;
 #endif
-	xfree((ptr_t) lp);
+	cleanup_until(lp);
 	ed_Init();
 	return;
     }
 #endif /* SIG_WINDOW */
-    xfree((ptr_t) lp);
+    cleanup_until(lp);
 }
 
 /*ARGSUSED*/
 void
 dounsetenv(Char **v, struct command *c)
 {
-    Char  **ep, *p, *n;
+    Char  **ep, *p, *n, *name;
     int     i, maxi;
-    static Char *name = NULL;
 
     USE(c);
-    if (name)
-	xfree((ptr_t) name);
     /*
      * Find the longest environment variable
      */
@@ -1466,7 +1464,8 @@ dounsetenv(Char **v, struct command *c)
 	    maxi = i;
     }
 
-    name = (Char *) xmalloc((size_t) ((maxi + 1) * sizeof(Char)));
+    name = xmalloc((maxi + 1) * sizeof(Char));
+    cleanup_push(name, xfree);
 
     while (++v && *v) 
 	for (maxi = 1; maxi;)
@@ -1508,7 +1507,7 @@ dounsetenv(Char **v, struct command *c)
 		    (void) setlocale(LC_COLLATE, "");
 # endif
 # ifdef LC_CTYPE
-	(void) setlocale(LC_CTYPE, ""); /* for iscntrl */
+		    (void) setlocale(LC_CTYPE, ""); /* for iscntrl */
 # endif /* LC_CTYPE */
 # ifdef NLS_CATALOGS
 #  ifdef LC_MESSAGES
@@ -1558,7 +1557,7 @@ dounsetenv(Char **v, struct command *c)
 		 */
 		break;
 	    }
-    xfree((ptr_t) name); name = NULL;
+    cleanup_until(name);
 }
 
 void
@@ -1572,13 +1571,13 @@ tsetenv(const Char *name, const Char *val)
  * it is not needed anymore.
  */
 #undef setenv
-    char    nameBuf[BUFSIZE];
-    char   *cname = short2str(name);
+    char   *cname;
 
-    if (cname == NULL)
+    if (name == NULL)
 	return;
-    (void) strcpy(nameBuf, cname);
-    setenv(nameBuf, short2str(val), 1);
+    cname = strsave(short2str(name));
+    setenv(cname, short2str(val), 1);
+    xfree(cname);
 #else /* !SETENV_IN_LIB */
     Char **ep = STR_environ;
     const Char *ccp;
@@ -1587,7 +1586,7 @@ tsetenv(const Char *name, const Char *val)
     Char  **oep = ep;
 
 #ifdef WINNT_NATIVE
-	nt_set_env(name,val);
+    nt_set_env(name,val);
 #endif /* WINNT_NATIVE */
     for (; *ep; ep++) {
 #ifdef WINNT_NATIVE
@@ -1600,21 +1599,21 @@ tsetenv(const Char *name, const Char *val)
 	if (*ccp != 0 || *dp != '=')
 	    continue;
 	cp = Strspl(STRequal, val);
-	xfree((ptr_t) * ep);
+	xfree(*ep);
 	*ep = strip(Strspl(name, cp));
-	xfree((ptr_t) cp);
+	xfree(cp);
 	blkfree((Char **) environ);
 	environ = short2blk(STR_environ);
 	return;
     }
     cp = Strspl(name, STRequal);
     blk[0] = strip(Strspl(cp, val));
-    xfree((ptr_t) cp);
+    xfree(cp);
     blk[1] = 0;
     STR_environ = blkspl(STR_environ, blk);
     blkfree((Char **) environ);
     environ = short2blk(STR_environ);
-    xfree((ptr_t) oep);
+    xfree(oep);
 #endif /* SETENV_IN_LIB */
 }
 
@@ -1639,8 +1638,8 @@ Unsetenv(Char *name)
 	blkfree((Char **) environ);
 	environ = short2blk(STR_environ);
 	*ep = cp;
-	xfree((ptr_t) cp);
-	xfree((ptr_t) oep);
+	xfree(cp);
+	xfree(oep);
 	return;
     }
 }
@@ -1847,7 +1846,7 @@ findlim(Char *cp)
 {
     struct limits *lp, *res;
 
-    res = (struct limits *) NULL;
+    res = NULL;
     for (lp = limits; lp->limconst >= 0; lp++)
 	if (prefix(cp, str2short(lp->limname))) {
 	    if (res)
@@ -2048,7 +2047,7 @@ plim(struct limits *lp, int hard)
 # endif
 # ifdef RLIMIT_CPU
     if (lp->limconst == RLIMIT_CPU)
-	psecs((long) limit);
+	psecs(limit);
     else
 # endif /* RLIMIT_CPU */
 	xprintf("%ld %s", (long) (limit / xdiv), lp->limscale);
@@ -2135,11 +2134,12 @@ setlim(struct limits *lp, int hard, RLIM_TYPE limit)
 	err = errno;
 	op = strsave(limit == RLIM_INFINITY ? CGETS(15, 2, "remove") :
 		     	CGETS(15, 3, "set"));
+	cleanup_push(op, xfree);
 	type = strsave(hard ? CGETS(15, 4, " hard") : "");
+	cleanup_push(type, xfree);
 	xprintf(CGETS(15, 1, "%s: %s: Can't %s%s limit (%s)\n"), bname,
 	    lp->limname, op, type, strerror(err));
-	xfree(type);
-	xfree(op);
+	cleanup_until(op);
 	return (-1);
     }
     return (0);
@@ -2153,8 +2153,7 @@ dosuspend(Char **v, struct command *c)
 {
 #ifdef BSDJOBS
     int     ctpgrp;
-
-    signalfun_t old;
+    struct sigaction old;
 #endif /* BSDJOBS */
     
     USE(c);
@@ -2165,10 +2164,11 @@ dosuspend(Char **v, struct command *c)
     untty();
 
 #ifdef BSDJOBS
-    old = signal(SIGTSTP, SIG_DFL);
+    sigaction(SIGTSTP, NULL, &old);
+    signal(SIGTSTP, SIG_DFL);
     (void) kill(0, SIGTSTP);
     /* the shell stops here */
-    (void) signal(SIGTSTP, old);
+    sigaction(SIGTSTP, &old, NULL);
 #else /* !BSDJOBS */
     stderror(ERR_JOBCONTROL);
 #endif /* BSDJOBS */
@@ -2180,9 +2180,10 @@ retry:
 	if (ctpgrp == -1)
 	    stderror(ERR_SYSTEM, "tcgetpgrp", strerror(errno));
 	if (ctpgrp != opgrp) {
-	    old = signal(SIGTTIN, SIG_DFL);
+	    sigaction(SIGTTIN, NULL, &old);
+	    signal(SIGTTIN, SIG_DFL);
 	    (void) kill(0, SIGTTIN);
-	    (void) signal(SIGTTIN, old);
+	    sigaction(SIGTTIN, &old, NULL);
 	    goto retry;
 	}
 	(void) setpgid(0, shpgrp);
@@ -2205,106 +2206,106 @@ retry:
  *   pgrp, with no way for the shell to get them going again.  -IAN!
  */
 
-static Char **gv = NULL, **gav = NULL;
+struct doeval_state
+{
+    Char **evalvec, *evalp;
+    int didfds;
+#ifndef CLOSE_ON_EXEC
+    int didcch;
+#endif
+    int saveIN, saveOUT, saveDIAG;
+    int SHIN, SHOUT, SHDIAG;
+};
+
+static void
+doeval_cleanup(void *xstate)
+{
+    struct doeval_state *state;
+
+    state = xstate;
+    evalvec = state->evalvec;
+    evalp = state->evalp;
+    doneinp = 0;
+#ifndef CLOSE_ON_EXEC
+    didcch = state->didcch;
+#endif /* CLOSE_ON_EXEC */
+    didfds = state->didfds;
+    xclose(SHIN);
+    xclose(SHOUT);
+    xclose(SHDIAG);
+    close_on_exec(SHIN = dmove(state->saveIN, state->SHIN), 1);
+    close_on_exec(SHOUT = dmove(state->saveOUT, state->SHOUT), 1);
+    close_on_exec(SHDIAG = dmove(state->saveDIAG, state->SHDIAG), 1);
+}
 
 /*ARGSUSED*/
 void
 doeval(Char **v, struct command *c)
 {
-    Char  **oevalvec;
-    Char   *oevalp;
-    int     odidfds;
-#ifndef CLOSE_ON_EXEC
-    int     odidcch;
-#endif /* CLOSE_ON_EXEC */
-    jmp_buf_t osetexit;
-    int     my_reenter;
-    Char  **savegv;
-    int     saveIN, saveOUT, saveDIAG;
-    int     oSHIN, oSHOUT, oSHDIAG;
+    struct doeval_state state;
+    int gflag;
+    Char **gv;
 
     USE(c);
-    oevalvec = evalvec;
-    oevalp = evalp;
-    odidfds = didfds;
-#ifndef CLOSE_ON_EXEC
-    odidcch = didcch;
-#endif /* CLOSE_ON_EXEC */
-    oSHIN = SHIN;
-    oSHOUT = SHOUT;
-    oSHDIAG = SHDIAG;
-
-    savegv = gv;
-    gav = v;
-
-    gav++;
-    if (*gav == 0)
+    v++;
+    if (*v == 0)
 	return;
-    gflag = 0, tglob(gav);
+    gflag = tglob(v);
     if (gflag) {
-	gv = gav = globall(gav);
-	gargv = 0;
-	if (gav == 0)
+	gv = v = globall(v, gflag);
+	if (v == 0)
 	    stderror(ERR_NOMATCH);
-	gav = copyblk(gav);
+	cleanup_push(gv, blk_cleanup);
+	v = copyblk(v);
     }
     else {
 	gv = NULL;
-	gav = copyblk(gav);
-	trim(gav);
+	v = copyblk(v);
+	trim(v);
     }
 
-    (void)close_on_exec(saveIN = dcopy(SHIN, -1), 1);
-    (void)close_on_exec(saveOUT = dcopy(SHOUT, -1), 1);
-    (void)close_on_exec(saveDIAG = dcopy(SHDIAG, -1), 1);
-
-    getexit(osetexit);
-
-    /* PWP: setjmp/longjmp bugfix for optimizing compilers */
-#ifdef cray
-    my_reenter = 1;             /* assume non-zero return val */
-    if (setexit() == 0) {
-	my_reenter = 0;         /* Oh well, we were wrong */
-#else /* !cray */
-    if ((my_reenter = setexit()) == 0) {
-#endif /* cray */
-	evalvec = gav;
-	evalp = 0;
-	(void)close_on_exec(SHIN = dcopy(0, -1), 1);
-	(void)close_on_exec(SHOUT = dcopy(1, -1), 1);
-	(void)close_on_exec(SHDIAG = dcopy(2, -1), 1);
+    state.evalvec = evalvec;
+    state.evalp = evalp;
+    state.didfds = didfds;
 #ifndef CLOSE_ON_EXEC
-	didcch = 0;
+    state.didcch = didcch;
 #endif /* CLOSE_ON_EXEC */
-	didfds = 0;
-	process(0);
-    }
+    state.SHIN = SHIN;
+    state.SHOUT = SHOUT;
+    state.SHDIAG = SHDIAG;
 
-    evalvec = oevalvec;
-    evalp = oevalp;
-    doneinp = 0;
+    (void)close_on_exec(state.saveIN = dcopy(SHIN, -1), 1);
+    (void)close_on_exec(state.saveOUT = dcopy(SHOUT, -1), 1);
+    (void)close_on_exec(state.saveDIAG = dcopy(SHDIAG, -1), 1);
+
+    cleanup_push(&state, doeval_cleanup);
+
+    evalvec = v;
+    evalp = 0;
+    (void)close_on_exec(SHIN = dcopy(0, -1), 1);
+    (void)close_on_exec(SHOUT = dcopy(1, -1), 1);
+    (void)close_on_exec(SHDIAG = dcopy(2, -1), 1);
 #ifndef CLOSE_ON_EXEC
-    didcch = odidcch;
+    didcch = 0;
 #endif /* CLOSE_ON_EXEC */
-    didfds = odidfds;
-    (void) close(SHIN);
-    (void) close(SHOUT);
-    (void) close(SHDIAG);
-    (void)close_on_exec (SHIN = dmove(saveIN, oSHIN), 1);
-    (void)close_on_exec (SHOUT = dmove(saveOUT, oSHOUT), 1);
-    (void)close_on_exec (SHDIAG = dmove(saveDIAG, oSHDIAG), 1);
+    didfds = 0;
+    process(0);
+
+    cleanup_until(&state);
 
     if (gv)
-	blkfree(gv);
-
-    gv = savegv;
-    resexit(osetexit);
-    if (my_reenter)
-	stderror(ERR_SILENT);
+	cleanup_until(gv);
 }
 
 /*************************************************************************/
 /* print list of builtin commands */
+
+static void
+lbuffed_cleanup (void *dummy)
+{
+    USE(dummy);
+    lbuffed = 1;
+}
 
 /*ARGSUSED*/
 void
@@ -2313,13 +2314,14 @@ dobuiltins(Char **v, struct command *c)
     /* would use print_by_column() in tw.parse.c but that assumes
      * we have an array of Char * to pass.. (sg)
      */
-    struct biltins *b;
+    const struct biltins *b;
     int row, col, columns, rows;
     unsigned int w, maxwidth;
 
     USE(c);
     USE(v);
     lbuffed = 0;		/* turn off line buffering */
+    cleanup_push(&lbuffed, lbuffed_cleanup);
 
     /* find widest string */
     for (maxwidth = 0, b = bfunc; b < &bfunc[nbfunc]; ++b)
@@ -2356,11 +2358,26 @@ dobuiltins(Char **v, struct command *c)
     xputchar('\n');
 #endif /* WINNT_NATIVE */
 
-    lbuffed = 1;		/* turn back on line buffering */
+    cleanup_until(&lbuffed);		/* turn back on line buffering */
     flush();
 }
 
-#if defined (NLS_CATALOGS) && defined(HAVE_ICONV) && defined(HAVE_NL_LANGINFO)
+#ifdef NLS_CATALOGS
+char *
+xcatgets(nl_catd ctd, int set_id, int msg_id, const char *s)
+{
+    char *res;
+
+    errno = 0;
+    while ((res = catgets(ctd, set_id, msg_id, s)) == s && errno == EINTR) {
+	handle_pending_signals();
+	errno = 0;
+    }
+    return res;
+}
+
+
+# if defined(HAVE_ICONV) && defined(HAVE_NL_LANGINFO)
 char *
 iconv_catgets(nl_catd ctd, int set_id, int msg_id, const char *s)
 {
@@ -2375,7 +2392,7 @@ iconv_catgets(nl_catd ctd, int set_id, int msg_id, const char *s)
 #endif
     size_t src_size, dest_size;
   
-    orig = catgets(ctd, set_id, msg_id, s);
+    orig = xcatgets(ctd, set_id, msg_id, s);
     if (catgets_iconv == (iconv_t)-1 || orig == s)
         return orig;
     src = orig;
@@ -2403,22 +2420,26 @@ iconv_catgets(nl_catd ctd, int set_id, int msg_id, const char *s)
     }
     return buf;
 }
-#endif
+# endif /* HAVE_ICONV && HAVE_NL_LANGINFO */
+#endif /* NLS_CATALOGS */
 
 void
 nlsinit(void)
 {
 #ifdef NLS_CATALOGS
-    char catalog[ 256 ] = { 't', 'c', 's', 'h', '\0' };
+    static const char default_catalog[] = "tcsh";
+
+    char *catalog = (char *)default_catalog;
 
     if (adrof(STRcatalog) != NULL)
-        xsnprintf((char *)catalog, sizeof(catalog), "tcsh.%s",
-		  short2str(varval(STRcatalog)));
+	catalog = xasprintf("tcsh.%s", short2str(varval(STRcatalog)));
     catd = catopen(catalog, MCLoadBySet);
+    if (catalog != default_catalog)
+	xfree(catalog);
 #if defined(HAVE_ICONV) && defined(HAVE_NL_LANGINFO)
-    /* catgets (), not CGETS, the charset name should be in ASCII anyway. */
+    /* xcatgets (), not CGETS, the charset name should be in ASCII anyway. */
     catgets_iconv = iconv_open (nl_langinfo (CODESET),
-				catgets(catd, 255, 1, "ASCII"));
+				xcatgets(catd, 255, 1, "ASCII"));
 #endif /* HAVE_ICONV && HAVE_NL_LANGINFO */
 #endif /* NLS_CATALOGS */
 #ifdef WINNT_NATIVE
@@ -2441,6 +2462,17 @@ nlsclose(void)
 	catgets_iconv = (iconv_t)-1;
     }
 #endif /* HAVE_ICONV && HAVE_NL_LANGINFO */
-    catclose(catd);
+    if (catd != (nl_catd)-1) {
+	/*
+	 * catclose can call other functions which can call longjmp
+	 * making us re-enter this code. Prevent infinite recursion
+	 * by resetting catd. Problem reported and solved by:
+	 * Gerhard Niklasch
+	 */
+	nl_catd oldcatd = catd;
+	catd = (nl_catd)-1;
+	while (catclose(oldcatd) == -1 && errno == EINTR)
+	    handle_pending_signals();
+    }
 #endif /* NLS_CATALOGS */
 }

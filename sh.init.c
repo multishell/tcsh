@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.init.c,v 3.55 2005/01/18 20:43:31 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.init.c,v 3.58 2006/01/12 19:43:00 christos Exp $ */
 /*
  * sh.init.c: Function and signal tables
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.init.c,v 3.55 2005/01/18 20:43:31 christos Exp $")
+RCSID("$Id: sh.init.c,v 3.58 2006/01/12 19:43:00 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -41,23 +41,17 @@ RCSID("$Id: sh.init.c,v 3.55 2005/01/18 20:43:31 christos Exp $")
  * C shell
  */
 
-#define	INF	0x7fffffff
+#define	INF INT_MAX
 
-struct	biltins bfunc[] = {
+const struct biltins bfunc[] = {
     { ":",		dozip,		0,	INF	},
     { "@",		dolet,		0,	INF	},
     { "alias",		doalias,	0,	INF	},
-#ifdef OBSOLETE
-    { "aliases",	doaliases,	0,	1,	},
-#endif /* OBSOLETE */
     { "alloc",		showall,	0,	1	},
 #if defined(_CX_UX)
     { "att",		doatt,		0,	INF	},
 #endif /* _CX_UX */
     { "bg",		dobg,		0,	INF	},
-#ifdef OBSOLETE
-    { "bind",		dobind,		0,	2	},
-#endif /* OBSOLETE */
     { "bindkey",	dobindkey,	0,	8	},
     { "break",		dobreak,	0,	0	},
     { "breaksw",	doswbrk,	0,	0	},
@@ -239,7 +233,7 @@ mesginit(void)
     int i;
 
     for (i = 0; i < NUMSIG; i++) {
-	xfree((ptr_t) mesg[i].pname);
+        xfree((char *)mesg[i].pname);
 	mesg[i].pname = NULL;
     }
 #endif /* NLS_CATALOGS */

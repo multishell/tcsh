@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tw.color.c,v 1.18 2005/03/03 16:40:53 kim Exp $ */
+/* $Header: /src/pub/tcsh/tw.color.c,v 1.21 2006/01/12 19:43:01 christos Exp $ */
 /*
  * tw.color.c: builtin color ls-F
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tw.color.c,v 1.18 2005/03/03 16:40:53 kim Exp $")
+RCSID("$Id: tw.color.c,v 1.21 2006/01/12 19:43:01 christos Exp $")
 
 #include "tw.h"
 #include "ed.h"
@@ -42,7 +42,7 @@ RCSID("$Id: tw.color.c,v 1.18 2005/03/03 16:40:53 kim Exp $")
 
 typedef struct {
     const char   *s;
-    int     len;
+    size_t len;
 } Str;
 
 
@@ -102,8 +102,8 @@ int	     color_context_ls = FALSE;	/* do colored ls */
 static int  color_context_lsmF = FALSE;	/* do colored ls-F */
 
 static int getstring (char **, const Char **, Str *, int);
-static void put_color (Str *);
-static void print_color (Char *, size_t, Char);
+static void put_color (const Str *);
+static void print_color (const Char *, size_t, Char);
 
 /* set_color_context():
  */
@@ -152,7 +152,7 @@ getstring(char **dp, const Char **sp, Str *pd, int f)
     }
 
     pd->s = *dp;
-    pd->len = (int) (d - *dp);
+    pd->len = d - *dp;
     *sp = s;
     *dp = d;
     return *s == (Char)f;
@@ -163,19 +163,19 @@ getstring(char **dp, const Char **sp, Str *pd, int f)
  *	Parse the LS_COLORS environment variable
  */
 void
-parseLS_COLORS(Char *value)
+parseLS_COLORS(const Char *value)
 {
     size_t  i, len;
     const Char   *v;		/* pointer in value */
     char   *c;			/* pointer in colors */
     Extension *volatile e;	/* pointer in extensions */
     jmp_buf_t osetexit;
+    size_t omark;
 
     (void) &e;
 
     /* init */
-    if (extensions)
-        xfree((ptr_t) extensions);
+    xfree(extensions);
     for (i = 0; i < nvariables; i++)
 	variables[i].color = variables[i].defaultcolor;
     colors = NULL;
@@ -191,7 +191,7 @@ parseLS_COLORS(Char *value)
     for (v = value; *v; v++)
 	if ((*v & CHAR) == ':')
 	    i++;
-    extensions = (Extension *) xmalloc((size_t) (len + i * sizeof(Extension)));
+    extensions = xmalloc(len + i * sizeof(Extension));
     colors = i * sizeof(Extension) + (char *)extensions;
     nextensions = 0;
 
@@ -202,10 +202,11 @@ parseLS_COLORS(Char *value)
 
     /* Prevent from crashing if unknown parameters are given. */
 
+    omark = cleanup_push_mark();
     getexit(osetexit);
 
     if (setexit() == 0) {
-	    
+
     /* parse */
     while (*v) {
 	switch (*v & CHAR) {
@@ -245,32 +246,33 @@ parseLS_COLORS(Char *value)
     }
     }
 
+    cleanup_pop_mark(omark);
     resexit(osetexit);
 
-    nextensions = (int) (e - extensions);
+    nextensions = e - extensions;
 }
-
 
 /* put_color():
  */
 static void
-put_color(Str *color)
+put_color(const Str *color)
 {
     size_t  i;
     const char   *c = color->s;
     int    original_output_raw = output_raw;
 
     output_raw = TRUE;
+    cleanup_push(&original_output_raw, output_raw_restore);
     for (i = color->len; 0 < i; i--)
 	xputchar(*c++);
-    output_raw = original_output_raw;
+    cleanup_until(&original_output_raw);
 }
 
 
 /* print_color():
  */
 static void
-print_color(Char *fname, size_t len, Char suffix)
+print_color(const Char *fname, size_t len, Char suffix)
 {
     size_t  i;
     char   *filename = short2str(fname);
@@ -281,7 +283,7 @@ print_color(Char *fname, size_t len, Char suffix)
     case '>':			/* File is a symbolic link pointing to
 				 * a directory */
         color = &variables[VDir].color;
-	    break;
+	break;
     case '+':			/* File is a hidden directory [aix] or
 				 * context dependent [hpux] */
     case ':':			/* File is network special [hpux] */
@@ -295,9 +297,10 @@ print_color(Char *fname, size_t len, Char suffix)
 	    }
 	if (i == nvariables) {
 	    for (i = 0; i < nextensions; i++)
-	        if (strncmp(last - extensions[i].extension.len,
-			    extensions[i].extension.s,
-			    extensions[i].extension.len) == 0) {
+	        if (len >= extensions[i].extension.len
+		    && strncmp(last - extensions[i].extension.len,
+			       extensions[i].extension.s,
+			       extensions[i].extension.len) == 0) {
 		  color = &extensions[i].color;
 		break;
 	    }
@@ -314,7 +317,7 @@ print_color(Char *fname, size_t len, Char suffix)
 /* print_with_color():
  */
 void
-print_with_color(Char *filename, size_t len, Char suffix)
+print_with_color(const Char *filename, size_t len, Char suffix)
 {
     if (color_context_lsmF &&
 	(haderr ? (didfds ? is2atty : isdiagatty) :

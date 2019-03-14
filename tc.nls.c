@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tc.nls.c,v 3.6 2005/02/15 21:09:02 christos Exp $ */
+/* $Header: /src/pub/tcsh/tc.nls.c,v 3.16 2006/01/12 18:15:25 christos Exp $ */
 /*
  * tc.nls.c: NLS handling
  */
@@ -32,9 +32,9 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.nls.c,v 3.6 2005/02/15 21:09:02 christos Exp $")
+RCSID("$Id: tc.nls.c,v 3.16 2006/01/12 18:15:25 christos Exp $")
 
-#ifdef SHORT_STRINGS
+#if defined(SHORT_STRINGS) && defined(NLS)
 int
 NLSWidth(NLSChar c)
 {
@@ -45,16 +45,18 @@ NLSWidth(NLSChar c)
     l = wcwidth(c);
     return l >= 0 ? l : 0;
 # else
-    return c != 0;
+    return Iswprint(c) != 0;
 # endif
 }
 #endif
 
-#if defined (WIDE_STRINGS) || !defined (SHORT_STRINGS)
+#if defined(WIDE_STRINGS) || (defined(SHORT_STRINGS) && !defined(NLS))
 Char *
-NLSChangeCase(Char *p, int mode)
+NLSChangeCase(const Char *p, int mode)
 {
-    Char c, *op = p, *n, c2 = 0;
+    Char c, *n, c2 = 0;
+    const Char *op = p;
+
     for (; (c = *p) != 0; p++) {
         if (mode == 0 && Islower(c)) {
 	    c2 = Toupper(c);
@@ -72,7 +74,7 @@ NLSChangeCase(Char *p, int mode)
 }
 
 int
-NLSExtend(Char *from, int max, int num)
+NLSExtend(const Char *from, int max, int num)
 {
     (void)from;
     num = abs (num);
@@ -85,15 +87,23 @@ NLSExtend(Char *from, int max, int num)
 #ifdef WIDE_STRINGS
 
 int
-NLSStringWidth(Char *s)
+NLSStringWidth(const Char *s)
 {
-    int w = 0;
-    while (*s)
-	w += wcwidth(*s++);
+    int w = 0, c, l;
+    while (*s) {
+	c = *s++;
+#ifdef HAVE_WCWIDTH
+	if ((l = wcwidth(c)) < 0)
+		l = 2;
+#else
+	l = Iswprint(c) != 0;
+#endif
+	w += l;
+    }
     return w;
 }
 
-#elif defined (SHORT_STRINGS)
+#elif defined (SHORT_STRINGS) && defined(NLS)
 
 int
 NLSFrom(const Char *p, size_t l, NLSChar *cp)
@@ -123,8 +133,9 @@ NLSFrom(const Char *p, size_t l, NLSChar *cp)
 }
 
 int
-NLSFinished(Char *p, size_t l, eChar extra)
+NLSFinished(const Char *p, size_t l, eChar extra)
 {
+#ifdef HAVE_MBRTOWC
     size_t i, r; 
     wchar_t c;
     char b[MB_LEN_MAX + 1], back[MB_LEN_MAX];
@@ -134,26 +145,29 @@ NLSFinished(Char *p, size_t l, eChar extra)
     if (extra != CHAR_ERR)
         b[i++] = extra;
     memset(&state, 0, sizeof(state));
-    r = mbrtowc((wchar_t *)&c, b, i, (mbstate_t *)&state);
+    r = mbrtowc(&c, b, i, &state);
     if (r == (size_t)-2)
 	return 0;
     if (r == (size_t)-1 || (size_t)wctomb(back, c) != r ||
 	memcmp(b, back, r) != 0)
 	return -1;
     return r == i ? 1 : 2;
+#else
+    return *p ? 2 : 1;
+#endif
 }
 
 int
-NLSChars(Char *s)
+NLSChars(const Char *s)
 {
     int l;
     for (l = 0; *s; l++)
-        s += NLSSize(s, -1);
+        s += NLSSize(s, NLSZEROT);
     return l;
 }
 
 int
-NLSStringWidth(Char *s)
+NLSStringWidth(const Char *s)
 {
     int w = 0;
     NLSChar c;
@@ -186,7 +200,7 @@ NLSTo(Char *p, NLSChar c)
 
 
 int
-NLSExtend(Char *from, int max, int num)
+NLSExtend(const Char *from, int max, int num)
 {
     int l, n, i;
     Char *p;
@@ -234,7 +248,7 @@ NLSQuote(Char *cp)
 {
     int l;
     while (*cp) {
-	l = NLSSize(cp, -1);
+	l = NLSSize(cp, NLSZEROT);
 	cp++;
 	while (l-- > 1)
 	    *cp++ |= QUOTE;
@@ -242,32 +256,52 @@ NLSQuote(Char *cp)
 }
 
 Char *
-NLSChangeCase(Char *p, int mode)
+NLSChangeCase(const Char *p, int mode)
 {
-    Char *n, *op = p;
+#ifdef HAVE_WINT_T
+    Char *n;
+    const Char *op = p;
     NLSChar c, c2 = 0;
-    int l, l2;
+    size_t l;
+    int l2;
 
     while (*p) {
-       l = NLSFrom(p, NLSZEROT, &c);
-       if (mode == 0 && iswlower((wint_t)c)) {
-	   c2 = (int)towupper((wint_t)c);
-	   break;
-       } else if (mode && iswupper((wint_t)c)) {
-	   c2 = (int)towlower((wint_t)c);
-	   break;
-       }
+	l = NLSFrom(p, NLSZEROT, &c);
+	if (mode == 0 && iswlower((wint_t)c)) {
+	    c2 = (int)towupper((wint_t)c);
+	    break;
+	} else if (mode && iswupper((wint_t)c)) {
+	    c2 = (int)towlower((wint_t)c);
+	    break;
+	}
 	p += l;
     }
     if (!*p)
 	return 0;
     l2 = NLSTo((Char *)0, c2);
-    n = (Char *)xmalloc((size_t)((op - p + l2 + Strlen(p + l) + 1) * sizeof(Char)));
-    if (p != op)
-	memcpy(n, op, (p - op) * sizeof(Char));
+    n = xmalloc(((p - op + l2 + Strlen(p + l) + 1) * sizeof(Char)));
+    memcpy(n, op, (p - op) * sizeof(Char));
     NLSTo(n + (p - op), c2);
-    memcpy(n + (p - op + l2), p + l, (Strlen(p + l) + 1) * sizeof(Char));
+    Strcpy(n + (p - op + l2), p + l);
     return n;
+#else
+    Char *n = Strsave(p);
+
+    if (mode == 0) {
+	for (p = n; *p; p++) 
+	    if (Islower(*p)) {
+		*p = Toupper(*p);
+		return n;
+	    }
+    } else {
+	for (p = n; *p; p++) 
+	    if (Isupper(*p)) {
+		*p = Tolower(*p);
+		return n;
+	    }
+    }
+    return n;
+#endif
 }
 #endif
 

@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.misc.c,v 3.34 2005/01/18 20:24:50 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.misc.c,v 3.38 2006/01/12 19:55:38 christos Exp $ */
 /*
  * sh.misc.c: Miscelaneous functions
  */
@@ -32,11 +32,12 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.misc.c,v 3.34 2005/01/18 20:24:50 christos Exp $")
+RCSID("$Id: sh.misc.c,v 3.38 2006/01/12 19:55:38 christos Exp $")
 
 static	int	renum	(int, int);
 static  Char  **blkend	(Char **);
 static  Char  **blkcat	(Char **, Char **);
+static	int	xdup2	(int, int);
 
 /*
  * C Shell
@@ -54,27 +55,33 @@ any(const char *s, Char c)
 }
 
 void
-setzero(char *cp, int i)
+setzero(void *p, size_t size)
 {
-    if (i != 0)
-	do
-	    *cp++ = 0;
-	while (--i);
+    memset(p, 0, size);
+}
+
+char *
+strnsave(const char *s, size_t len)
+{
+    char *r;
+
+    r = xmalloc(len + 1);
+    memcpy(r, s, len);
+    r[len] = '\0';
+    return r;
 }
 
 char   *
 strsave(const char *s)
 {
-    char   *n, *r;
-    const char *p;
+    char   *r;
+    size_t size;
 
     if (s == NULL)
 	s = "";
-    for (p = s; *p++ != '\0';)
-	continue;
-    r = n = (char *) xmalloc((size_t)((((const char *) p) - s) * sizeof(char)));
-    while ((*n++ = *s++) != '\0')
-	continue;
+    size = strlen(s) + 1;
+    r = xmalloc(size);
+    memcpy(r, s, size);
     return (r);
 }
 
@@ -89,7 +96,7 @@ blkend(Char **up)
 
 
 void
-blkpr(Char **av)
+blkpr(Char *const *av)
 {
 
     for (; *av; av++) {
@@ -99,15 +106,17 @@ blkpr(Char **av)
     }
 }
 
-void
-blkexpand(Char **av, Char *str)
+Char *
+blkexpand(Char *const *av)
 {
-    *str = '\0';
+    struct Strbuf buf = Strbuf_INIT;
+
     for (; *av; av++) {
-	(void) Strcat(str, *av);
+	Strbuf_append(&buf, *av);
 	if (av[1])
-	    (void) Strcat(str, STRspace);
+	    Strbuf_append1(&buf, ' ');
     }
+    return Strbuf_finish(&buf);
 }
 
 int
@@ -146,15 +155,29 @@ blkfree(Char **av0)
     if (!av0)
 	return;
     for (; *av; av++)
-	xfree((ptr_t) * av);
-    xfree((ptr_t) av0);
+	xfree(*av);
+    xfree(av0);
+}
+
+void
+blk_cleanup(void *ptr)
+{
+    blkfree(ptr);
+}
+
+void
+blk_indirect_cleanup(void *xptr)
+{
+    Char ***ptr;
+
+    ptr = xptr;
+    blkfree(*ptr);
 }
 
 Char  **
 saveblk(Char **v)
 {
-    Char **newv =
-    (Char **) xcalloc((size_t) (blklen(v) + 1), sizeof(Char **));
+    Char **newv = xcalloc(blklen(v) + 1, sizeof(Char **));
     Char  **onewv = newv;
 
     while (*v)
@@ -172,14 +195,13 @@ strstr(const char *s, const char *t)
 
 	do
 	    if (*tt == '\0')
-		return ((char *) s);
+		return (s);
 	while (*ss++ == *tt++);
     } while (*s++ != '\0');
     return (NULL);
 }
 #endif /* !HAVE_STRSTR */
 
-#ifndef SHORT_STRINGS
 char   *
 strspl(const char *cp, const char *dp)
 {
@@ -192,20 +214,16 @@ strspl(const char *cp, const char *dp)
 	dp = "";
     cl = strlen(cp);
     dl = strlen(dp);
-    ep = (char *) xmalloc((cl + dl + 1) * sizeof(char));
+    ep = xmalloc((cl + dl + 1) * sizeof(char));
     memcpy(ep, cp, cl);
     memcpy(ep + cl, dp, dl + 1);
     return (ep);
 }
 
-#endif /* !SHORT_STRINGS */
-
 Char  **
 blkspl(Char **up, Char **vp)
 {
-    Char **wp =
-    (Char **) xcalloc((size_t) (blklen(up) + blklen(vp) + 1),
-		      sizeof(Char **));
+    Char **wp = xcalloc(blklen(up) + blklen(vp) + 1, sizeof(Char **));
 
     (void) blkcpy(wp, up);
     return (blkcat(wp, vp));
@@ -231,7 +249,7 @@ lastchr(Char *cp)
 void
 closem(void)
 {
-    int f;
+    int f, num_files;
 
 #ifdef NLS_BUGS
 #ifdef NLS_CATALOGS
@@ -242,7 +260,8 @@ closem(void)
     /* suggested by Justin Bur; thanks to Karl Kleinpaste */
     fix_yp_bugs();
 #endif /* YPBUGS */
-    for (f = 0; f < NOFILE; f++)
+    num_files = NOFILE;
+    for (f = 0; f < num_files; f++)
 	if (f != SHIN && f != SHOUT && f != SHDIAG && f != OLDSTD &&
 	    f != FSHTTY 
 #ifdef MALLOC_TRACE
@@ -250,10 +269,10 @@ closem(void)
 #endif /* MALLOC_TRACE */
 	    )
 	  {
-	    (void) close(f);
+	    xclose(f);
 #ifdef NISPLUS
 	    if(f < 3)
-		(void) open(_PATH_DEVNULL, O_RDONLY|O_LARGEFILE);
+		(void) xopen(_PATH_DEVNULL, O_RDONLY|O_LARGEFILE);
 #endif /* NISPLUS */
 	  }
 #ifdef NLS_BUGS
@@ -273,7 +292,7 @@ closem(void)
 void
 closech(void)
 {
-    int f;
+    int f, num_files;
 
     if (didcch)
 	return;
@@ -284,8 +303,9 @@ closech(void)
     OLDSTD = 0;
     isoutatty = isatty(SHOUT);
     isdiagatty = isatty(SHDIAG);
-    for (f = 3; f < NOFILE; f++)
-	(void) close(f);
+    num_files = NOFILE;
+    for (f = 3; f < num_files; f++)
+	xclose(f);
 }
 
 #endif /* CLOSE_ON_EXEC */
@@ -294,13 +314,13 @@ void
 donefds(void)
 {
 
-    (void) close(0);
-    (void) close(1);
-    (void) close(2);
+    xclose(0);
+    xclose(1);
+    xclose(2);
     didfds = 0;
 #ifdef NISPLUS
     {
-	int fd = open(_PATH_DEVNULL, O_RDONLY|O_LARGEFILE);
+	int fd = xopen(_PATH_DEVNULL, O_RDONLY|O_LARGEFILE);
 	(void)dcopy(fd, 1);
 	(void)dcopy(fd, 2);
 	(void)dmove(fd, 0);
@@ -321,15 +341,15 @@ dmove(int i, int j)
 	return (i);
 #ifdef HAVE_DUP2
     if (j >= 0) {
-	(void) dup2(i, j);
+	(void) xdup2(i, j);
 	if (j != i)
-	    (void) close(i);
+	    xclose(i);
 	return (j);
     }
 #endif
     j = dcopy(i, j);
     if (j != i)
-	(void) close(i);
+	xclose(i);
     return (j);
 }
 
@@ -341,10 +361,10 @@ dcopy(int i, int j)
 	return (i);
     if (j >= 0) {
 #ifdef HAVE_DUP2
-	(void) dup2(i, j);
+	(void) xdup2(i, j);
 	return (j);
 #else
-	(void) close(j);
+	xclose(j);
 #endif
     }
     return (renum(i, j));
@@ -361,7 +381,7 @@ renum(int i, int j)
 	return (k);
     if (k != j) {
 	j = renum(k, j);
-	(void) close(k);
+	xclose(k);
 	return (j);
     }
     return (k);
@@ -378,7 +398,7 @@ lshift(Char **v, int c)
     Char **u;
 
     for (u = v; *u && --c >= 0; u++)
-	xfree((ptr_t) *u);
+	xfree(*u);
     (void) blkcpy(v, u);
 }
 
@@ -401,24 +421,20 @@ number(Char *cp)
 Char  **
 copyblk(Char **v)
 {
-    Char **nv =
-    (Char **) xcalloc((size_t) (blklen(v) + 1), sizeof(Char **));
+    Char **nv = xcalloc(blklen(v) + 1, sizeof(Char **));
 
     return (blkcpy(nv, v));
 }
 
-#ifndef SHORT_STRINGS
 char   *
-strend(char *cp)
+strend(const char *cp)
 {
     if (!cp)
-	return (cp);
+	return ((char *)(intptr_t)cp);
     while (*cp)
 	cp++;
-    return (cp);
+    return ((char *)(intptr_t)cp);
 }
-
-#endif /* SHORT_STRINGS */
 
 Char   *
 strip(Char *cp)
@@ -444,23 +460,22 @@ quote(Char *cp)
     return (cp);
 }
 
-Char   *
-quote_meta(Char *d, const Char *s)
+const Char *
+quote_meta(struct Strbuf *buf, const Char *s)
 {
-    Char *r = d;
+    buf->len = 0;
     while (*s != '\0') {
 	if (cmap(*s, _META | _DOL | _QF | _QB | _ESC | _GLOB))
-		*d++ = '\\';
-	*d++ = *s++;
+	    Strbuf_append1(buf, '\\');
+	Strbuf_append1(buf, *s++);
     }
-    *d = '\0';
-    return r;
+    Strbuf_terminate(buf);
+    return buf->s;
 }
 
 void
 udvar(Char *name)
 {
-
     setname(short2str(name));
     stderror(ERR_NAME | ERR_UNDVAR);
 }
@@ -477,4 +492,166 @@ prefix(const Char *sub, const Char *str)
 	if ((*sub++ & TRIM) != (*str++ & TRIM))
 	    return (0);
     }
+}
+
+char *
+areadlink(const char *path)
+{
+    char *buf;
+    size_t size;
+    ssize_t res;
+
+    size = MAXPATHLEN + 1;
+    buf = xmalloc(size);
+    while ((size_t)(res = readlink(path, buf, size)) == size) {
+	size *= 2;
+	buf = xrealloc(buf, size);
+    }
+    if (res == -1) {
+	int err;
+
+	err = errno;
+	xfree(buf);
+	errno = err;
+	return NULL;
+    }
+    buf[res] = '\0';
+    return xrealloc(buf, res + 1);
+}
+
+void
+xclose(int fildes)
+{
+    while (close(fildes) == -1 && errno == EINTR)
+	handle_pending_signals();
+}
+
+void
+xclosedir(DIR *dirp)
+{
+    while (closedir(dirp) == -1 && errno == EINTR)
+	handle_pending_signals();
+}
+
+int
+xcreat(const char *path, mode_t mode)
+{
+    int res;
+
+    while ((res = creat(path, mode)) == -1 && errno == EINTR)
+	handle_pending_signals();
+    return res;
+}
+
+#ifdef HAVE_DUP2
+static int
+xdup2(int fildes, int fildes2)
+{
+    int res;
+
+    while ((res = dup2(fildes, fildes2)) == -1 && errno == EINTR)
+	handle_pending_signals();
+    return res;
+}
+#endif
+
+struct group *
+xgetgrgid(gid_t xgid)
+{
+    struct group *res;
+
+    errno = 0;
+    while ((res = getgrgid(xgid)) == NULL && errno == EINTR) {
+	handle_pending_signals();
+	errno = 0;
+    }
+    return res;
+}
+
+struct passwd *
+xgetpwnam(const char *name)
+{
+    struct passwd *res;
+
+    errno = 0;
+    while ((res = getpwnam(name)) == NULL && errno == EINTR) {
+	handle_pending_signals();
+	errno = 0;
+    }
+    return res;
+}
+
+struct passwd *
+xgetpwuid(uid_t xuid)
+{
+    struct passwd *res;
+
+    errno = 0;
+    while ((res = getpwuid(xuid)) == NULL && errno == EINTR) {
+	handle_pending_signals();
+	errno = 0;
+    }
+    return res;
+}
+
+int
+xopen(const char *path, int oflag, ...)
+{
+    int res;
+
+    if ((oflag & O_CREAT) == 0) {
+	while ((res = open(path, oflag)) == -1 && errno == EINTR)
+	    handle_pending_signals();
+    } else {
+	va_list ap;
+	mode_t mode;
+
+	va_start(ap, oflag);
+	/* "int" should actually be "mode_t after default argument
+	   promotions". "int" is the best guess we have, "mode_t" used to be
+	   "unsigned short", which we obviously can't use. */
+	mode = va_arg(ap, int);
+	while ((res = open(path, oflag, mode)) == -1 && errno == EINTR)
+	    handle_pending_signals();
+    }
+    return res;
+}
+
+ssize_t
+xread(int fildes, void *buf, size_t nbyte)
+{
+    ssize_t res;
+
+    /* This is where we will be blocked most of the time, so handle signals
+       that didn't interrupt any system call. */
+    do
+      handle_pending_signals();
+    while ((res = read(fildes, buf, nbyte)) == -1 && errno == EINTR);
+    return res;
+}
+
+#ifdef POSIX
+int
+xtcsetattr(int fildes, int optional_actions, const struct termios *termios_p)
+{
+    int res;
+
+    while ((res = tcsetattr(fildes, optional_actions, termios_p)) == -1 &&
+	   errno == EINTR)
+	handle_pending_signals();
+    return res;
+}
+#endif
+
+ssize_t
+xwrite(int fildes, const void *buf, size_t nbyte)
+{
+    ssize_t res;
+
+    /* This is where we will be blocked most of the time, so handle signals
+       that didn't interrupt any system call. */
+    do
+      handle_pending_signals();
+    while ((res = write(fildes, buf, nbyte)) == -1 && errno == EINTR);
+    return res;
 }

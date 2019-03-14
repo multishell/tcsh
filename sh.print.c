@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.print.c,v 3.28 2005/03/03 17:19:35 kim Exp $ */
+/* $Header: /src/pub/tcsh/sh.print.c,v 3.30 2006/01/12 19:43:00 christos Exp $ */
 /*
  * sh.print.c: Primitive Output routines.
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.print.c,v 3.28 2005/03/03 17:19:35 kim Exp $")
+RCSID("$Id: sh.print.c,v 3.30 2006/01/12 19:43:00 christos Exp $")
 
 #include "ed.h"
 
@@ -111,6 +111,16 @@ char   *linp = linbuf;
 int    output_raw = 0;		/* PWP */
 int    xlate_cr   = 0;		/* HE */
 
+/* For cleanup_push() */
+void
+output_raw_restore(void *xorig)
+{
+    int *orig;
+
+    orig = xorig;
+    output_raw = *orig;
+}
+
 #ifdef WIDE_STRINGS
 void
 putwraw(Char c)
@@ -138,9 +148,9 @@ xputwchar(Char c)
 void
 xputchar(int c)
 {
-    int     atr = 0;
+    int     atr;
 
-    atr |= c & ATTRIBUTES & TRIM;
+    atr = c & ATTRIBUTES & TRIM;
     c &= CHAR | QUOTE;
     if (!output_raw && (c & QUOTE) == 0) {
 	if (iscntrl(c) && (c < 0x80 || MB_CUR_MAX == 1)) {
@@ -221,7 +231,6 @@ flush(void)
 {
     int unit;
     static int interrupted = 0;
-    size_t sz;
 
     /* int lmode; */
 
@@ -231,7 +240,7 @@ flush(void)
 	return;
     if (interrupted) {
 	interrupted = 0;
-	linp = linbuf;		/* avoid resursion as stderror calls flush */
+	linp = linbuf;		/* avoid recursion as stderror calls flush */
 	stderror(ERR_SILENT);
     }
     interrupted = 1;
@@ -245,12 +254,11 @@ flush(void)
 	lmode & LFLUSHO) {
 	lmode = LFLUSHO;
 	(void) ioctl(unit, TIOCLBIC, (ioclt_t) & lmode);
-	(void) write(unit, "\n", 1);
+	(void) xwrite(unit, "\n", 1);
     }
 #endif
 #endif
-    sz = (size_t) (linp - linbuf);
-    if (write(unit, linbuf, sz) == -1)
+    if (xwrite(unit, linbuf, linp - linbuf) == -1)
 	switch (errno) {
 #ifdef EIO
 	/* We lost our tty */

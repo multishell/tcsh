@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/ed.h,v 3.45 2005/04/11 21:09:34 kim Exp $ */
+/* $Header: /src/pub/tcsh/ed.h,v 3.47 2006/01/12 18:15:24 christos Exp $ */
 /*
  * ed.h: Editor declarations and globals
  */
@@ -37,7 +37,6 @@
 # define EXTERN extern
 #endif
 
-#define TABSIZE		8	/* usually 8 spaces/tab */
 #define MAXMACROLEVELS	10	/* max number of nested kbd macros */
 
 #ifndef WINNT_NATIVE
@@ -100,7 +99,7 @@ typedef struct {
     int   len;
 } CStr;
 
-typedef union Xmapval {		/* value passed to the Xkey routines */
+typedef union {		/* value passed to the Xkey routines */
     KEYCMD cmd;
     CStr str;
 } XmapVal;
@@ -118,7 +117,7 @@ EXTERN KEYCMD *CurrentKeyMap;	/* current command key map */
 EXTERN int inputmode;		/* insert, replace, replace1 mode */
 EXTERN Char GettingInput;	/* true if getting an input line (mostly) */
 EXTERN Char NeedsRedraw;	/* for editor and twenex error messages */
-EXTERN Char InputBuf[INBUFSIZE];	/* the real input data */
+EXTERN Char InputBuf[INBUFSIZE];	/* the real input data *//*FIXBUF*/
 EXTERN Char *LastChar, *Cursor;	/* point to the next open space */
 EXTERN Char *InputLim;		/* limit of size of InputBuf */
 EXTERN Char MetaNext;		/* flags for ^V and ^[ functions */
@@ -134,17 +133,17 @@ EXTERN int KillRingLen;		/* current length of kill ring */
 EXTERN int KillPos;		/* points to next kill */
 EXTERN int YankPos;		/* points to next yank */
 
-EXTERN Char UndoBuf[INBUFSIZE];
+EXTERN Char UndoBuf[INBUFSIZE];/*FIXBUF*/
 EXTERN Char *UndoPtr;
 EXTERN int  UndoSize;
 EXTERN int  UndoAction;
 
-EXTERN Char HistBuf[INBUFSIZE];	/* history buffer */
-EXTERN Char *LastHist;		/* points to end of history buffer */
+EXTERN struct Strbuf HistBuf; /* = Strbuf_INIT; history buffer */
 EXTERN int Hist_num;		/* what point up the history we are at now. */
-EXTERN Char SavedBuf[INBUFSIZE]; /* buffer for which command and others */
-EXTERN Char *LastSaved;		/* points to end of saved buffer */
-EXTERN Char *CursSaved;		/* points to the cursor point in saved buf */
+/* buffer for which command and others */
+EXTERN struct Strbuf SavedBuf; /* = Strbuf_INIT; */
+EXTERN size_t LastSaved;	/* points to end of saved buffer */
+EXTERN size_t CursSaved;	/* points to the cursor point in saved buf */
 EXTERN int HistSaved;		/* Hist_num is saved in this */
 EXTERN char RestoreSaved;	/* true if SavedBuf should be restored */
 EXTERN char Expand;		/* true if we are expanding a line */
@@ -177,14 +176,14 @@ EXTERN Char **Vdisplay;	/* new buffer */
 EXTERN int T_Lines, T_Cols;	/* Rows and Cols of the terminal */
 EXTERN Char T_CanIns;		/* true if I can insert characters */
 EXTERN Char T_CanDel;		/* dito for delete characters */
-EXTERN Char T_Tabs;		/* true if tty interface is passing tabs */
-EXTERN Char T_Margin;		
+EXTERN char T_Tabs;		/* true if tty interface is passing tabs */
+EXTERN char T_Margin;
 #define MARGIN_AUTO  1		/* term has auto margins */
 #define MARGIN_MAGIC 2		/* concept glitch */
 EXTERN speed_t T_Speed;		/* Tty input Baud rate */
 EXTERN Char T_CanCEOL;		/* true if we can clear to end of line */
 EXTERN Char T_CanUP;		/* true if this term can do reverse linefeen */
-EXTERN Char T_HasMeta;		/* true if we have a meta key */
+EXTERN char T_HasMeta;		/* true if we have a meta key */
 
 /* note the extra characters in the Strchr() call in this macro */
 #define isword(c)	(Isalpha(c)||Isdigit(c)||Strchr(word_chars,c))

@@ -12,6 +12,7 @@ AC_PREREQ([2.59])dnl Minimum Autoconf version required.
 AC_INIT
 AC_CONFIG_SRCDIR([tc.vers.c])
 AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_TESTDIR([.], [.])
 
 AC_CANONICAL_HOST
 
@@ -120,6 +121,11 @@ case "${host}" in
     tcsh_config_file=bsd4.4
   ;;
 
+  ## DragonFly systems
+  *-*-dragonfly*)
+    tcsh_config_file=bsd4.4
+  ;;
+
   ## Silicon Graphics machines
   *-sgi-iri* )
     tcsh_config_file=irix
@@ -150,16 +156,16 @@ case "${host}" in
   *-sun-sunos4.1.[3456]* )
     tcsh_config_file=sunos413
   ;;
-  *-*-solaris2.[01]* ) # Should handle sparc or x86
+  *-*-solaris2.[01] ) # Should handle sparc or x86
     tcsh_config_file=sol2
   ;;
-  *-sun-solaris2.2* ) # Sparc only release
+  *-sun-solaris2.2 ) # Sparc only release
     tcsh_config_file=sol22
   ;;
-  *-sun-solaris2.3* ) # Sparc only release
+  *-sun-solaris2.3 ) # Sparc only release
     tcsh_config_file=sol23
   ;;
-  *-*-solaris2.[45]* ) # Should handle sparc, x86 and powerpc
+  *-*-solaris2.[45] ) # Should handle sparc, x86 and powerpc
     tcsh_config_file=sol24
   ;;
   *-*-solaris2.* ) # Should handle sparc, x86 and powerpc
@@ -277,11 +283,23 @@ AC_HEADER_STDC
 
 dnl Checks for types
 AC_CHECK_TYPES([long long])
+AC_CHECK_TYPES([wint_t], , ,
+[AC_INCLUDES_DEFAULT
+#include <wchar.h>
+])
 AC_TYPE_GETGROUPS
 AC_TYPE_MODE_T
-AC_TYPE_SIGNAL
 AC_TYPE_SIZE_T
 AC_TYPE_UID_T
+
+AC_DEFUN([AC_TYPE_SSIZE_T], [
+AC_CHECK_TYPE(ssize_t,,
+AC_DEFINE(ssize_t, int, [Define to `int' not defined in <sys/types.h>.]),
+[
+#include <sys/types.h>
+])
+])
+AC_TYPE_SSIZE_T
 
 AC_DEFUN([AC_TYPE_SOCKLEN_T], [
 AC_CHECK_TYPE(socklen_t,,
@@ -308,7 +326,8 @@ AC_CHECK_MEMBERS([struct dirent.d_ino], , ,
 #endif])
 AC_CHECK_MEMBERS([struct utmp.ut_host, struct utmp.ut_user, struct utmp.ut_tv,
 		  struct utmp.ut_xtime], , ,
-[#ifdef HAVE_UTMPX_H
+[#include <sys/types.h>
+#ifdef HAVE_UTMPX_H
 #include <utmpx.h>
 #define utmp utmpx
 #elif defined HAVE_UTMP_H
@@ -327,7 +346,7 @@ dnl checks for library functions
 AC_CHECK_DECLS([gethostname])
 AC_CHECK_FUNCS([dup2 getcwd gethostname getpwent getutent memmove memset] dnl
 	[nice nl_langinfo sbrk setpgid setpriority strerror strstr sysconf] dnl
-	[wcwidth])
+	[wcwidth mbrtowc])
 AC_FUNC_GETPGRP
 AC_FUNC_SETPGRP
 

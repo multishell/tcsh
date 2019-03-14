@@ -1,4 +1,4 @@
-/*$Header: /src/pub/tcsh/win32/stdio.c,v 1.3 2002/08/11 07:58:13 amold Exp $*/
+/*$Header: /src/pub/tcsh/win32/stdio.c,v 1.5 2005/05/25 03:01:20 amold Exp $*/
 /*-
  * Copyright (c) 1980, 1991 The Regents of the University of California.
  * All rights reserved.
@@ -197,13 +197,13 @@ int nt_access(char *filename, int mode) {
 	
 	DWORD attribs=(DWORD)-1, bintype;
 	int tries=0;
-	char buf[512];
+	char buf[512];/*FIXBUF*/
 
 	if (!filename) {
 		errno = ENOENT;
 		return -1;
 	}
-	sprintf(buf,"%s",filename);
+	sprintf(buf,"%s",filename);/*FIXME: buffer overflow*/
 retry:
 	attribs = GetFileAttributes(buf);
 	tries++;
@@ -529,7 +529,7 @@ get_fd:
 	return fd;
 	
 }
-int nt_open(char *filename, int perms,...) { 
+int nt_open(const char *filename, int perms,...) { 
 
 	// ignore the bloody mode
 

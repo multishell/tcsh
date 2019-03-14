@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tc.os.c,v 3.58 2005/01/18 20:24:51 christos Exp $ */
+/* $Header: /src/pub/tcsh/tc.os.c,v 3.63 2006/01/12 19:43:01 christos Exp $ */
 /*
  * tc.os.c: OS Dependent builtin functions
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.os.c,v 3.58 2005/01/18 20:24:51 christos Exp $")
+RCSID("$Id: tc.os.c,v 3.63 2006/01/12 19:43:01 christos Exp $")
 
 #include "tw.h"
 #include "ed.h"
@@ -81,14 +81,14 @@ void
 dosetpath(Char **arglist, struct command *c)
 {
     extern char *getenv();
-    sigmask_t omask;
     Char  **pathvars, **cmdargs;
     char  **spaths, **cpaths, **cmds;
     char   *tcp;
     unsigned int npaths, ncmds;
     int     i, sysflag;
 
-    omask = sigsetmask(sigmask(SIGINT));
+    pintr_disabled++;
+    cleanup_push(&pintr_disabled, disabled_cleanup);
 
     /*
      * setpath(3) uses stdio and we want 0, 1, 2 to work...
@@ -119,20 +119,20 @@ dosetpath(Char **arglist, struct command *c)
 
     /* note that npaths != 0 */
 
-    spaths = (char **) xmalloc((size_t) npaths * sizeof *spaths);
-    setzero((char *) spaths, npaths * sizeof *spaths);
-    cpaths = (char **) xmalloc((size_t) (npaths + 1) * sizeof *cpaths);
-    setzero((char *) cpaths, (npaths + 1) * sizeof *cpaths);
-    cmds = (char **) xmalloc((size_t) (ncmds + 1) * sizeof *cmds);
-    setzero((char *) cmds, (ncmds + 1) * sizeof *cmds);
+    spaths = xmalloc(npaths * sizeof *spaths);
+    setzero(spaths, npaths * sizeof *spaths);
+    cpaths = xmalloc((npaths + 1) * sizeof *cpaths);
+    setzero(cpaths, (npaths + 1) * sizeof *cpaths);
+    cmds = xmalloc((ncmds + 1) * sizeof *cmds);
+    setzero(cmds, (ncmds + 1) * sizeof *cmds);
     for (i = 0; i < npaths; i++) {
 	char   *val = getenv(short2str(pathvars[i]));
 
 	if (val == NULL)
 	    val = "";
 
-	spaths[i] = (char *) xmalloc((size_t) (Strlen(pathvars[i]) +
-				      strlen(val) + 2) * sizeof **spaths);
+	spaths[i] = xmalloc((Strlen(pathvars[i]) + strlen(val) + 2) *
+			    sizeof **spaths);
 	(void) strcpy(spaths[i], short2str(pathvars[i]));
 	(void) strcat(spaths[i], "=");
 	(void) strcat(spaths[i], val);
@@ -140,12 +140,11 @@ dosetpath(Char **arglist, struct command *c)
     }
 
     for (i = 0; i < ncmds; i++) {
-	Char   *val = globone(cmdargs[i], G_ERROR);
+	Char   *val = globone(cmdargs[i], G_ERROR);/*FIXRESET*/
 
 	if (val == NULL)
 	    goto abortpath;
-	cmds[i] = (char *) xmalloc((size_t) Strlen(val) + 1);
-	(void) strcpy(cmds[i], short2str(val));
+	cmds[i] = strsave(short2str(val));
     }
 
 
@@ -153,20 +152,17 @@ dosetpath(Char **arglist, struct command *c)
 abortpath:
 	if (spaths) {
 	    for (i = 0; i < npaths; i++)
-		if (spaths[i])
-		    xfree((ptr_t) spaths[i]);
-	    xfree((ptr_t) spaths);
+		xfree(spaths[i]);
+	    xfree(spaths);
 	}
-	if (cpaths)
-	    xfree((ptr_t) cpaths);
+	xfree(cpaths);
 	if (cmds) {
 	    for (i = 0; i < ncmds; i++)
-		if (cmds[i])
-		    xfree((ptr_t) cmds[i]);
-	    xfree((ptr_t) cmds);
+		xfree(cmds[i]);
+	    xfree(cmds);
 	}
 
-	(void) sigsetmask(omask);
+	cleanup_until(&pintr_disabled);
 	donefds();
 	return;
     }
@@ -179,16 +175,16 @@ abortpath:
 	if (val && *val == '=') {
 	    *val++ = '\0';
 
-	    tsetenv(name, val);
+	    tsetenv(name, val);/*FIXRESET*/
 	    if (Strcmp(name, STRKPATH) == 0) {
-		importpath(val);
+		importpath(val);/*FIXRESET*/
 		if (havhash)
-		    dohash(NULL, NULL);
+		    dohash(NULL, NULL);/*FIXRESET*/
 	    }
 	    *--val = '=';
 	}
     }
-    (void) sigsetmask(omask);
+    cleanup_until(&pintr_disabled);
     donefds();
 }
 #endif /* MACH */
@@ -395,7 +391,7 @@ migratepid(pit_t pid, siteno_t new_site)
 
     need_local = (pid == 0) || (pid == getpid());
 
-    if (kill3((pid_t) pid, SIGMIGRATE, new_site) < 0) {
+    if (kill3(pid, SIGMIGRATE, new_site) < 0) {
 	xprintf("%d: %s\n", pid, strerror(errno));
 	return (-1);
     }
@@ -429,18 +425,13 @@ domigrate(Char **v, struct command *c)
     int    err1 = 0;
     int    pid = 0;
     siteno_t new_site = 0;
-    sigmask_t omask;
 
-#ifdef BSDSIGS
-    omask = sigmask(SIGCHLD);
-    if (setintr)
-	omask |= sigmask(SIGINT);
-    omask = sigblock(omask) & ~omask;
-#else
-    if (setintr)
-	(void) sighold(SIGINT);
-    (void) sighold(SIGCHLD);
-#endif /* BSDSIGS */
+    pchild_disabled++;
+    cleanup_push(&pchild_disabled, disabled_cleanup);
+    if (setintr) {
+	pintr_disabled++;
+	cleanup_push(&pintr_disabled, disabled_cleanup);
+    }
 
     ++v;
     if (*v[0] == '-') {
@@ -453,6 +444,7 @@ domigrate(Char **v, struct command *c)
 	 */
 	dont_free = 1;
 	if ((st = sfname(s)) == NULL) {
+	    dont_free = 0;
 	    setname(s);
 	    stderror(ERR_NAME | ERR_STRING, CGETS(23, 7, "Site not found"));
 	}
@@ -466,21 +458,26 @@ domigrate(Char **v, struct command *c)
 	    err1++;
     }
     else {
-	gflag = 0, tglob(v);
+	Char **globbed;
+        int gflag;
+
+	gflag = tglob(v);
 	if (gflag) {
-	    v = globall(v);
+	    v = globall(v, gflag);
 	    if (v == 0)
 		stderror(ERR_NAME | ERR_NOMATCH);
 	}
 	else {
-	    v = gargv = saveblk(v);
+	    v = saveblk(v);
 	    trim(v);
 	}
+	globbed = v;
+	cleanup_push(globbed, blk_cleanup);
 
 	while (v && (cp = *v)) {
 	    if (*cp == '%') {
 		pp = pfind(cp);
-		if (kill3((pid_t) - pp->p_jobid, SIGMIGRATE, new_site) < 0) {
+		if (kill3(- pp->p_jobid, SIGMIGRATE, new_site) < 0) {
 		    xprintf("%S: %s\n", cp, strerror(errno));
 		    err1++;
 		}
@@ -494,18 +491,11 @@ domigrate(Char **v, struct command *c)
 	    }
 	    v++;
 	}
-	if (gargv)
-	    blkfree(gargv), gargv = 0;
+	cleanup_until(globbed);
     }
 
 done:
-#ifdef BSDSIGS
-    (void) sigsetmask(omask);
-#else
-    (void) sigrelse(SIGCHLD);
-    if (setintr)
-	(void) sigrelse(SIGINT);
-#endif /* BSDSIGS */
+    cleanup_until(&pchild_disabled);
     if (err1)
 	stderror(ERR_SILENT);
 }
@@ -532,7 +522,7 @@ dodmmode(Char **v, struct command *c)
     }
     else {
 	if (cp[1] != '\0')
-	    stderror(ERR_NAME | ERR_STRING, 
+	    stderror(ERR_NAME | ERR_STRING,
 		     CGETS(23, 30, "Too many arguments"));
 	else
 	    switch(*cp) {
@@ -543,7 +533,7 @@ dodmmode(Char **v, struct command *c)
 		dmmode(1);
 		break;
 	    default:
-		stderror(ERR_NAME | ERR_STRING, 
+		stderror(ERR_NAME | ERR_STRING,
 			 CGETS(23, 31, "Invalid argument"));
 	    }
     }
@@ -564,29 +554,31 @@ dodmmode(Char **v, struct command *c)
 
 static jmp_buf sigsys_buf;
 
-static RETSIGTYPE
+static void
 catch_sigsys(void)
 {
+    sigrelse(SIGSYS);
     longjmp(sigsys_buf, 1);
 }
 
 
 /*ARGSUSED*/
 void
-dowarp(Char **v, struct command *c)
+dowarp(Char **v, struct command *c) 
 {
     int     warp, oldwarp;
     struct warpent *we;
-    void    (*old_sigsys_handler) () = 0;
+    volatile struct sigaction old_sigsys_handler;
     char   *newwarp;
 
     if (setjmp(sigsys_buf)) {
-	signal(SIGSYS, old_sigsys_handler);
-	stderror(ERR_NAME | ERR_STRING, 
+	sigaction(SIGSYS, &old_sigsys_handler, NULL);
+	stderror(ERR_NAME | ERR_STRING,
 		 CGETS(23, 8, "You're trapped in a universe you never made"));
 	return;
     }
-    old_sigsys_handler = signal(SIGSYS, catch_sigsys);
+    sigaction(SIGSYS, NULL, &old_sigsys_handler);
+    signal(SIGSYS, catch_sigsys);
 
     warp = getwarp();
 
@@ -619,8 +611,7 @@ dowarp(Char **v, struct command *c)
 	    stderror(ERR_NAME | ERR_STRING, CGETS(23, 11, "Setwarp failed"));
 	}
     }
-    signal(SIGSYS, old_sigsys_handler);
-    return;
+    sigaction(SIGSYS, &old_sigsys_handler, NULL);
 }
 #endif /* WARP */
 
@@ -629,16 +620,22 @@ dowarp(Char **v, struct command *c)
  ***/
 /* Added, DAS DEC-90. */
 #if defined(masscomp) || defined(_CX_UX)
+static void
+setuniverse_cleanup(void *xbuf)
+{
+    char *buf;
+
+    buf = xbuf;
+    setuniverse(buf);
+}
+
 /*ARGSUSED*/
 void
-douniverse(Char **v, struct command *c)
+douniverse(Char **v, struct command *c) 
 {
     Char *cp = v[1];
     Char *cp2;		/* dunno how many elements v comes in with */
     char    ubuf[100];
-#ifdef BSDSIGS
-    sigmask_t omask = 0;
-#endif /* BSDSIGS */
 
     if (cp == 0) {
 	(void) getuniverse(ubuf);
@@ -653,22 +650,17 @@ douniverse(Char **v, struct command *c)
 	else {
 	    (void) getuniverse(ubuf);
 	    if (*cp == '\0' || setuniverse(short2str(cp)) != 0)
-	stderror(ERR_NAME | ERR_STRING, CGETS(23, 12, "Illegal universe"));
-	    if (setintr)
-#ifdef BSDSIGS
-		omask = sigblock(sigmask(SIGINT)) & ~sigmask(SIGINT);
-#else /* !BSDSIGS */
-		(void) sighold(SIGINT);
-#endif /* BSDSIGS */
+		stderror(ERR_NAME | ERR_STRING, CGETS(23, 12, "Illegal universe"));
+	    cleanup_push(ubuf, setuniverse_cleanup);
+	    if (setintr) {
+		pintr_disabled++;
+		cleanup_push(&pintr_disabled, disabled_cleanup);
+	    }
 	    lshift(v, 2);
 	    if (setintr)
-#ifdef BSDSIGS
-		(void) sigsetmask(omask);
-#else /* !BSDSIGS */
-		(void) sigrelse (SIGINT);
-#endif /* BSDSIGS */
+		cleanup_until(&pintr_disabled);
 	    reexecute(c);
-	    (void) setuniverse(ubuf);
+	    cleanup_until(ubuf);
 	}
     }
 }
@@ -777,40 +769,42 @@ bs2cmdlist(char *str)
 void
 dobs2cmd(Char **v, struct command *c)
 {
-    Char *cp;
+    Char *cp, **globbed;
     int  i = 0, len = 0;
     char *cmd = NULL;
     int     pvec[2];
     struct command faket;
     Char   *fakecom[2];
     char    tibuf[BUFSIZE];
-    int     icnt;
+    int     icnt, gflag;
     static const Char STRbs2cmd[] = { 'b','s','2','c','m','d','\0' };
 
-    if (setintr)
-#ifdef BSDSIGS
-	(void) sigsetmask(sigblock((sigmask_t) 0) & ~sigmask(SIGINT));
-#else /* !BSDSIGS */
-	(void) sigrelse (SIGINT);
-#endif /* BSDSIGS */
     v++;
-    gflag = 0, tglob(v);
+    gflag = tglob(v);
     if (gflag) {
-	v = globall(v);
+	int old_pintr_disabled;
+
+	if (setintr)
+	    pintr_push_enable(&old_pintr_disabled);
+	v = globall(v, gflag);
+	if (setintr)
+	    cleanup_until(&old_pintr_disabled);
 	if (v == 0)
 	    stderror(ERR_NAME | ERR_NOMATCH);
     }
     else {
-	v = gargv = saveblk(v);
+	v = saveblk(v);
 	trim(v);
     }
+    globbed = v;
+    cleanup_push(globbed, blk_cleanup);
 
     /* First round: count the string lengths */
     for (i=0; v[i]; ++i) {
-	len += s_strlen(v[i]) + (v[i+1] != NULL);
+	len += Strlen(v[i]) + (v[i+1] != NULL);
     }
 
-    cmd = xmalloc(len+1); /* 1 for the final '\0' */
+    cmd = xmalloc(len+1); /* 1 for the final '\0' *//* FIXME: memory leak? */
 
     /* 2nd round: fill cmd buffer */
     i = 0;
@@ -832,17 +826,20 @@ dobs2cmd(Char **v, struct command *c)
     faket.t_drit = 0;
     faket.t_dspr = 0;
     faket.t_dcom = fakecom;
-    fakecom[0] = STRbs2cmd;
+    fakecom[0] = (Char *)STRbs2cmd;
     fakecom[1] = 0;
 
     mypipe(pvec);
+    cleanup_push(&pvec[0], open_cleanup);
+    cleanup_push(&pvec[1], open_cleanup);
     if (pfork(&faket, -1) == 0) {
         /* child */
-        (void) close(pvec[0]);
+        xclose(pvec[0]);
         (void) dmove(pvec[1], 1);
         (void) dmove(SHDIAG,  2);
         initdesc();
 /*        closem();*/
+	sigrelse(SIGINT);
 #ifdef SIGTSTP
         (void) sigignore(SIGTSTP);
 #endif
@@ -854,63 +851,61 @@ dobs2cmd(Char **v, struct command *c)
 #endif
         xexit(bs2cmdlist(cmd));
     }
-    (void) close(pvec[1]);
+    cleanup_until(&pvec[1]);
     for(;;) {
-        do
-            icnt = read(pvec[0], tibuf, BUFSIZE);
-        while (icnt == -1 && errno == EINTR);
+	int old_pintr_disabled;
+
+	if (setintr)
+	    pintr_push_enable(&old_pintr_disabled);
+	icnt = xread(pvec[0], tibuf, sizeof(tibuf));
+	if (setintr)
+	    cleanup_until(&old_pintr_disabled);
         if (icnt <= 0)
             break;
         for (i = 0; i < icnt; i++)
             xputchar((unsigned char) tibuf[i]);
     }
-    (void) close(pvec[0]);
+    cleanup_until(&pvec[0]);
     pwait();
 
     flush();
 
-    if (setintr)
-#ifdef BSDSIGS
-	(void) sigblock(sigmask(SIGINT));
-#else /* !BSDSIGS */
-	(void) sighold(SIGINT);
-#endif /* BSDSIGS */
-    if (gargv)
-	blkfree(gargv), gargv = 0;
+    cleanup_until(globbed);
 }
 #endif /* _OSD_POSIX */
 
 #if defined(_CX_UX)
+static void
+setuniverse_cleanup(void *xbuf)
+{
+    char *buf;
+
+    buf = xbuf;
+    setuniverse(buf);
+}
+
 /*ARGSUSED*/
 void
 doatt(Char **v, struct command *c)
 {
     Char *cp = v[1];
     char    ubuf[100];
-#ifdef BSDSIGS
-    sigmask_t omask = 0;
-#endif /* BSDSIGS */
 
     if (cp == 0)
 	(void) setuniverse("att");
     else {
 	(void) getuniverse(ubuf);
 	(void) setuniverse("att");
-	if (setintr)
-#ifdef BSDSIGS
-	    omask = sigblock(sigmask(SIGINT)) & ~sigmask(SIGINT);
-#else /* !BSDSIGS */
-	    (void) sighold(SIGINT);
-#endif /* BSDSIGS */
+	cleanup_push(ubuf, setuniverse_cleanup);
+	if (setintr) {
+	    pintr_disabled++;
+	    cleanup_push(&pintr_disabled, disabled_cleanup);
+	}
 	lshift(v, 1);
 	if (setintr)
-#ifdef BSDSIGS
-	    (void) sigsetmask(omask);
-#else /* !BSDSIGS */
-	    (void) sigrelse (SIGINT);
-#endif /* BSDSIGS */
+	    cleanup_until(&pintr_disabled);
 	reexecute(c);
-	(void) setuniverse(ubuf);
+	cleanup_until(ubuf);
     }
 }
 
@@ -920,30 +915,22 @@ doucb(Char **v, struct command *c)
 {
     Char *cp = v[1];
     char    ubuf[100];
-#ifdef BSDSIGS
-    sigmask_t omask = 0;
-#endif /* BSDSIGS */
 
     if (cp == 0)
 	(void) setuniverse("ucb");
     else {
 	(void) getuniverse(ubuf);
 	(void) setuniverse("ucb");
-	if (setintr)
-#ifdef BSDSIGS
-	    omask = sigblock(sigmask(SIGINT)) & ~sigmask(SIGINT);
-#else /* !BSDSIGS */
-	    (void) sighold(SIGINT);
-#endif /* BSDSIGS */
+	cleanup_push(ubuf, setuniverse_cleanup);
+	if (setintr) {
+	    pintr_disabled++;
+	    cleanup_push(&pintr_disabled, disabled_cleanup);
+	}
 	lshift(v, 1);
 	if (setintr)
-#ifdef BSDSIGS
-	    (void) sigsetmask(omask);
-#else /* !BSDSIGS */
-	    (void) sigrelse (SIGINT);
-#endif /* BSDSIGS */
+	    cleanup_until(&pintr_disabled);
 	reexecute(c);
-	(void) setuniverse(ubuf);
+	cleanup_until(ubuf);
     }
 }
 #endif /* _CX_UX */
@@ -993,10 +980,10 @@ pr_stat_sub(struct process_stats *p2, struct process_stats *p1,
 
 #ifndef HAVE_MEMSET
 /* This is a replacement for a missing memset function */
-ptr_t xmemset(ptr_t loc, int value, size_t len)
+void *xmemset(void *loc, int value, size_t len)
 {
-    char *ptr = (char *) loc;
-  
+    char *ptr = loc;
+
     while (len--)
 	*ptr++ = value;
     return loc;
@@ -1010,11 +997,11 @@ ptr_t xmemset(ptr_t loc, int value, size_t len)
  *	Unlike memcpy(), it handles overlaps between source and 
  *	destination memory
  */
-ptr_t
-xmemmove(ptr_t vdst, const ptr_t vsrc, size_t len)
+void *
+xmemmove(void *vdst, const void *vsrc, size_t len)
 {
-    const char *src = (const char *) vsrc;
-    char *dst = (char *) vdst;
+    const char *src = vsrc;
+    char *dst = vdst;
 
     if (src == dst)
 	return vdst;
@@ -1036,7 +1023,7 @@ xmemmove(ptr_t vdst, const ptr_t vsrc, size_t len)
 
 #ifndef WINNT_NATIVE
 #ifdef NEEDtcgetpgrp
-int
+pid_t
 xtcgetpgrp(int fd)
 {
     int     pgrp;
@@ -1106,12 +1093,12 @@ fix_strcoll_bug(void)
     static char *root = "/";
 
     if (!didfds)
-	fd = open(root, O_RDONLY|O_LARGEFILE);
+	fd = xopen(root, O_RDONLY|O_LARGEFILE);
 
     (void) strcoll(root, root);
 
     if (fd != -1)
-	(void) close(fd);
+	xclose(fd);
 #endif
 }
 #endif /* STRCOLLBUG */
@@ -1133,7 +1120,7 @@ osinit(void)
 #ifdef aiws
     {
 	struct sigstack inst;
-	inst.ss_sp = (char *) xmalloc((size_t) 4192) + 4192;
+	inst.ss_sp = xmalloc(4192) + 4192;
 	inst.ss_onstack = 0;
 	sigstack(&inst, NULL);
     }
@@ -1153,16 +1140,18 @@ osinit(void)
 }
 
 #ifndef HAVE_STRERROR
+extern int sys_nerr;
+extern char *sys_errlist[];
 char *
 xstrerror(int i)
 {
-    static char errbuf[128];
-
     if (i >= 0 && i < sys_nerr) {
 	return sys_errlist[i];
     } else {
-	(void) xsnprintf(errbuf, sizeof(errbuf),
-	    CGETS(23, 13, "Unknown Error: %d"), i);
+	static char *errbuf; /* = NULL; */
+
+	xfree(errbuf);
+	errbuf = xasprintf(CGETS(23, 13, "Unknown Error: %d"), i);
 	return errbuf;
     }
 }
@@ -1247,7 +1236,7 @@ static char *strnrcpy (char *, char *, size_t);
 char *
 xgetcwd(char *pathname, size_t pathlen)
 {
-    char pathbuf[MAXNAMLEN];	/* temporary pathname buffer */
+    char pathbuf[MAXPATHLEN];	/* temporary pathname buffer */
     char *pnptr = &pathbuf[(sizeof pathbuf)-1]; /* pathname pointer */
     dev_t rdev;			/* root device number */
     DIR *dirp = NULL;		/* directory stream */
@@ -1296,7 +1285,7 @@ xgetcwd(char *pathname, size_t pathlen)
 	} while (dd.st_ino  != d.st_ino  ||
 		 dd.st_dev  != d.st_dev  ||
 		 dd.st_size != d.st_size);
-	(void) closedir(dirp);
+	closedir(dirp);
 	dirp = NULL;
 	pnptr = strnrcpy(dirp->d_name, pnptr, pnptr - pathbuf);
 	pnptr = strnrcpy("/", pnptr, pnptr - pathbuf);
@@ -1427,7 +1416,7 @@ xgetcwd(char *pathname, size_t pathlen)
 	    (void) xsnprintf(pathname, pathlen, CGETS(23, 27,
 			     "getcwd: Cannot find \".\" in \"..\" (%s)"),
 			     strerror(save_errno ? save_errno : ENOENT));
-	    (void) closedir(dp);
+	    closedir(dp);
 	    return NULL;
 	}
 	else
@@ -1437,7 +1426,7 @@ xgetcwd(char *pathname, size_t pathlen)
 	pathptr = strnrcpy(pathptr, "/", pathptr - pathbuf);
 	nextpathptr = strnrcpy(nextpathptr, "../", nextpathptr - nextpathbuf);
 	*cur_name_add = '\0';
-	(void) closedir(dp);
+	closedir(dp);
     }
 } /* end getcwd */
 # endif /* hp9000s500 */
@@ -1471,7 +1460,7 @@ strnrcpy(char *ptr, char *str, size_t siz)
 static char *
 apperr(status_$t *st)
 {
-    static char buf[BUFSIZE];
+    static char *buf; /* = NULL */
     short e_subl, e_modl, e_codel;
     error_$string_t e_sub, e_mod, e_code;
 
@@ -1479,7 +1468,8 @@ apperr(status_$t *st)
     e_sub[e_subl] = '\0';
     e_code[e_codel] = '\0';
     e_mod[e_modl] = '\0';
-    (void) xsnprintf(buf, sizeof(buf), "%s (%s/%s)", e_code, e_sub, e_mod);
+    xfree(buf);
+    buf = xasprintf("%s (%s/%s)", e_code, e_sub, e_mod);
 
     return(buf);
 }
@@ -1500,22 +1490,26 @@ llib(Char *s)
 void
 doinlib(Char **v, struct command *c)
 {
+    Char **globbed;
+    int gflag;
+
     setname(short2str(*v++));
-    gflag = 0, tglob(v);
+    gflag = tglob(v);
     if (gflag) {
-	v = globall(v);
+	v = globall(v, gflag);
 	if (v == 0)
 	    stderror(ERR_NAME | ERR_NOMATCH);
     }
     else {
-	v = gargv = saveblk(v);
+	v = saveblk(v);
 	trim(v);
     }
+    globbed = v;
+    cleanup_push(globbed, blk_cleanup);
 
     while (v && *v) 
 	llib(*v++);
-    if (gargv)
-	blkfree(gargv), gargv = 0;
+    cleanup_until(globbed);
 }
 
 int

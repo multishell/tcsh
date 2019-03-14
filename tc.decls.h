@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tc.decls.h,v 3.57 2005/01/18 20:24:51 christos Exp $ */
+/* $Header: /src/pub/tcsh/tc.decls.h,v 3.61 2006/01/13 16:29:20 christos Exp $ */
 /*
  * tc.decls.h: Function declarations from all the tcsh modules
  */
@@ -33,15 +33,21 @@
 #ifndef _h_tc_decls
 #define _h_tc_decls
 
+struct blk_buf;
+struct strbuf;
+struct Strbuf;
+
 /*
  * tc.alloc.c
  */
 #ifndef SYSMALLOC
 #ifndef WINNT_NATIVE
+#ifndef __linux__
 extern	void		  free		(ptr_t);
 extern	memalign_t	  malloc	(size_t);
 extern	memalign_t	  realloc	(ptr_t, size_t);
 extern	memalign_t	  calloc	(size_t, size_t);
+#endif
 #endif /* !WINNT_NATIVE */
 #else /* SYSMALLOC */
 extern	void		  sfree		(ptr_t);
@@ -55,9 +61,6 @@ extern	void		  showall	(Char **, struct command *);
  * tc.bind.c
  */
 extern	void		  dobindkey	(Char **, struct command *);
-#ifdef OBSOLETE
-extern	void		  dobind	(Char **, struct command *);
-#endif /* OBSOLETE */
 
 /*
  * tc.defs.c:
@@ -74,20 +77,19 @@ extern	int		  resetdisc	(int);
 /*
  * tc.func.c
  */
-extern	Char		 *expand_lex    (Char *, size_t, struct wordent *, 
-					 int, int);
-extern	Char		 *sprlex	(Char *, size_t, struct wordent *);
-extern	Char		 *Itoa		(int, Char *, int, int);
+extern	Char		 *expand_lex    (const struct wordent *, int, int);
+extern	Char		 *sprlex	(const struct wordent *);
+extern	Char		 *Itoa		(int, size_t, Char);
 extern	void		  dolist	(Char **, struct command *);
 extern	void		  dotermname	(Char **, struct command *);
 extern	void		  dotelltc	(Char **, struct command *);
 extern	void		  doechotc	(Char **, struct command *);
 extern	void		  dosettc	(Char **, struct command *);
-extern	int		  cmd_expand	(Char *, Char *);
+extern	int		  cmd_expand	(Char *, Char **);
 extern	void		  dowhich	(Char **, struct command *);
 extern	struct process	 *find_stop_ed	(void);
 extern	void		  fg_proc_entry	(struct process *);
-extern	RETSIGTYPE	  alrmcatch	(int);
+extern	void		  alrmcatch	(void);
 extern	void		  precmd	(void);
 extern	void		  postcmd	(void);
 extern	void		  cwd_cmd	(void);
@@ -98,7 +100,7 @@ extern	void		  aliasrun	(int, Char *, Char *);
 extern	void		  setalarm	(int);
 extern	void		  rmstar	(struct wordent *);
 extern	void		  continue_jobs	(struct wordent *);
-extern	Char		 *gettilde	(Char *);
+extern	Char		 *gettilde	(const Char *);
 extern	Char		 *getusername	(Char **);
 #ifdef OBSOLETE
 extern	void		  doaliases	(Char **, struct command *);
@@ -158,7 +160,7 @@ extern	void	 	  pr_stat_sub	(struct process_stats *,
 #endif /* _SEQUENT_ */
 
 #ifdef NEEDtcgetpgrp
-extern	int	 	  xtcgetpgrp	(int);
+extern	pid_t	 	  xtcgetpgrp	(int);
 extern	int		  xtcsetpgrp	(int, int);
 # undef tcgetpgrp
 # define tcgetpgrp(a) 	  xtcgetpgrp(a)
@@ -176,12 +178,12 @@ extern	void	 	  fix_strcoll_bug	(void);
 extern	void	 	  osinit	(void);
 
 #ifndef HAVE_MEMMOVE
-extern ptr_t 		 xmemmove	(ptr_t, const ptr_t, size_t);
+extern void 		*xmemmove	(void *, const void *, size_t);
 # define memmove(a, b, c) xmemmove(a, b, c)
 #endif /* !HAVE_MEMMOVE */
 
 #ifndef HAVE_MEMSET
-extern ptr_t 		 xmemset	(ptr_t, int, size_t);
+extern void 		*xmemset	(void *, int, size_t);
 # define memset(a, b, c) xmemset(a, b, c)
 #endif /* !HAVE_MEMSET */
 
@@ -221,71 +223,37 @@ extern	int		  getv		(Char *);
 /*
  * tc.printf.h
  */
-extern	pret_t		  xprintf	(const char *, ...);
-extern	pret_t		  xsnprintf	(char *, size_t, const char *, ...);
-extern	pret_t		  xvprintf	(const char *, va_list);
-extern	pret_t		  xvsnprintf	(char *, size_t, const char *,
-					 va_list);
+#ifndef __GNUC__
+#define __attribute__(a)
+#endif
+extern	pret_t		  xprintf	(const char *, ...)
+    __attribute__((__format__(__printf__, 1, 2)));
+extern	pret_t		  xsnprintf	(char *, size_t, const char *, ...)
+    __attribute__((__format__(__printf__, 3, 4)));
+extern	char		 *xasprintf	(const char *, ...)
+    __attribute__((__format__(__printf__, 1, 2)));
+extern	pret_t		  xvprintf	(const char *, va_list)
+    __attribute__((__format__(__printf__, 1, 0)));
+extern	pret_t		  xvsnprintf	(char *, size_t, const char *, va_list)
+    __attribute__((__format__(__printf__, 3, 0)));
+extern	char		 *xvasprintf	(const char *, va_list)
+    __attribute__((__format__(__printf__, 1, 0)));
 
 /*
  * tc.prompt.c
  */
 extern	void		  dateinit	(void);
 extern	void		  printprompt	(int, const char *);
-extern  Char 		 *expdollar	(Char **, const Char **, size_t *,
-					 int);
-extern	void		  tprintf	(int, Char *, const Char *, size_t, 
-					 const char *, time_t, ptr_t);
+extern  int 		  expdollar	(struct Strbuf *, const Char **, Char);
+extern	Char		 *tprintf	(int, const Char *, const char *,
+					 time_t, ptr_t);
 
 /*
  * tc.sched.c
  */
 extern	time_t		  sched_next	(void);
 extern	void		  dosched	(Char **, struct command *);
-extern	void		  sched_run	(int);
-
-/*
- * tc.sig.c
- */
-#ifndef BSDSIGS
-# ifdef UNRELSIGS
-#  ifdef COHERENT
-extern	RETSIGTYPE	(*xsignal	(int, RETSIGTYPE (*)(int))) ();
-#   define signal(x,y)	  xsignal(x,y)
-#  endif /* COHERENT */
-extern	RETSIGTYPE	(*xsigset	(int, RETSIGTYPE (*)(int))) ();
-#  define sigset(x,y)	  xsigset(x,y)
-extern	void		  xsigrelse	(int);
-#  define sigrelse(x)	  xsigrelse(x)
-extern	void		  xsighold	(int);
-#  define sighold(x)	  xsighold(x)
-extern	void		  xsigignore	(int);
-#  define sigignore(x)	  xsigignore(x)
-extern	void 		  xsigpause	(int);
-#  define sigpause(x)	  xsigpause(x)
-extern	pid_t 		  ourwait	(int *);
-# endif /* UNRELSIGS */
-# ifdef SXA
-extern	void 		  sigpause	(int);
-# endif /* SXA */
-#endif /* !BSDSIGS */
-
-#ifdef NEEDsignal
-extern	RETSIGTYPE	(*xsignal	(int, RETSIGTYPE (*)(int))) ();
-# define signal(a, b)	  xsignal(a, b)
-#endif /* NEEDsignal */
-#if defined(_SEQUENT_) || ((SYSVREL > 3 || defined(_DGUX_SOURCE)) && defined(POSIXSIGS)) || ((defined(_AIX) || defined(__CYGWIN__)) && defined(POSIXSIGS)) || defined(WINNT_NATIVE)
-extern	sigmask_t	  sigsetmask	(sigmask_t);
-# if !defined(DGUX) || (defined(DGUX) && defined(__ix86))
-extern	sigmask_t	  sigblock	(sigmask_t);
-# endif /* !DGUX */
-extern	void		  bsd_sigpause	(sigmask_t);
-extern  RETSIGTYPE        (*bsd_signal    (int, RETSIGTYPE (*)(int))) (int);
-#endif /* _SEQUENT_ */
-#ifdef SIGSYNCH
-extern	RETSIGTYPE	  synch_handler	(int);
-#endif /* SIGSYNCH */
-
+extern	void		  sched_run	(void);
 
 /*
  * tc.str.c:
@@ -313,6 +281,7 @@ extern	size_t		  s_strlen	(const Char *);
 extern	int		  s_strcmp	(const Char *, const Char *);
 extern	int		  s_strncmp	(const Char *, const Char *, size_t);
 extern	int		  s_strcasecmp	(const Char *, const Char *);
+extern	Char		 *s_strnsave	(const Char *, size_t);
 extern	Char		 *s_strsave	(const Char *);
 extern	Char		 *s_strend	(const Char *);
 extern	Char		 *s_strstr	(const Char *, const Char *);
@@ -322,6 +291,25 @@ extern	char		 *short2str	(const Char *);
 extern	char		**short2blk	(Char **);
 #endif /* SHORT_STRINGS */
 extern	char		 *short2qstr	(const Char *);
+
+extern	void		  bb_append	(struct blk_buf *, Char *);
+extern	void		  bb_cleanup	(void *);
+extern	Char		**bb_finish	(struct blk_buf *);
+
+extern	void		  strbuf_terminate(struct strbuf *);
+extern  void		  strbuf_append1(struct strbuf *, char);
+extern  void		  strbuf_appendn(struct strbuf *, const char *,
+					 size_t);
+extern  void		  strbuf_append (struct strbuf *, const char *);
+extern  char		 *strbuf_finish (struct strbuf *);
+extern	void		  strbuf_cleanup(void *);
+extern	void		  Strbuf_terminate(struct Strbuf *);
+extern  void		  Strbuf_append1(struct Strbuf *, Char);
+extern  void		  Strbuf_appendn(struct Strbuf *, const Char *,
+					 size_t);
+extern  void		  Strbuf_append (struct Strbuf *, const Char *);
+extern  Char		 *Strbuf_finish (struct Strbuf *);
+extern	void		  Strbuf_cleanup(void *);
 
 
 /*
@@ -336,7 +324,7 @@ extern	void		  fix_version	(void);
 extern	void		  initwatch	(void);
 extern	void		  resetwatch	(void);
 extern	void		  watch_login	(int);
-extern	const char 	 *who_info	(ptr_t, int, char *, size_t);
+extern	char	 	 *who_info	(ptr_t, int);
 extern	void		  dolog		(Char **, struct command *);
 # ifdef HAVE_STRUCT_UTMP_UT_HOST
 extern	char		 *utmphost	(void);
