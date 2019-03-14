@@ -1,4 +1,4 @@
-/* $Header: /u/christos/cvsroot/tcsh/tc.func.c,v 3.80 1998/09/18 15:31:49 christos Exp $ */
+/* $Header: /u/christos/cvsroot/tcsh/tc.func.c,v 3.82 1998/12/15 13:07:28 christos Exp $ */
 /*
  * tc.func.c: New tcsh builtins.
  */
@@ -36,7 +36,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: tc.func.c,v 3.80 1998/09/18 15:31:49 christos Exp $")
+RCSID("$Id: tc.func.c,v 3.82 1998/12/15 13:07:28 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -63,6 +63,7 @@ extern int do_logout;
 extern time_t t_period;
 extern int just_signaled;
 static bool precmd_active = 0;
+static bool postcmd_active = 0;
 static bool periodic_active = 0;
 static bool cwdcmd_active = 0;	/* PWP: for cwd_cmd */
 static bool beepcmd_active = 0;
@@ -171,37 +172,48 @@ sprlex(buf, bufsiz, sp0)
     return (buf);
 }
 
-void
-Itoa(n, s)			/* convert n to characters in s */
-    int     n;
-    Char   *s;
+
+Char *
+Itoa(n, s, min_digits, attributes)
+    int n;
+    Char *s;
+    int min_digits, attributes;
 {
-    int     i, sign;
+    /*
+     * The array size here is derived from
+     *	log8(UINT_MAX)
+     * which is guaranteed to be enough for a decimal
+     * representation.  We add 1 because integer divide
+     * rounds down.
+     */
+#ifndef CHAR_BIT
+# define CHAR_BIT 8
+#endif
+    Char buf[CHAR_BIT * sizeof(int) / 3 + 1];
+    Char *p;
+    unsigned int un;	/* handle most negative # too */
+    int pad = (min_digits != 0);
 
-    if ((sign = n) < 0)		/* record sign */
-	n = -n;
-    i = 0;
-    do {
-	s[i++] = n % 10 + '0';
-    } while ((n /= 10) > 0);
-    if (sign < 0)
-	s[i++] = '-';
-    s[i] = '\0';
-    Reverse(s);
-}
+    if (sizeof(buf) - 1 < min_digits)
+	min_digits = sizeof(buf) - 1;
 
-static void
-Reverse(s)
-    Char   *s;
-{
-    Char   c;
-    int     i, j;
-
-    for (i = 0, j = (int) Strlen(s) - 1; i < j; i++, j--) {
-	c = s[i];
-	s[i] = s[j];
-	s[j] = c;
+    un = n;
+    if (n < 0) {
+	un = -un;
+	*s++ = '-';
     }
+
+    p = buf;
+    do {
+	*p++ = un % 10 + '0';
+	un /= 10;
+    } while ((pad && --min_digits > 0) || un != 0);
+
+    while (p > buf)
+	*s++ = *--p | attributes;
+
+    *s = '\0';
+    return s;
 }
 
 
@@ -900,6 +912,33 @@ leave:
 #endif /* BSDSIGS */
 }
 
+void
+postcmd()
+{
+#ifdef BSDSIGS
+    sigmask_t omask;
+
+    omask = sigblock(sigmask(SIGINT));
+#else /* !BSDSIGS */
+    (void) sighold(SIGINT);
+#endif /* BSDSIGS */
+    if (postcmd_active) {	/* an error must have been caught */
+	aliasrun(2, STRunalias, STRpostcmd);
+	xprintf(CGETS(22, 3, "Faulty alias 'postcmd' removed.\n"));
+	goto leave;
+    }
+    postcmd_active = 1;
+    if (!whyles && adrof1(STRpostcmd, &aliases))
+	aliasrun(1, STRpostcmd, NULL);
+leave:
+    postcmd_active = 0;
+#ifdef BSDSIGS
+    (void) sigsetmask(omask);
+#else /* !BSDSIGS */
+    (void) sigrelse(SIGINT);
+#endif /* BSDSIGS */
+}
+
 /*
  * Paul Placeway  11/24/87  Added cwd_cmd by hacking precmd() into
  * submission...  Run every time $cwd is set (after it is set).  Useful
@@ -1076,6 +1115,8 @@ aliasrun(cnt, s1, s2)
 	 */
 	if (precmd_active)
 	    precmd();
+	if (postcmd_active)
+	    postcmd();
 #ifdef notdef
 	/*
 	 * XXX: On the other hand, just interrupting them causes an error too.
@@ -1746,7 +1787,7 @@ shlvl(val)
 	else {
 	    Char    buff[BUFSIZE];
 
-	    Itoa(val, buff);
+	    (void) Itoa(val, buff, 0, 0);
 	    set(STRshlvl, Strsave(buff), VAR_READWRITE);
 	    tsetenv(STRKSHLVL, buff);
 	}

@@ -1,3 +1,13 @@
+ 33. V6.08.03 - 19990211
+ 32. Helpcommand documentation (Vladimir Alexiev)
+ 31. small Y2K fix [%y in prompt would be formatted as 10 not 00 at year 2000],
+     and new Itoa() code (Chris Torek)
+ 30. OpenBSD m68k patches (Paul DuBois)
+ 29. Avoid redefinition of getpeername on Solaris-2.7
+ 28. fix problems with savedups=erase, savehist=merge (Randy Gobbel)
+ 27. Don't set $shell to csh, if we were invoked as tcsh (Tomas Persson)
+ 26. added $_
+ 25. added postcmd
  24. V6.08.02 - 19981124
  23. document continue and continue_args
  22. wrong test in slowexec made NT optimization a noop (Amol)

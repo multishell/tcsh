@@ -76,7 +76,7 @@
 .\"   used here if you can. In particular, please don't use nroff commands
 .\"   which aren't already used herein.
 .\" 
-.TH TCSH 1 "24 November 1998" "Astron 6.08.02"
+.TH TCSH 1 "11 February 1999" "Astron 6.08.03"
 .SH NAME
 tcsh \- C shell with file name completion and command line editing
 .SH SYNOPSIS
@@ -716,7 +716,9 @@ can do this even more easily.
 Searches for documentation on the current command, using the same notion of
 `current command' as the completion routines, and prints it. There is no way
 to use a pager; \fIrun-help\fR is designed for short help files.
-Documentation should be in a file named \fIcommand\fR.help, \fIcommand\fR.1,
+If the special alias \fBhelpcommand\fR is defined, it is run with the
+command name as a sole argument. Else,
+documentation should be in a file named \fIcommand\fR.help, \fIcommand\fR.1,
 \fIcommand\fR.6, \fIcommand\fR.8 or \fIcommand\fR, which should be in one
 of the directories listed in the \fBHPATH\fR environment variable.
 If there is more than one help file only the first is printed.
@@ -1271,7 +1273,10 @@ Substitutes the (decimal) process number of the (parent) shell.
 .TP 8
 $!
 Substitutes the (decimal) process number of the last
-background process started by this shell.
+background process started by this shell. (+)
+.TP 8
+$_
+Substitures the command line of the last command executed. (+)
 .TP 8
 $<
 Substitutes a line from the standard input, with no further interpretation
@@ -1877,10 +1882,10 @@ and described in detail under the appropriate \fBBuiltin commands\fR,
 The \fIsched\fR builtin command puts commands in a scheduled-event list,
 to be executed by the shell at a given time.
 .PP
-The \fIbeepcmd\fR, \fIcwdcmd\fR, \fIperiodic\fR and \fIprecmd\fR
+The \fIbeepcmd\fR, \fIcwdcmd\fR, \fIperiodic\fR, \fIprecmd\fR, and \fIpostcmd\fR
 \fBSpecial aliases\fR can be set, respectively, to execute commands when the shell wants
 to ring the bell, when the working directory changes, every \fBtperiod\fR
-minutes and before each prompt.
+minutes, before each prompt, and before each command gets executed.
 .PP
 The \fBautologout\fR shell variable can be set to log out or lock the shell
 after a given number of minutes of inactivity.
@@ -3418,6 +3423,20 @@ may cause an infinite loop. It is the author's opinion that anyone doing
 so will get what they deserve.
 .RE
 .TP 8
+.B helpcommand
+Invoked by the \fBrun-help\fR editor command. The command name for which help
+is sought is passed as sole argument. 
+For example, if one does
+.RS +8
+.IP "" 4
+> alias helpcommand '\e!:1 --help'
+.PP
+then the help display of the command itself will be invoked, using the GNU
+help calling convention.
+Currently there is no easy way to account for various calling conventions (eg
+the customary Unix `-h'), except by using a table of many commands.
+.RE
+.TP 8
 .B periodic 
 Runs every \fBtperiod\fR minutes. This provides a convenient means for
 checking on common but infrequent changes such as new mail. For example,
@@ -3442,6 +3461,15 @@ Runs just before each prompt is printed. For example, if one does
 then \fIdate\fR(1) runs just before the shell prompts for each command.
 There are no limits on what \fIprecmd\fR can be set to do, but discretion
 should be used.
+.RE
+.TP 8
+.B postcmd
+Runs before each command gets executed.
+.RS +8
+.IP "" 4
+> alias postcmd  'echo \-n "^[]2\e;\e!#^G"'
+.PP
+then executing \fIvi foo.c\fR will put the command string in the xterm title bar.
 .RE
 .TP 8
 .B shell
@@ -4866,7 +4894,7 @@ pipe(2), setrlimit(2), sigvec(2), stat(2), umask(2), vfork(2), wait(2),
 malloc(3), setlocale(3), tty(4), a.out(5), termcap(5), environ(7),
 termio(7), Introduction to the C Shell
 .SH VERSION
-This manual documents tcsh 6.08.02 (Astron) 1998-11-24.
+This manual documents tcsh 6.08.03 (Astron) 1999-02-11.
 .SH AUTHORS
 .PD 0
 .TP 2

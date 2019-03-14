@@ -1,4 +1,4 @@
-/* $Header: /u/christos/cvsroot/tcsh/sh.c,v 3.84 1998/10/25 15:10:00 christos Exp $ */
+/* $Header: /u/christos/cvsroot/tcsh/sh.c,v 3.87 1999/02/06 15:01:19 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -43,7 +43,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$Id: sh.c,v 3.84 1998/10/25 15:10:00 christos Exp $")
+RCSID("$Id: sh.c,v 3.87 1999/02/06 15:01:19 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -551,14 +551,14 @@ main(argc, argv)
 #ifdef apollo
 	int     oid = getoid();
 
-	Itoa(oid, buff);
+	(void) Itoa(oid, buff, 0, 0);
 	set(STRoid, Strsave(buff), VAR_READWRITE);
 #endif /* apollo */
 
-	Itoa(uid, buff);
+	(void) Itoa(uid, buff, 0, 0);
 	set(STRuid, Strsave(buff), VAR_READWRITE);
 
-	Itoa(gid, buff);
+	(void) Itoa(gid, buff, 0, 0);
 	set(STRgid, Strsave(buff), VAR_READWRITE);
 
 	cln = getenv("LOGNAME");
@@ -693,7 +693,7 @@ main(argc, argv)
 	if ((tcp = getenv("SHELL")) != NULL) {
 	    sh_len = strlen(tcp);
 	    if ((sh_len >= 5 && strcmp(tcp + (sh_len - 5), "/tcsh") == 0) || 
-	        (sh_len >= 4 && strcmp(tcp + (sh_len - 4), "/csh") == 0))
+	        (!tcsh && sh_len >= 4 && strcmp(tcp + (sh_len - 4), "/csh") == 0))
 		set(STRshell, quote(SAVE(tcp)), VAR_READWRITE);
 	    else
 		sh_len = 0;
@@ -1849,7 +1849,7 @@ pintr1(wantnl)
 	(void) sighold(SIGINT);
     (void) sigrelse(SIGCHLD);
 #endif
-    draino();
+    drainoline();
 #if !defined(_VMS_POSIX) && !defined(WINNT)
     (void) endpwent();
 #endif /* !_VMS_POSIX && !WINNT */
@@ -2086,6 +2086,7 @@ process(catch)
 	if (seterr)
 	    stderror(ERR_OLD);
 
+	postcmd();
 	/*
 	 * Execute the parse tree From: Michael Schroeder
 	 * <mlschroe@immd4.informatik.uni-erlangen.de> was execute(t, tpgrp);
@@ -2101,6 +2102,7 @@ process(catch)
 	if (catch && intty && !whyles && !tellwhat)
 	    (void) window_change(0);	/* for window systems */
 #endif /* SIG_WINDOW */
+	set(STR_, Strsave(InputBuf), VAR_READWRITE | VAR_NOGLOB);
     }
     savet = t;
     resexit(osetexit);
