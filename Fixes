@@ -1,14 +1,21 @@
+ 19. V6.13.02 - 20040804
+ 18. de-register, de-extern, de-shadow, and const poison.
+ 17. WIDE_STRINGS support (Miloslav Trmac)
+ 16. warning cleanups (Miloslav Trmac)
+ 15. nlsclose() arg passing, exp2 is now a gcc builtin (Mark Peek)
+ 14. iconv malloc portability fix.
+ 13. make automatic dspmbyte determination case insensitive
  12. V6.13.01 - 20040724
  11. bug fix in automatic dspmbyte setting (Miloslav Trmac)
- 10. iconv patches (Aleksey Nogin)
+ 10. iconv patches (Miloslav Trmac)
   9. cygwin signal fixes; only init 32 signals, don't set bit flag on error;
      breaks SIGHUP. (Corinna Vinschen)
   8. Make sure terminal size change takes effect immediately.
   7. Obey $printexitvalue for builtins.
   6. FreeBSD PR/66420: Allow history parsing to be special so that it
      can handle inline # characters (Oliver Eikemeier)
-  5. new termname builtin from (Andrew ?)
-  4. if ($var =~ *[^0-9]*) echo not numeric, fix (Andrew ?)
+  5. new termname builtin from (Andrew Stevenson)
+  4. if ($var =~ *[^0-9]*) echo not numeric, fix (Andrew Stevenson)
   3. completion fix to avoid dup hosts from ssh_known_hosts
      (Eric D. Hendrickson)
   2. vc++ 7.1 compilation fix (Steve Schockley)

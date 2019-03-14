@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.file.c,v 3.22 2002/07/01 20:53:00 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.file.c,v 3.24 2004/08/04 14:28:23 christos Exp $ */
 /*
  * sh.file.c: File completion for csh. This file is not used in tcsh.
  */
@@ -33,7 +33,7 @@
 #include "sh.h"
 #include "ed.h"
 
-RCSID("$Id: sh.file.c,v 3.22 2002/07/01 20:53:00 christos Exp $")
+RCSID("$Id: sh.file.c,v 3.24 2004/08/04 14:28:23 christos Exp $")
 
 #if defined(FILEC) && defined(TIOCSTI)
 
@@ -64,8 +64,8 @@ static	void	 back_to_col_1		__P((void));
 static	void	 pushback		__P((Char *));
 static	void	 catn			__P((Char *, Char *, int));
 static	void	 copyn			__P((Char *, Char *, int));
-static	Char	 filetype		__P((Char *, Char *));
-static	void	 print_by_column	__P((Char *, Char *[], int));
+static	int	 filetype		__P((Char *, Char *));
+static	void	 print_by_column	__P((Char *, Char *[], size_t));
 static	Char 	*tilde			__P((Char *, Char *));
 static	void	 retype			__P((void));
 static	void	 beep			__P((void));
@@ -75,7 +75,7 @@ static	Char	*getitem		__P((DIR *, int));
 static	void	 free_items		__P((Char **, size_t));
 static	int	 tsearch		__P((Char *, COMMAND, int));
 static	int	 compare		__P((const ptr_t, const ptr_t));
-static	int	 recognize		__P((Char *, Char *, int, int));
+static	int	 recognize		__P((Char *, Char *, int, size_t));
 static	int	 is_prefix		__P((Char *, Char *));
 static	int	 is_suffix		__P((Char *, Char *));
 static	int	 ignored		__P((Char *));
@@ -226,7 +226,9 @@ pushback(string)
     Char   *string;
 {
     Char *p;
+#ifndef WIDE_STRINGS
     char    c;
+#endif
 #ifdef TERMIO
 # ifdef POSIX
     struct termios tty, tty_normal;
@@ -257,8 +259,19 @@ pushback(string)
     (void) ioctl(SHOUT, TCSETAW, (ioctl_t) &tty);
 # endif /* POSIX */
 
+# ifdef WIDE_STRINGS
+    for (p = string; *p != '\0'; p++) {
+	char buf[MB_LEN_MAX];
+	size_t i, len;
+
+	len = one_wctomb(buf, *p & CHAR);
+	for (i = 0; i < len; i++)
+	    (void) ioctl(SHOUT, TIOCSTI, (ioctl_t) &buf[i]);
+    }
+# else
     for (p = string; (c = *p) != '\0'; p++)
 	(void) ioctl(SHOUT, TIOCSTI, (ioctl_t) & c);
+# endif
 # ifdef POSIX
     (void) tcsetattr(SHOUT, TCSANOW, &tty_normal);
 # else
@@ -315,7 +328,7 @@ copyn(des, src, count)
     *des = '\0';
 }
 
-static  Char
+static int
 filetype(dir, file)
     Char   *dir, *file;
 {
@@ -354,9 +367,10 @@ static struct winsize win;
 static void
 print_by_column(dir, items, count)
     Char   *dir, *items[];
-    int     count;
+    size_t  count;
 {
-    int i, rows, r, c, maxwidth = 0, columns;
+    size_t i;
+    int rows, r, c, maxwidth = 0, columns;
 
     if (ioctl(SHOUT, TIOCGWINSZ, (ioctl_t) & win) < 0 || win.ws_col == 0)
 	win.ws_col = 80;
@@ -581,13 +595,13 @@ tsearch(word, command, max_word_length)
     COMMAND command;
 {
     DIR *dir_fd;
-    int numitems = 0, ignoring = TRUE, nignored = 0;
+    int ignoring = TRUE, nignored = 0;
     int name_length, looking_for_lognames;
     Char    tilded_dir[MAXPATHLEN + 1], dir[MAXPATHLEN + 1];
     Char    name[MAXNAMLEN + 1], extended_name[MAXNAMLEN + 1];
     Char   *item;
     Char **items = NULL;
-    size_t maxitems = 0;
+    size_t numitems = 0, maxitems = 0;
 
     looking_for_lognames = (*word == '~') && (Strchr(word, '/') == NULL);
     if (looking_for_lognames) {
@@ -669,7 +683,7 @@ again:				/* search for matches */
 	return (numitems);
     }
     else {			/* LIST */
-	qsort((ptr_t) items, (size_t) numitems, sizeof(items[0]), 
+	qsort((ptr_t) items, numitems, sizeof(items[0]), 
 	    (int (*) __P((const void *, const void *))) compare);
 	print_by_column(looking_for_lognames ? NULL : tilded_dir,
 			items, numitems);
@@ -684,13 +698,26 @@ static int
 compare(p, q)
     const ptr_t  p, q;
 {
-#if defined(NLS) && !defined(NOSTRCOLL)
-    errno = 0;  /* strcoll sets errno, another brain-damage */
- 
-    return (strcoll(*(char **) p, *(char **) q));
+#ifdef WIDE_STRINGS
+    errno = 0;
+
+    return (wcscoll(*(Char **) p, *(Char **) q));
 #else
-    return (strcmp(*(char **) p, *(char **) q));
-#endif /* NLS && !NOSTRCOLL */
+    char *p1, *q1;
+    int res;
+
+    p1 = strsave(short2str(*(Char **) p));
+    q1 = strsave(short2str(*(Char **) q));
+# if defined(NLS) && !defined(NOSTRCOLL)
+    errno = 0;  /* strcoll sets errno, another brain-damage */
+    res = strcoll(p1, q1);
+# else
+    res = strcmp(p1, q1);
+# endif /* NLS && !NOSTRCOLL */
+    xfree (p1);
+    xfree (q1);
+    return res;
+#endif /* not WIDE_STRINGS */
 }
 
 /*
@@ -704,7 +731,8 @@ compare(p, q)
 static int
 recognize(extended_name, item, name_length, numitems)
     Char   *extended_name, *item;
-    int     name_length, numitems;
+    int     name_length;
+    size_t  numitems;
 {
     if (numitems == 1)		/* 1st match */
 	copyn(extended_name, item, MAXNAMLEN);
@@ -763,21 +791,21 @@ tenex(inputline, inputline_size)
     int     inputline_size;
 {
     int numitems, num_read;
-    char    tinputline[BUFSIZE];
+    char    tinputline[BUFSIZE + 1];
 
 
     setup_tty(ON);
 
     while ((num_read = read(SHIN, tinputline, BUFSIZE)) > 0) {
-	int     i;
 	static Char delims[] = {' ', '\'', '"', '\t', ';', '&', '<',
 	'>', '(', ')', '|', '^', '%', '\0'};
 	Char *str_end, *word_start, last_Char, should_retype;
 	int space_left;
 	COMMAND command;
 
-	for (i = 0; i < num_read; i++)
-	    inputline[i] = (unsigned char) tinputline[i];
+	tinputline[num_read] = 0;
+	Strcpy(inputline, str2short(tinputline));
+	num_read = Strlen(inputline);
 	last_Char = inputline[num_read - 1] & ASCII;
 
 	if (last_Char == '\n' || num_read == inputline_size)
