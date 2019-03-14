@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/tc.const.c,v 3.103 2014/10/28 16:51:30 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/tc.const.c,v 3.106 2015/08/13 09:04:07 christos Exp $ */
 /*
  * sh.const.c: String constants for tcsh.
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: tc.const.c,v 3.103 2014/10/28 16:51:30 christos Exp $")
+RCSID("$tcsh: tc.const.c,v 3.106 2015/08/13 09:04:07 christos Exp $")
 
 Char STRlogout[]	= { 'l', 'o', 'g', 'o', 'u', 't', '\0' };
 Char STRautologout[]	= { 'a', 'u', 't', 'o', 'l', 'o', 'g', 'o', 'u', 't', 
@@ -86,6 +86,7 @@ Char STRMACHTYPE[]	= { 'M', 'A', 'C', 'H', 'T', 'Y', 'P', 'E', '\0' };
 Char STROSTYPE[]	= { 'O', 'S', 'T', 'Y', 'P', 'E', '\0' };
 Char STRedit[]		= { 'e', 'd', 'i', 't', '\0' };
 Char STReditors[]	= { 'e', 'd', 'i', 't', 'o', 'r', 's', '\0' };
+Char STRvimode[]	= { 'v', 'i', 'm', 'o', 'd', 'e', '\0' };
 Char STRaddsuffix[]	= { 'a', 'd', 'd', 's', 'u', 'f', 'f', 'i', 'x',
 			    '\0' };
 Char STRcsubstnonl[]	= { 'c', 's', 'u', 'b', 's', 't', 'n', 'o', 'n', 'l',
@@ -371,6 +372,8 @@ Char STRsldotcshrc[]	= { '/', '.', 'c', 's', 'h', 'r', 'c', '\0' };
 Char STRsldotlogin[]	= { '/', '.', 'l', 'o', 'g', 'i', 'n', '\0' };
 Char STRignoreeof[]	= { 'i', 'g', 'n', 'o', 'r', 'e', 'e', 'o', 'f', '\0' };
 Char STRnoclobber[]	= { 'n', 'o', 'c', 'l', 'o', 'b', 'b', 'e', 'r', '\0' };
+Char STRnotempty[]	= { 'n', 'o', 't', 'e', 'm', 'p', 't', 'y', '\0' };
+Char STRask[]		= { 'a', 's', 'k', '\0' };
 Char STRhelpcommand[]	= { 'h', 'e', 'l', 'p', 'c', 'o', 'm', 'm', 'a', 'n', 
 			    'd', '\0' };
 Char STRfignore[]	= { 'f', 'i', 'g', 'n', 'o', 'r', 'e', '\0' };
@@ -453,7 +456,7 @@ Char STRLC_MONETARY[]	= { 'L', 'C', '_', 'M', 'O', 'N', 'E', 'T', 'A',
 			    'R', 'Y', '\0' };
 Char STRNOREBIND[] 	= { 'N', 'O', 'R', 'E', 'B', 'I', 'N', 'D', '\0' };
 
-#if defined(SIG_WINDOW) || defined(SIGWINCH) || defined(SIGWINDOW) || defined (_VMS_POSIX)	 
+#if defined(SIG_WINDOW) || defined(SIGWINCH) || defined(SIGWINDOW) || defined (_VMS_POSIX) || defined(_SIGWINCH)
 /* atp - problem with declaration of str{lines,columns} in sh.func.c (1277) */
 Char STRLINES[]		= { 'L', 'I', 'N', 'E', 'S', '\0'};
 Char STRCOLUMNS[]	= { 'C', 'O', 'L', 'U', 'M', 'N', 'S', '\0'};

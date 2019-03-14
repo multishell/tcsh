@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/tc.func.c,v 3.152 2014/07/18 19:30:14 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/tc.func.c,v 3.157 2015/09/08 15:49:53 christos Exp $ */
 /*
  * tc.func.c: New tcsh builtins.
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: tc.func.c,v 3.152 2014/07/18 19:30:14 christos Exp $")
+RCSID("$tcsh: tc.func.c,v 3.157 2015/09/08 15:49:53 christos Exp $")
 
 #include "ed.h"
 #include "ed.defns.h"		/* for the function names */
@@ -120,11 +120,17 @@ expand_lex(const struct wordent *sp0, int from, int to)
 		if ((*s & QUOTE)
 		    && (((*s & TRIM) == HIST && HIST != '\0') ||
 			(((*s & TRIM) == '\'') && (prev_c != '\\')) ||
-			(((*s & TRIM) == '\"') && (prev_c != '\\')) ||
-			(((*s & TRIM) == '\\') && (prev_c != '\\')))) {
+			(((*s & TRIM) == '\"') && (prev_c != '\\')))) {
 		    Strbuf_append1(&buf, '\\');
 		}
+#if INVALID_BYTE != 0
+		if ((*s & INVALID_BYTE) != INVALID_BYTE) /* *s < INVALID_BYTE */
+		    Strbuf_append1(&buf, *s & TRIM);
+		else
+		    Strbuf_append1(&buf, *s);
+#else
 		Strbuf_append1(&buf, *s & TRIM);
+#endif
 		prev_c = *s;
 	    }
 	    Strbuf_append1(&buf, ' ');
@@ -506,31 +512,12 @@ struct process *
 find_stop_ed(void)
 {
     struct process *pp, *retp;
-    const char *ep, *vp;
+    const char *ep = NULL, *vp = NULL;
     char *cp, *p;
-    size_t epl, vpl;
+    size_t epl = 0, vpl = 0;
     int pstatus;
     struct varent *varp;
     Char **vv;
-
-    if ((ep = getenv("EDITOR")) != NULL) {	/* if we have a value */
-	if ((p = strrchr(ep, '/')) != NULL) 	/* if it has a path */
-	    ep = p + 1;		/* then we want only the last part */
-    }
-    else 
-	ep = "ed";
-
-    if ((vp = getenv("VISUAL")) != NULL) {	/* if we have a value */
-	if ((p = strrchr(vp, '/')) != NULL) 	/* and it has a path */
-	    vp = p + 1;		/* then we want only the last part */
-    }
-    else 
-	vp = "vi";
-
-    for (vpl = 0; vp[vpl] && !isspace((unsigned char)vp[vpl]); vpl++)
-	continue;
-    for (epl = 0; ep[epl] && !isspace((unsigned char)ep[epl]); epl++)
-	continue;
 
     if (pcurrent == NULL)	/* see if we have any jobs */
 	return NULL;		/* nope */
@@ -539,6 +526,27 @@ find_stop_ed(void)
 	vv = varp->vec;
     else
 	vv = NULL;
+
+    if (! vv) {
+	if ((ep = getenv("EDITOR")) != NULL) {	/* if we have a value */
+	    if ((p = strrchr(ep, '/')) != NULL) 	/* if it has a path */
+		ep = p + 1;		/* then we want only the last part */
+	}
+	else
+	    ep = "ed";
+
+	if ((vp = getenv("VISUAL")) != NULL) {	/* if we have a value */
+	    if ((p = strrchr(vp, '/')) != NULL) 	/* and it has a path */
+		vp = p + 1;		/* then we want only the last part */
+	}
+	else
+	    vp = "vi";
+
+	for (vpl = 0; vp[vpl] && !isspace((unsigned char)vp[vpl]); vpl++)
+	    continue;
+	for (epl = 0; ep[epl] && !isspace((unsigned char)ep[epl]); epl++)
+	    continue;
+    }
 
     retp = NULL;
     for (pp = proclist.p_next; pp; pp = pp->p_next)
@@ -565,10 +573,13 @@ find_stop_ed(void)
 	    else
 		cp = p;			/* else we get all of it */
 
-	    /* if we find either in the current name, fg it */
-	    if (strncmp(ep, cp, epl) == 0 ||
-		strncmp(vp, cp, vpl) == 0 || findvv(vv, cp)) {
-
+	    /*
+	     * If we find the current name in the $editors array (if set)
+	     * or as $EDITOR or $VISUAL (if $editors not set), fg it.
+	     */
+	    if ((vv && findvv(vv, cp)) ||
+	        (epl && strncmp(ep, cp, epl) == 0 && cp[epl] == '\0') ||
+		(vpl && strncmp(vp, cp, vpl) == 0 && cp[vpl] == '\0')) {
 		/*
 		 * If there is a choice, then choose the current process if
 		 * available, or the previous process otherwise, or else
@@ -1133,7 +1144,6 @@ rmstar(struct wordent *cp)
     Char   *tag;
 #endif /* RMDEBUG */
     Char   *charac;
-    char    c;
     int     ask, doit, star = 0, silent = 0, opintr_disabled;
 
     if (!adrof(STRrmstar))
@@ -1166,17 +1176,8 @@ rmstar(struct wordent *cp)
 		    if (!Strcmp(args->word, STRstar))
 			star = 1;
 		if (ask && star) {
-		    xprintf("%s", CGETS(22, 8,
-			    "Do you really want to delete all files? [n/y] "));
-		    flush();
-		    (void) force_read(SHIN, &c, 1);
-		    /* 
-		     * Perhaps we should use the yesexpr from the
-		     * actual locale
-		     */
-		    doit = (strchr(CGETS(22, 14, "Yy"), c) != NULL);
-		    while (c != '\n' && force_read(SHIN, &c, 1) == 1)
-			continue;
+		    doit = getYN(CGETS(22, 8,
+			"Do you really want to delete all files? [N/y] "));
 		    if (!doit) {
 			/* remove the command instead */
 #ifdef RMDEBUG

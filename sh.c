@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.184 2015/05/08 22:36:07 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.c,v 3.188 2016/04/16 19:56:46 christos Exp $ */
 /*
  * sh.c: Main shell routines
  */
@@ -39,7 +39,7 @@ char    copyright[] =
  All rights reserved.\n";
 #endif /* not lint */
 
-RCSID("$tcsh: sh.c,v 3.184 2015/05/08 22:36:07 christos Exp $")
+RCSID("$tcsh: sh.c,v 3.188 2016/04/16 19:56:46 christos Exp $")
 
 #include "tc.h"
 #include "ed.h"
@@ -274,6 +274,7 @@ main(int argc, char **argv)
 #endif
 
     nlsinit();
+    initlex(&paraml);
 
 #ifdef MALLOC_TRACE
     mal_setstatsfile(fdopen(dmove(xopen("/tmp/tcsh.trace", 
@@ -345,6 +346,7 @@ main(int argc, char **argv)
 # endif
 #endif
     STR_WORD_CHARS = SAVE(WORD_CHARS);
+    STR_WORD_CHARS_VI = SAVE(WORD_CHARS_VI);
 
     HIST = '!';
     HISTSUB = '^';
@@ -595,19 +597,22 @@ main(int argc, char **argv)
      */
     shlvl(1);
 
+#ifdef __ANDROID__
+    /* On Android, $HOME either isn't set or set to /data, a R/O location.
+       Check for the environment variable EXTERNAL_STORAGE, which contains
+       the mount point of the external storage (SD card, mostly).  If
+       EXTERNAL_STORAGE isn't set fall back to "/sdcard".  Eventually
+       override $HOME so the environment is on the same page. */
+    if (((tcp = getenv("HOME")) != NULL && strcmp (tcp, "/data") != 0)
+	|| (tcp = getenv("EXTERNAL_STORAGE")) != NULL) {
+	cp = quote(SAVE(tcp));
+    } else
+	cp = quote(SAVE("/sdcard"));
+    tsetenv(STRKHOME, cp);
+#else
     if ((tcp = getenv("HOME")) != NULL)
 	cp = quote(SAVE(tcp));
     else
-#ifdef __ANDROID__
-	/* On Android, $HOME usually isn't set, so we can't load user RC files.
-	   Check for the environment variable EXTERNAL_STORAGE, which contains
-	   the mount point of the external storage (SD card, mostly).  If
-	   EXTERNAL_STORAGE isn't set fall back to "/sdcard". */
-    if ((tcp = getenv("EXTERNAL_STORAGE")) != NULL)
-	cp = quote(SAVE(tcp));
-    else
-	cp = quote(SAVE("/sdcard"));
-#else
 	cp = NULL;
 #endif
 
@@ -808,7 +813,8 @@ main(int argc, char **argv)
 	parseLSCOLORS(str2short(tcp));
 #endif /* COLOR_LS_F */
 
-    doldol = putn((tcsh_number_t)getpid());	/* For $$ */
+    mainpid = getpid();
+    doldol = putn((tcsh_number_t)mainpid);	/* For $$ */
 #ifdef WINNT_NATIVE
     {
 	char *tmp;
@@ -2048,6 +2054,7 @@ process(int catch)
 	 */
 	if (setintr)
 	    pintr_push_enable(&old_pintr_disabled);
+	freelex(&paraml);
 	hadhist = lex(&paraml);
 	if (setintr)
 	    cleanup_until(&old_pintr_disabled);

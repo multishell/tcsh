@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.func.c,v 3.172 2015/05/04 15:28:12 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.func.c,v 3.175 2015/09/08 15:49:53 christos Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.func.c,v 3.172 2015/05/04 15:28:12 christos Exp $")
+RCSID("$tcsh: sh.func.c,v 3.175 2015/09/08 15:49:53 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -1045,6 +1045,17 @@ getword(struct Strbuf *wp)
 		goto past;
 	    if (wp)
 		Strbuf_append1(wp, (Char) c);
+	    if (!d && c == ')') {
+		if (!first && wp) {
+		    goto past_word_end;
+		} else {
+		    if (wp) {
+			wp->len = 1;
+			Strbuf_terminate(wp);
+		    }
+		    return found;
+		}
+	    }
 	    if (!first && !d && c == '(') {
 		if (wp)
 		    goto past_word_end;
@@ -2437,12 +2448,20 @@ doeval_cleanup(void *xstate)
     didcch = state->didcch;
 #endif /* CLOSE_ON_EXEC */
     didfds = state->didfds;
-    xclose(SHIN);
-    xclose(SHOUT);
-    xclose(SHDIAG);
+    if (state->saveIN != SHIN)
+	xclose(SHIN);
+    if (state->saveOUT != SHOUT)
+	xclose(SHOUT);
+    if (state->saveDIAG != SHDIAG)
+	xclose(SHDIAG);
     close_on_exec(SHIN = dmove(state->saveIN, state->SHIN), 1);
     close_on_exec(SHOUT = dmove(state->saveOUT, state->SHOUT), 1);
     close_on_exec(SHDIAG = dmove(state->saveDIAG, state->SHDIAG), 1);
+    if (didfds) {
+	close_on_exec(dcopy(SHIN, 0), 1);
+	close_on_exec(dcopy(SHOUT, 1), 1);
+	close_on_exec(dcopy(SHDIAG, 2), 1);
+    }
 }
 
 static Char **Ggv;
@@ -2710,4 +2729,21 @@ nlsclose(void)
 	    handle_pending_signals();
     }
 #endif /* NLS_CATALOGS */
+}
+
+int
+getYN(const char *prompt)
+{
+    int doit, c;
+    xprintf("%s", prompt);
+    flush();
+    (void) force_read(SHIN, &c, 1);
+    /* 
+     * Perhaps we should use the yesexpr from the
+     * actual locale
+     */
+    doit = (strchr(CGETS(22, 14, "Yy"), c) != NULL);
+    while (c != '\n' && force_read(SHIN, &c, 1) == 1)
+	continue;
+    return doit;
 }

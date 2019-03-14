@@ -1,4 +1,25 @@
- 41  V6.19.00 - 20150521
+ 18: V6.19.01 - 20161025
+ 17: restore file description when cleaning up after eval:
+	repeat 99 time
+ 16. PR/572: Fix $SHLVL issue when exec'ing subshells.
+ 15. PR/403: Fix backquote expansion for multi-byte character sets.
+ 14. Fix drawing issu with multi-line prompt (Kensuke Iwahashi/David Kaspar)
+ 13. always send prusage to stdout.
+ 12. PR/526: Fix double \\ printing from previous fix in history expansion.
+ 11. Android updates from Corinna Vinschen
+ 10. PR/526: Quote backslashes properly so they can be preserved in ``
+     expansions
+  9. Fix memory leak for paraml
+  8. Add notempty and ask values for the noclobber setting (Martin Tournoij)
+  7. more correct $wordchars for vimode (Luke Mewburn)
+  6. expose VImode in $vimode (Luke Mewburn)
+  5. display what the compiled in editor is in bindkey -d (Luke Mewburn)
+  4. run-fg-editor improvements and documentation (Luke Mewburn)
+  3. Fix parsing of 'if (cond)then' (Fridolin Pokorny)
+  2. PR/437: Fix handling of invalid unicode characters.
+  1. PR/451: Fix error messages containing %c to be always '%c'
+
+ 41. V6.19.00 - 20150521
  40. V6.18.05 - 20150510
  39. fix reseting when interrupted inside an eval "eval sleep 10^C"
      (paulo.cesar.pereira.de.andrade)

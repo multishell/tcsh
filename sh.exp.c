@@ -1,4 +1,4 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.exp.c,v 3.60 2012/05/11 17:16:11 christos Exp $ */
+/* $Header: /p/tcsh/cvsroot/tcsh/sh.exp.c,v 3.62 2015/12/09 15:06:19 christos Exp $ */
 /*
  * sh.exp.c: Expression evaluations
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$tcsh: sh.exp.c,v 3.60 2012/05/11 17:16:11 christos Exp $")
+RCSID("$tcsh: sh.exp.c,v 3.62 2015/12/09 15:06:19 christos Exp $")
 
 #include "tw.h"
 
@@ -955,8 +955,7 @@ evalav(Char **v)
     struct wordent *wdp = hp;
 
     setcopy(STRstatus, STR0, VAR_READWRITE);
-    hp->prev = hp->next = hp;
-    hp->word = STRNULL;
+    initlex(hp);
     while (*v) {
 	struct wordent *new = xcalloc(1, sizeof *wdp);
 
