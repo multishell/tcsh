@@ -531,7 +531,7 @@ typedef struct timeval timeval_t;
 #endif /* NeXT */
 
 #ifndef NEEDgethostname
-extern int gethostname __P((char *, int));
+//extern int gethostname __P((char *, int));
 #endif /* NEEDgethostname */
 
 #if !defined(POSIX) || defined(SUNOS4) || defined(UTekV) || defined(sysV88)
