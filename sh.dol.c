@@ -1036,7 +1036,7 @@ heredoc(term)
 #ifndef O_TEMPORARY
 # define O_TEMPORARY 0
 #endif
-    if (open(tmp, O_RDWR|O_CREAT|O_TEMPORARY) < 0) {
+    if (open(tmp, O_RDWR|O_CREAT|O_TEMPORARY, 0600) < 0) {
 	int     oerrno = errno;
 
 	(void) unlink(tmp);
