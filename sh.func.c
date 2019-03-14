@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.func.c,v 3.102 2002/07/08 20:43:55 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.func.c,v 3.107 2003/12/02 18:00:08 christos Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.func.c,v 3.102 2002/07/08 20:43:55 christos Exp $")
+RCSID("$Id: sh.func.c,v 3.107 2003/12/02 18:00:08 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -63,6 +63,7 @@ static	int	getword		__P((Char *));
 static	void	toend		__P((void));
 static	void	xecho		__P((int, Char **));
 static	bool	islocale_var	__P((Char *));
+static	void	wpfree		__P((struct whyle *));
 
 struct biltins *
 isbfunc(t)
@@ -346,11 +347,13 @@ dologin(v, c)
 #ifdef WINNT_NATIVE
     USE(v);
 #else /* !WINNT_NATIVE */
+    char **p = short2blk(v);
     islogin();
     rechist(NULL, adrof(STRsavehist) != NULL);
     (void) signal(SIGTERM, parterm);
-    (void) execl(_PATH_BIN_LOGIN, "login", short2str(v[1]), NULL);
-    (void) execl(_PATH_USRBIN_LOGIN, "login", short2str(v[1]), NULL);
+    (void) execv(_PATH_BIN_LOGIN, p);
+    (void) execv(_PATH_USRBIN_LOGIN, p);
+    blkfree((Char **) p);
     untty();
     xexit(1);
 #endif /* !WINNT_NATIVE */
@@ -829,6 +832,7 @@ search(type, level, goal)
     Char    wordbuf[BUFSIZE];
     register Char *aword = wordbuf;
     register Char *cp;
+    struct whyle *wp;
 
     Stype = (Char) type;
     Sgoal = goal;
@@ -871,6 +875,13 @@ search(type, level, goal)
 	    break;
 
 	case TC_END:
+	    if (type == TC_BRKSW) {
+		wp = whyles;
+		if (wp) {
+			whyles = wp->w_next;
+			wpfree(wp);
+		}
+	    }
 	    if (type == TC_BREAK)
 		level--;
 	    break;
@@ -1029,6 +1040,17 @@ toend()
     wfree();
 }
 
+static void
+wpfree(wp)
+    struct whyle *wp;
+{
+	if (wp->w_fe0)
+	    blkfree(wp->w_fe0);
+	if (wp->w_fename)
+	    xfree((ptr_t) wp->w_fename);
+	xfree((ptr_t) wp);
+}
+
 void
 wfree()
 {
@@ -1078,11 +1100,7 @@ wfree()
 	    }
 	}
 
-	if (wp->w_fe0)
-	    blkfree(wp->w_fe0);
-	if (wp->w_fename)
-	    xfree((ptr_t) wp->w_fename);
-	xfree((ptr_t) wp);
+	wpfree(wp);
     }
 }
 
@@ -1245,8 +1263,8 @@ islocale_var(var)
     Char *var;
 {
     static Char *locale_vars[] = {
-	STRLANG,	STRLC_CTYPE,	STRLC_NUMERIC,	STRLC_TIME,
-	STRLC_COLLATE,	STRLC_MESSAGES,	STRLC_MONETARY, 0
+	STRLANG,	STRLC_ALL, 	STRLC_CTYPE,	STRLC_NUMERIC,
+	STRLC_TIME,	STRLC_COLLATE,	STRLC_MESSAGES,	STRLC_MONETARY, 0
     };
     register Char **v;
 
@@ -1312,15 +1330,11 @@ dosetenv(v, c)
     vp = *v++;
 
     lp = vp;
-    if (!letter(*lp))
-        stderror(ERR_NAME | ERR_VARBEGIN);
-
-    for (; alnum(*lp); lp++)
-        continue;
-
-    if (*lp != '\0')
-	stderror(ERR_NAME | ERR_SYNTAX);
  
+    for (; *lp != '\0' ; lp++) {
+	if (*lp == '=')
+	    stderror(ERR_NAME | ERR_SYNTAX);
+    }
     if ((lp = *v++) == 0)
 	lp = STRNULL;
 
@@ -1732,7 +1746,7 @@ doumask(v, c)
 #   define toset(a) ((a) + 1)
 #  endif /* aiws */
 # else /* BSDLIMIT */
-#  if (defined(BSD4_4) || defined(__linux__)) && !defined(__386BSD__)
+#  if (defined(BSD4_4) || defined(__linux__) || (HPUXVERSION >= 1100)) && !defined(__386BSD__)
     typedef rlim_t RLIM_TYPE;
 #  else
 #   if defined(SOLARIS2) || (defined(sgi) && SYSVREL > 3)
@@ -1747,7 +1761,7 @@ doumask(v, c)
 #  endif /* BSD4_4 && !__386BSD__  */
 # endif /* BSDLIMIT */
 
-# if (HPUXVERSION > 700) && defined(BSDLIMIT)
+# if (HPUXVERSION > 700) && (HPUXVERSION < 1100) && defined(BSDLIMIT)
 /* Yes hpux8.0 has limits but <sys/resource.h> does not make them public */
 /* Yes, we could have defined _KERNEL, and -I/etc/conf/h, but is that better? */
 #  ifndef RLIMIT_CPU
@@ -1768,7 +1782,7 @@ doumask(v, c)
 #  ifndef SIGRTMIN
 #   define FILESIZE512
 #  endif /* SIGRTMIN */
-# endif /* (HPUXVERSION > 700) && BSDLIMIT */
+# endif /* (HPUXVERSION > 700) && (HPUXVERSION < 1100) && BSDLIMIT */
 
 # if SYSVREL > 3 && defined(BSDLIMIT) && !defined(_SX)
 /* In order to use rusage, we included "/usr/ucbinclude/sys/resource.h" in */
@@ -2224,6 +2238,8 @@ dosuspend(v, c)
     if (tpgrp != -1) {
 retry:
 	ctpgrp = tcgetpgrp(FSHTTY);
+	if (ctpgrp == -1)
+	    stderror(ERR_SYSTEM, "tcgetpgrp", strerror(errno));
 	if (ctpgrp != opgrp) {
 	    old = signal(SIGTTIN, SIG_DFL);
 	    (void) kill(0, SIGTTIN);

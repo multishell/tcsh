@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.proc.c,v 3.76 2002/03/08 17:36:46 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.proc.c,v 3.80 2003/06/03 13:11:43 christos Exp $ */
 /*
  * sh.proc.c: Job manipulations
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.proc.c,v 3.76 2002/03/08 17:36:46 christos Exp $")
+RCSID("$Id: sh.proc.c,v 3.80 2003/06/03 13:11:43 christos Exp $")
 
 #include "ed.h"
 #include "tc.h"
@@ -603,7 +603,7 @@ pjwait(pp)
 	if ((jobflags & PRUNNING) == 0)
 	    break;
 #ifdef JOBDEBUG
-	xprintf("%d starting to sigpause for  SIGCHLD on %d\n",
+	xprintf("%d starting to sigpause for SIGCHLD on %d\n",
 		getpid(), fp->p_procid);
 #endif /* JOBDEBUG */
 #ifdef BSDSIGS
@@ -1536,7 +1536,6 @@ dokill(v, c)
     register int signum, len = 0;
     register char *name;
     Char *sigptr;
-    char *ep;
     extern int T_Cols;
     extern int nsig;
 
@@ -1567,8 +1566,9 @@ dokill(v, c)
  	    }
  	}
  	if (Isdigit(*sigptr)) {
- 	    signum = strtol(short2str(sigptr), &ep, 10);
-	    if (signum < 0 || signum > (MAXSIG-1) || *ep)
+	    char *ep;
+ 	    signum = strtoul(short2str(sigptr), &ep, 0);
+	    if (*ep || signum < 0 || signum > (MAXSIG-1))
 		stderror(ERR_NAME | ERR_BADSIG);
 	}
 	else {
@@ -1599,7 +1599,6 @@ pkill(v, signum)
     sigmask_t omask;
 #endif /* BSDSIGS */
     Char   *cp, **vp;
-    char   *ep;
 
 #ifdef BSDSIGS
     omask = sigmask(SIGCHLD);
@@ -1679,16 +1678,14 @@ pkill(v, signum)
 	else if (!(Isdigit(*cp) || *cp == '-'))
 	    stderror(ERR_NAME | ERR_JOBARGS);
 	else {
+	    char *ep;
 #ifndef WINNT_NATIVE
 	    pid = strtol(short2str(cp), &ep, 10);
 #else
-		pid = strtoul(short2str(cp),&ep,0);
+	    pid = strtoul(short2str(cp), &ep, 0);
 #endif /* WINNT_NATIVE */
-	    if (*ep) {
-		xprintf(CGETS(17, 14, "%S: Badly formed number\n"), cp);
-		err1++;
-		goto cont;
-	    }
+	    if (*ep)
+		stderror(ERR_NAME | ERR_JOBARGS);
 	    else if (kill(pid, signum) < 0) {
 		xprintf("%d: %s\n", pid, strerror(errno));
 		err1++;

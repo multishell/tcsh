@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/sh.init.c,v 3.48 1999/02/11 16:18:36 christos Exp $ */
+/* $Header: /src/pub/tcsh/sh.init.c,v 3.50 2003/05/26 07:11:07 christos Exp $ */
 /*
  * sh.init.c: Function and signal tables
  */
@@ -32,7 +32,7 @@
  */
 #include "sh.h"
 
-RCSID("$Id: sh.init.c,v 3.48 1999/02/11 16:18:36 christos Exp $")
+RCSID("$Id: sh.init.c,v 3.50 2003/05/26 07:11:07 christos Exp $")
 
 #include "ed.h"
 #include "tw.h"
@@ -61,6 +61,9 @@ struct	biltins bfunc[] = {
     { "bindkey",	dobindkey,	0,	8	},
     { "break",		dobreak,	0,	0	},
     { "breaksw",	doswbrk,	0,	0	},
+#ifdef _OSD_POSIX
+    { "bs2cmd",		dobs2cmd,	1,	INF	},
+#endif /* OBSOLETE */
     { "builtins",	dobuiltins,	0,	0	},
 #ifdef KAI
     { "bye",		goodbye,	0,	0	},
@@ -118,7 +121,7 @@ struct	biltins bfunc[] = {
     { "migrate",	domigrate,	1,	INF	},
 #endif /* TCF */
 #ifdef NEWGRP
-    { "newgrp",		donewgrp,	1,	2	},
+    { "newgrp",		donewgrp,	0,	2	},
 #endif /* NEWGRP */
     { "nice",		donice,		0,	INF	},
     { "nohup",		donohup,	0,	INF	},

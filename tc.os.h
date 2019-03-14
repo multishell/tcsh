@@ -1,4 +1,4 @@
-/* $Header: /src/pub/tcsh/tc.os.h,v 3.87 2002/03/08 17:36:47 christos Exp $ */
+/* $Header: /src/pub/tcsh/tc.os.h,v 3.89 2003/03/12 19:14:51 christos Exp $ */
 /*
  * tc.os.h: Shell os dependent defines
  */
@@ -33,9 +33,11 @@
 #ifndef _h_tc_os
 #define _h_tc_os
 
+#ifndef __STDC__
 #ifndef WINNT_NATIVE
 #define NEEDstrerror		/* Too hard to find which systems have it */
 #endif /* WINNT_NATIVE */
+#endif
 
 
 #ifdef notdef 
@@ -48,6 +50,8 @@
 #endif /* notdef */
 
 #ifdef __CYGWIN__
+#  undef NOFILE
+#  define NOFILE sysconf(_SC_OPEN_MAX)
 #  undef NEEDstrerror
 #endif
 
