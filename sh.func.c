@@ -1,4 +1,3 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.func.c,v 3.175 2015/09/08 15:49:53 christos Exp $ */
 /*
  * sh.func.c: csh builtin functions
  */
@@ -31,9 +30,6 @@
  * SUCH DAMAGE.
  */
 #include "sh.h"
-
-RCSID("$tcsh: sh.func.c,v 3.175 2015/09/08 15:49:53 christos Exp $")
-
 #include "ed.h"
 #include "tw.h"
 #include "tc.h"
@@ -203,7 +199,7 @@ dohup(Char **v, struct command *c)
     if (intty)
 	stderror(ERR_NAME | ERR_TERMINAL);
     if (setintr == 0)
-	(void) signal(SIGHUP, SIG_DFL);
+    	sigset_interrupting(SIGHUP, SIG_DFL);
 }
 
 
@@ -230,7 +226,7 @@ dofiletest(Char **v, struct command *c)
     globbed = v;
     cleanup_push(globbed, blk_cleanup);
 
-    while (*(fileptr = v++) != '\0') {
+    while (*(fileptr = v++) != NULL) {
 	res = filetest(ftest, &fileptr, 0);
 	cleanup_push(res, xfree);
 	xprintf("%S", res);
@@ -2734,16 +2730,18 @@ nlsclose(void)
 int
 getYN(const char *prompt)
 {
-    int doit, c;
+    int doit;
+    char c;
+
     xprintf("%s", prompt);
     flush();
-    (void) force_read(SHIN, &c, 1);
+    (void) force_read(SHIN, &c, sizeof(c));
     /* 
      * Perhaps we should use the yesexpr from the
      * actual locale
      */
     doit = (strchr(CGETS(22, 14, "Yy"), c) != NULL);
-    while (c != '\n' && force_read(SHIN, &c, 1) == 1)
+    while (c != '\n' && force_read(SHIN, &c, sizeof(c)) == sizeof(c))
 	continue;
     return doit;
 }

@@ -1,4 +1,3 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/ed.chared.c,v 3.102 2015/08/13 09:06:33 christos Exp $ */
 /*
  * ed.chared.c: Character editing functions.
  */
@@ -71,9 +70,6 @@
  */
 
 #include "sh.h"
-
-RCSID("$tcsh: ed.chared.c,v 3.102 2015/08/13 09:06:33 christos Exp $")
-
 #include "ed.h"
 #include "tw.h"
 #include "ed.defns.h"
@@ -750,7 +746,7 @@ c_substitute(void)
     /*
      * If we found a history character, go expand it.
      */
-    if (HIST != '\0' && *p == HIST)
+    if (p >= InputBuf && HIST != '\0' && *p == HIST)
 	nr_exp = c_excl(p);
     else
         nr_exp = 0;
@@ -1105,8 +1101,7 @@ e_inc_search(int dir)
 	if (GetNextChar(&ch) != 1)
 	    return(e_send_eof(0));
 
-	switch (ch > NT_NUM_KEYS
-		? F_INSERT : CurrentKeyMap[(unsigned char) ch]) {
+	switch (GetCmdChar(ch)) {
 	case F_INSERT:
 	case F_DIGIT:
 	case F_MAGIC_SPACE:

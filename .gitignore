@@ -1,7 +1,10 @@
+**/*.o
 **/Makefile
 !win32/msg/Makefile
 atconfig
+autom4te.cache
 config.h
+config.log
 config.status
 config_p.h
 ed.defns.h
@@ -11,5 +14,7 @@ sh.err.h
 tc.const.h
 tc.defs.c
 tcsh
+tcsh-*.tar.gz
 tests/package.m4
 tests/testsuite
+*.suo
